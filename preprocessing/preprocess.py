@@ -1,8 +1,6 @@
 """
 Preprocessing script to extract actions, rewards, ground truth from text files
 
-TODO: negative rewards
-TODO: preprocess images ?
 """
 from __future__ import print_function, division, absolute_import
 
@@ -26,6 +24,19 @@ text_files = {
 
 DELTA_POS = 0.05
 N_ACTIONS = 26
+# Bound for negative rewards
+BOUND_INF = [0.42, -0.1, -0.11]
+BOUND_SUP = [0.75, 0.60, 0.35]
+
+def isInBound(coordinate):
+    """
+    :param coordinate: [float]
+    :return: (bool)
+    """
+    for i, axis in enumerate(coordinate):
+        if not (BOUND_INF[i] < axis < BOUND_SUP[i]):
+            return False
+    return True
 
 
 def getActions(delta_pos, n_actions):
@@ -91,7 +102,7 @@ if __name__ == '__main__':
 
     # Retrieve frame indices where the button was pressed
     df = getDataFrame('{}/{}'.format(record_folder, text_files['is_pressed']))
-    positive_reward_indices = np.where(df['value'].values == 1)[0]
+    rewards = df['value'].values
 
     # Retrieve button position
     with open('{}/{}'.format(record_folder, text_files['button_position'])) as f:
@@ -110,20 +121,27 @@ if __name__ == '__main__':
 
     # Retrieve ground truth states:
     df = getDataFrame('{}/{}'.format(record_folder, text_files['arm_state']))
-    states = []
+    arm_states = []
     for i in range(n_frames):
-        states.append(map(float, (df.x[i], df.y[i], df.z[i])))
-    states = np.array(states)
+        arm_states.append(map(float, (df.x[i], df.y[i], df.z[i])))
+    arm_states = np.array(arm_states)
 
-    # TODO: negative rewards
+    # Add negative rewards
+    for i in range(n_frames):
+        if rewards[i] > 0:
+            continue
+        if not isInBound(arm_states[i]):
+            rewards[i] = -1
+
+    print('{} positive rewards, {} negative rewards'.format(sum(rewards > 0), sum(rewards < 0)))
 
     # Save Everything
     data = {
-        'positive_reward_indices': positive_reward_indices,
+        'rewards': rewards,
         'button_position': button_position,
         'actions': actions,
         'actions_deltas': action_to_idx.keys(),
-        'states': states
+        'arm_states': arm_states
     }
     print("Saving preprocessed data...")
     np.savez('{}/data.npz'.format(record_folder), **data)
