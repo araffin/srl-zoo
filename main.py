@@ -1,3 +1,10 @@
+"""
+This is a PyTorch implementation of the method for state representation learning described in the paper "Learning State
+Representations with Robotic Priors" (Jonschkowski & Brock, 2015).
+
+This program is based on th original implementation:
+https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
+"""
 from __future__ import print_function, division
 
 import matplotlib.pyplot as plt
@@ -6,35 +13,40 @@ import torch as th
 import torch.nn as nn
 from torch.autograd import Variable
 
-N_EPOCHS = 30
+# Python 2/3 compatibility
+try:
+    input = raw_input
+except NameError:
+    pass
 
+N_EPOCHS = 100
+BATCHSIZE = 256
 
-# import warnings
-# warnings.filterwarnings("ignore")  # to ignore the following warning:
-# # anaconda3/lib/python3.5/site-packages/matplotlib/backend_bases.py:2437: MatplotlibDeprecationWarning:
-# # Using default event loop until function specific to this GUI is implemented
-# # warnings.warn(str, mplDeprecation)
 
 class SRLNetwork(nn.Module):
-    def __init__(self, obs_dim, state_dim=2):
+    def __init__(self, obs_dim, state_dim=2, batchsize=256):
         super(SRLNetwork, self).__init__()
-        # TODO: add gaussian noise to avoid division by zero
-        self.fc1 = nn.Sequential(nn.Linear(obs_dim, state_dim))
+        self.l1 = nn.Linear(obs_dim, state_dim)
+        self.noise = GaussianNoise(batchsize, state_dim, 1e-6)
 
     def forward(self, x):
-        return self.fc1(x)
-
+        x = self.l1(x)
+        x = self.noise(x)
+        return x
 
 # WARNING: this implementation is SLOW!
 class GaussianNoise(nn.Module):
-    def __init__(self, std):
-        super(GaussianNoise).__init__()
+    def __init__(self, batchsize, dim, std):
+        super(GaussianNoise, self).__init__()
         self.std = std
+        # TODO: handle GPU variable
+        self.noise = Variable(th.zeros(batchsize, dim))
 
-    def forward(self, din):
+    def forward(self, x):
         if self.training:
-            return din + th.autograd.Variable(th.randn(din.size()).cuda() * self.std)
-        return din
+            self.noise.data.normal_(0, std=self.std)
+            return x + self.noise
+        return x
 
 
 class RoboticPriorsLoss(nn.Module):
@@ -71,22 +83,25 @@ class SRL4robotics:
 
         self.state_dim = state_dim
         self.obs_dim = obs_dim
-        self.batchsize = 256
+        self.batchsize = BATCHSIZE
 
-        # seed random number generator
-        self.rand = np.random.RandomState(seed)
+        np.random.seed(seed)
+        th.manual_seed(seed)
 
         # init values
         self.mean_obs = np.zeros(self.obs_dim)
         self.std_obs = 1
 
-        self.model = SRLNetwork(self.obs_dim, self.state_dim)
+        self.model = SRLNetwork(self.obs_dim, self.state_dim, self.batchsize)
         self.optimizer = th.optim.Adam(self.model.parameters(), lr=learning_rate)
 
-    def test(self, x):
+    def _predFn(self, observations, restore_train=True):
         # test mode
         self.model.eval()
-        return self.model(x)
+        states = self.model(observations)
+        if restore_train:
+            self.model.train()
+        return states.data.numpy()
 
     def learn(self, observations, actions, rewards, episode_starts):
 
@@ -98,6 +113,8 @@ class SRL4robotics:
         self.mean_obs = np.mean(observations, axis=0, keepdims=True)
         self.std_obs = np.std(observations, ddof=1)
         observations = (observations - self.mean_obs) / self.std_obs
+        # For testing
+        obs_var = Variable(th.from_numpy(observations), volatile=True)
 
         num_samples = observations.shape[0] - 1  # number of samples
 
@@ -127,19 +144,17 @@ class SRL4robotics:
         self.model.train()
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
-            epoch_loss = 0
-            epoch_batches = 0
+            epoch_loss, epoch_batches = 0, 0
             enumerated_minibatches = list(enumerate(minibatchlist))
             np.random.shuffle(enumerated_minibatches)
             for i, batch in enumerated_minibatches:
                 diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])]  # [:10*self.batchsize]
                 same = same_actions[i][np.random.permutation(same_actions[i].shape[0])]  # [:10*self.batchsize]
-                diss = th.from_numpy(diss)
-                same = th.from_numpy(same)
+                diss, same = th.from_numpy(diss), th.from_numpy(same)
                 obs = Variable(th.from_numpy(observations[batch]))
                 next_obs = Variable(th.from_numpy(observations[batch + 1]))
-                states = self.model(obs)
-                next_states = self.model(next_obs)
+
+                states, next_states = self.model(obs), self.model(next_obs)
                 self.optimizer.zero_grad()
                 loss = criterion(states, next_states, diss, same)
                 loss.backward()
@@ -152,26 +167,26 @@ class SRL4robotics:
                 print("Epoch {:3}/{}, loss:{:.4f}".format(epoch + 1, N_EPOCHS, epoch_loss / epoch_batches))
 
                 # Optionally plot the current state space
-                # plot_representation(self._pred_fn(observations), rewards, add_colorbar=epoch==0,
-                #                          name="Learned State Representation (Training Data)")
+                plot_representation(self._predFn(obs_var), rewards, add_colorbar=epoch==0,
+                                         name="Learned State Representation (Training Data)")
 
-        # plt.close("Learned State Representation (Training Data)")
+        plt.close("Learned State Representation (Training Data)")
 
         # return predicted states for training observations
-        self.model.eval()
-        obs = Variable(th.from_numpy(observations), volatile=True)
-        return self.model(obs).data.numpy()
+        return self._predFn(obs_var)
 
-    def phi(self, observations):
+    def predStates(self, observations):
         observations = (observations - self.mean_obs) / self.std_obs
-        states = self._pred_fn(observations)
+        observations = observations.astype(np.float32)
+        obs_var = Variable(th.from_numpy(observations), volatile=True)
+        states = self._predFn(obs_var, restore_train=False)
         return states
 
 
 def plot_representation(states, rewards, name="Learned State Representation", add_colorbar=True):
     plt.ion()
     plt.figure(name)
-    # plt.hold(False)
+    plt.clf()
     plt.scatter(states[:, 0], states[:, 1], s=7, c=np.clip(rewards, -1, 1), cmap='bwr', linewidths=0.1)
     plt.xlim([-2, 2])
     plt.xlabel('State dimension 1')
@@ -179,8 +194,7 @@ def plot_representation(states, rewards, name="Learned State Representation", ad
     plt.ylabel('State dimension 2')
     if add_colorbar:
         plt.colorbar(label='Reward')
-    # plt.pause(0.0001)
-    plt.show()
+    plt.pause(0.0001)
 
 
 def plot_observations(observations, name='Observation Samples'):
@@ -197,26 +211,26 @@ def plot_observations(observations, name='Observation Samples'):
 
 
 if __name__ == '__main__':
-    # print('\nSIMPLE NAVIGATION TASK\n')
-    #
-    # print('Loading and displaying training data ... ')
-    # training_data = np.load('simple_navigation_task_train.npz')
-    # # plot_observations(training_data['observations'], name="Observation Samples (Subset of Training Data) -- Simple Navigation Task")
-    # #
-    # print('Learning a state representation ... ')
-    # srl = SRL4robotics(16 * 16 * 3, 2, learning_rate=0.0001, l1_reg = 0.3)
-    # training_states = srl.learn(**training_data)
-    # plot_representation(training_states, training_data['rewards'],
-    #                         name='Observation-State-Mapping Applied to Training Data -- Simple Navigation Task',
-    #                         add_colorbar=True)
+    print('\nSIMPLE NAVIGATION TASK\n')
 
-    # print('Loading and displaying test data ... ')
-    # test_data = np.load('simple_navigation_task_test.npz')
-    # plot_observations(test_data['observations'], name="Observation Samples (Subset of Test Data) -- Simple Navigation Task")
-    #
-    # print('Testing the learned representation on this new data ... ')
-    # test_states = srl.phi(test_data['observations'])
-    # plot_representation(test_states, test_data['rewards'], name='Observation-State-Mapping Applied to Test Data -- Simple Navigation Task', add_colorbar=True)
+    print('Loading and displaying training data ... ')
+    training_data = np.load('simple_navigation_task_train.npz')
+    plot_observations(training_data['observations'], name="Observation Samples (Subset of Training Data) -- Simple Navigation Task")
+
+    print('Learning a state representation ... ')
+    srl = SRL4robotics(16 * 16 * 3, 2, learning_rate=0.0001, l1_reg = 0.3)
+    training_states = srl.learn(**training_data)
+    plot_representation(training_states, training_data['rewards'],
+                            name='Observation-State-Mapping Applied to Training Data -- Simple Navigation Task',
+                            add_colorbar=True)
+
+    print('Loading and displaying test data ... ')
+    test_data = np.load('simple_navigation_task_test.npz')
+    plot_observations(test_data['observations'], name="Observation Samples (Subset of Test Data) -- Simple Navigation Task")
+
+    print('Testing the learned representation on this new data ... ')
+    test_states = srl.predStates(test_data['observations'])
+    plot_representation(test_states, test_data['rewards'], name='Observation-State-Mapping Applied to Test Data -- Simple Navigation Task', add_colorbar=True)
 
     ####################################################################################################################
 
@@ -234,13 +248,13 @@ if __name__ == '__main__':
                         name='Observation-State-Mapping Applied to Training Data -- Slot Car Task',
                         add_colorbar=True)
 
-    # print('Loading and displaying test data ... ')
-    # test_data = np.load('slot_car_task_test.npz')
-    # plot_observations(test_data['observations'], name="Observation Samples (Subset of Test Data) -- Slot Car Task")
-    #
-    # print('Testing the learned representation on this new data ... ')
-    # test_states = srl.phi(test_data['observations'])
-    # plot_representation(test_states, test_data['rewards'], name='Observation-State-Mapping Applied to Test Data -- Slot Car Task',
-    #                         add_colorbar=True)
+    print('Loading and displaying test data ... ')
+    test_data = np.load('slot_car_task_test.npz')
+    plot_observations(test_data['observations'], name="Observation Samples (Subset of Test Data) -- Slot Car Task")
+
+    print('Testing the learned representation on this new data ... ')
+    test_states = srl.predStates(test_data['observations'])
+    plot_representation(test_states, test_data['rewards'], name='Observation-State-Mapping Applied to Test Data -- Slot Car Task',
+                            add_colorbar=True)
 
     input('\nPress any key to exit.')
