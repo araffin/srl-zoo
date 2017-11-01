@@ -2,8 +2,11 @@
 This is a PyTorch implementation of the method for state representation learning described in the paper "Learning State
 Representations with Robotic Priors" (Jonschkowski & Brock, 2015).
 
-This program is based on th original implementation:
+This program is based on the original implementation:
 https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
+
+TODO: Add L1 regularization
+TODO: Add cuda support
 """
 from __future__ import print_function, division
 
@@ -21,30 +24,43 @@ except NameError:
 
 N_EPOCHS = 100
 BATCHSIZE = 256
-
+NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 
 class SRLNetwork(nn.Module):
+    """
+    Neural Net for State Representation Learning (SRL)
+    :param obs_dim: (int)
+    :param state_dim: (int)
+    :param batchsize: (int)
+    """
     def __init__(self, obs_dim, state_dim=2, batchsize=256):
         super(SRLNetwork, self).__init__()
         self.l1 = nn.Linear(obs_dim, state_dim)
-        self.noise = GaussianNoise(batchsize, state_dim, 1e-6)
+        self.noise = GaussianNoise(batchsize, state_dim, NOISE_STD)
 
     def forward(self, x):
         x = self.l1(x)
         x = self.noise(x)
         return x
 
-# WARNING: this implementation is SLOW!
 class GaussianNoise(nn.Module):
-    def __init__(self, batchsize, dim, std):
+    """
+    Gaussian Noise layer
+    :param batchsize: (int)
+    :param input_dim: (int)
+    :param std: (float) standard deviation
+    :param mean: (float)
+    """
+    def __init__(self, batchsize, input_dim, std, mean=0):
         super(GaussianNoise, self).__init__()
         self.std = std
+        self.mean = mean
         # TODO: handle GPU variable
-        self.noise = Variable(th.zeros(batchsize, dim))
+        self.noise = Variable(th.zeros(batchsize, input_dim))
 
     def forward(self, x):
         if self.training:
-            self.noise.data.normal_(0, std=self.std)
+            self.noise.data.normal_(self.mean, std=self.std)
             return x + self.noise
         return x
 
