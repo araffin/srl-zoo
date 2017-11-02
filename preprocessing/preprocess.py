@@ -30,9 +30,10 @@ N_ACTIONS = 26
 BOUND_INF = [0.42, -0.1, -0.11]
 BOUND_SUP = [0.75, 0.60, 0.35]
 # Resized image shape
-IMAGE_WIDTH = 100 # in px
-IMAGE_HEIGHT = 100 # in px
+IMAGE_WIDTH = 224 # in px
+IMAGE_HEIGHT = 224 # in px
 N_CHANNELS = 3
+MAX_RECORDS = 10
 
 def isInBound(coordinate):
     """
@@ -48,17 +49,18 @@ def isInBound(coordinate):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Preprocess extracted ros bags')
     parser.add_argument('--experiment', type=str, default="", help='Experiment name')
-    parser.add_argument('--mode', type=str, default="tf", help='Preprocessing mode: One of "caffe", "tf".')
+    parser.add_argument('--mode', type=str, default="image_net", help='Preprocessing mode: One of "image_net", "tf".')
     parser.add_argument('--no-warnings', action='store_true', default=False,
                         help='disables warnings')
     args = parser.parse_args()
 
     assert args.experiment != "", "You must specify an experiment"
-    assert args.mode in ['tf', 'caffe'], "Unknown mode"
+    assert args.mode in ['tf', 'image_net'], "Unknown mode"
 
     print("Experiment: {}".format(args.experiment))
     print("Mode: {}".format(args.mode))
     print("Resized shape: ({}, {})".format(IMAGE_WIDTH, IMAGE_HEIGHT))
+    print("Max records: {}".format(MAX_RECORDS))
 
     experiment_name = args.experiment
     data_folder = "{}/data/{}/".format(base_path, experiment_name)
@@ -73,7 +75,7 @@ if __name__ == '__main__':
     print("Found {} folder(s)".format(len(record_folders)))
     # Iterate through record folders
     pbar = tqdm(total=len(record_folders))
-    for record_folder_name in record_folders:
+    for record_folder_name in record_folders[:MAX_RECORDS]:
         record_folder = '{}/{}'.format(data_folder, record_folder_name)
         image_folders = [item for item in os.listdir(record_folder) if os.path.isdir('{}/{}'.format(record_folder, item))]
 

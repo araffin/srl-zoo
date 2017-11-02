@@ -1,6 +1,6 @@
 #!/bin/bash
 
-experiment_name=75_episodes_250_frames_movingButton_staticDelta_staticRightArm
-mode=tf
+experiment_name=staticButtonSimplest
+mode=image_net
 
 python -m preprocessing.preprocess --experiment $experiment_name --no-warnings --mode $mode

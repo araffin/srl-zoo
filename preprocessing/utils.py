@@ -78,30 +78,31 @@ def getDataFrame(text_file):
     return pd.read_csv(text_file, sep=" ", skiprows=1, names=headers)
 
 
-def preprocessInput(x, mode="caffe"):
+def preprocessInput(x, mode="image_net"):
     """
     :param x: (numpy tensor)
-    :param mode: (str) One of "caffe", "tf".
-        - caffe: will convert the images from RGB to BGR,
-            then will zero-center each color channel with
+    :param mode: (str) One of "image_net", "tf".
+        - image_net: will zero-center each color channel with
             respect to the ImageNet dataset,
-            without scaling.
+            with scaling.
+            cf http://pytorch.org/docs/master/torchvision/models.html
         - tf: will scale pixels between -1 and 1,
             sample-wise.
     :return: (numpy tensor)
     """
+    x /= 255.
     if mode == "tf":
-        x /= 255.
         x -= 0.5
         x *= 2.
-    elif mode == "caffe":
-        assert x.shape[-1] == 3, "Channel are not the last dimension"
-        # 'RGB'->'BGR'
-        x = x[..., ::-1]
+    elif mode == "image_net":
         # Zero-center by mean pixel
-        x[..., 0] -= 103.939
-        x[..., 1] -= 116.779
-        x[..., 2] -= 123.68
+        x[..., 0] -= 0.485
+        x[..., 1] -= 0.456
+        x[..., 2] -= 0.406
+        # Scaling
+        x[..., 0] /= 0.229
+        x[..., 0] /= 0.224
+        x[..., 0] /= 0.225
     else:
         raise ValueError("Unknown mode for preprocessing")
     return x
