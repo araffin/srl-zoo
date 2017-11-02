@@ -4,10 +4,11 @@ Representations with Robotic Priors" (Jonschkowski & Brock, 2015).
 
 This program is based on the original implementation by Rico Jonschkowski (rico.jonschkowski@tu-berlin.de):
 https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
-
-TODO: Add cuda support
 """
 from __future__ import print_function, division
+
+import argparse
+import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,7 +22,6 @@ try:
 except NameError:
     pass
 
-N_EPOCHS = 50
 BATCHSIZE = 256
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 
@@ -31,11 +31,12 @@ class SRLNetwork(nn.Module):
     :param obs_dim: (int)
     :param state_dim: (int)
     :param batchsize: (int)
+    :param cuda: (bool)
     """
-    def __init__(self, obs_dim, state_dim=2, batchsize=256):
+    def __init__(self, obs_dim, state_dim=2, batchsize=256, cuda=False):
         super(SRLNetwork, self).__init__()
         self.l1 = nn.Linear(obs_dim, state_dim)
-        self.noise = GaussianNoise(batchsize, state_dim, NOISE_STD)
+        self.noise = GaussianNoise(batchsize, state_dim, NOISE_STD, cuda=cuda)
 
     def forward(self, x):
         x = self.l1(x)
@@ -49,13 +50,15 @@ class GaussianNoise(nn.Module):
     :param input_dim: (int)
     :param std: (float) standard deviation
     :param mean: (float)
+    :param cuda: (bool)
     """
-    def __init__(self, batchsize, input_dim, std, mean=0):
+    def __init__(self, batchsize, input_dim, std, mean=0, cuda=False):
         super(GaussianNoise, self).__init__()
         self.std = std
         self.mean = mean
-        # TODO: handle GPU variable
         self.noise = Variable(th.zeros(batchsize, input_dim))
+        if cuda:
+            self.noise = self.noise.cuda()
 
     def forward(self, x):
         if self.training:
@@ -75,7 +78,6 @@ class RoboticPriorsLoss(nn.Module):
 
     def forward(self, states, next_states, dissimilar_pairs, same_actions_pairs):
         """
-        WARNING: l1 regularization is missing
         :param states: (th Variable)
         :param next_states: (th Variable)
         :param dissimilar_pairs: (th tensor)
@@ -102,20 +104,33 @@ class RoboticPriorsLoss(nn.Module):
 
 
 class SRL4robotics:
-    def __init__(self, obs_dim, state_dim, seed=1, learning_rate=0.001, l1_reg=0.001):
+    """
+    :param obs_dim: (int)
+    :param state_dim: (int)
+    :param seed: (int)
+    :param learning_rate: (float)
+    :param l1_reg: (float)
+    :param cuda: (bool)
+    """
+    def __init__(self, obs_dim, state_dim, seed=1, learning_rate=0.001, l1_reg=0.001, cuda=False):
 
         self.state_dim = state_dim
         self.obs_dim = obs_dim
         self.batchsize = BATCHSIZE
+        self.cuda = cuda
 
         np.random.seed(seed)
         th.manual_seed(seed)
+        if cuda:
+            th.cuda.manual_seed(seed)
 
         # init values
         self.mean_obs = np.zeros(self.obs_dim)
         self.std_obs = 1
 
-        self.model = SRLNetwork(self.obs_dim, self.state_dim, self.batchsize)
+        self.model = SRLNetwork(self.obs_dim, self.state_dim, self.batchsize, cuda)
+        if cuda:
+            self.model.cuda()
         self.optimizer = th.optim.Adam(self.model.parameters(), lr=learning_rate)
         self.l1_reg = l1_reg
 
@@ -125,6 +140,8 @@ class SRL4robotics:
         states = self.model(observations)
         if restore_train:
             self.model.train()
+        if self.cuda:
+            return states.data.cpu().numpy()
         return states.data.numpy()
 
     def learn(self, observations, actions, rewards, episode_starts):
@@ -139,6 +156,8 @@ class SRL4robotics:
         observations = (observations - self.mean_obs) / self.std_obs
         # For testing
         obs_var = Variable(th.from_numpy(observations), volatile=True)
+        if self.cuda:
+            obs_var = obs_var.cuda()
 
         num_samples = observations.shape[0] - 1  # number of samples
 
@@ -167,6 +186,7 @@ class SRL4robotics:
         criterion = RoboticPriorsLoss(self.model, self.l1_reg)
 
         self.model.train()
+        start_time = time.time()
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             epoch_loss, epoch_batches = 0, 0
@@ -178,6 +198,9 @@ class SRL4robotics:
                 diss, same = th.from_numpy(diss), th.from_numpy(same)
                 obs = Variable(th.from_numpy(observations[batch]))
                 next_obs = Variable(th.from_numpy(observations[batch + 1]))
+                if self.cuda:
+                    obs, next_obs = obs.cuda(), next_obs.cuda()
+                    same, diss = same.cuda(), diss.cuda()
 
                 states, next_states = self.model(obs), self.model(next_obs)
                 self.optimizer.zero_grad()
@@ -190,6 +213,7 @@ class SRL4robotics:
             # Then we print the results for this epoch:
             if (epoch + 1) % 5 == 0:
                 print("Epoch {:3}/{}, loss:{:.4f}".format(epoch + 1, N_EPOCHS, epoch_loss / epoch_batches))
+                print("{:.2f}s/epoch".format((time.time() - start_time)/(epoch + 1)))
 
                 # Optionally plot the current state space
                 plot_representation(self._predFn(obs_var), rewards, add_colorbar=epoch==0,
@@ -204,6 +228,8 @@ class SRL4robotics:
         observations = (observations - self.mean_obs) / self.std_obs
         observations = observations.astype(np.float32)
         obs_var = Variable(th.from_numpy(observations), volatile=True)
+        if self.cuda:
+            obs_var = obs_var.cuda()
         states = self._predFn(obs_var, restore_train=False)
         return states
 
@@ -236,13 +262,24 @@ def plot_observations(observations, name='Observation Samples'):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='PyTorch SRL with robotic priors')
+    parser.add_argument('--epochs', type=int, default=50, metavar='N',
+                        help='number of epochs to train (default: 50)')
+    parser.add_argument('--seed', type=int, default=1, metavar='S',
+                        help='random seed (default: 1)')
+    parser.add_argument('--no-cuda', action='store_true', default=False,
+                        help='disables CUDA training')
+    args = parser.parse_args()
+    args.cuda = not args.no_cuda and th.cuda.is_available()
+    N_EPOCHS = args.epochs
+
     # print('\nSIMPLE NAVIGATION TASK\n')
     #
     # print('Loading and displaying training data ... ')
     # training_data = np.load('simple_navigation_task_train.npz')
     #
     # print('Learning a state representation ... ')
-    # srl = SRL4robotics(16 * 16 * 3, 2, learning_rate=0.0001, l1_reg=0.3)
+    # srl = SRL4robotics(16 * 16 * 3, 2, args.seed, learning_rate=0.0001, l1_reg=0.3,cuda=args.cuda)
     # training_states = srl.learn(**training_data)
     # plot_representation(training_states, training_data['rewards'],
     #                         name='Observation-State-Mapping Applied to Training Data -- Simple Navigation Task',
@@ -256,7 +293,7 @@ if __name__ == '__main__':
     training_data = np.load('slot_car_task_train.npz')
 
     print('Learning a state representation ... ')
-    srl = SRL4robotics(16 * 16 * 3, 2, learning_rate=0.001, l1_reg=0.001)
+    srl = SRL4robotics(16 * 16 * 3, 2, args.seed, learning_rate=0.001, l1_reg=0.001, cuda=args.cuda)
     training_states = srl.learn(**training_data)
     plot_representation(training_states, training_data['rewards'],
                         name='Observation-State-Mapping Applied to Training Data -- Slot Car Task',
