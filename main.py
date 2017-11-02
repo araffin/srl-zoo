@@ -2,10 +2,9 @@
 This is a PyTorch implementation of the method for state representation learning described in the paper "Learning State
 Representations with Robotic Priors" (Jonschkowski & Brock, 2015).
 
-This program is based on the original implementation:
+This program is based on the original implementation by Rico Jonschkowski (rico.jonschkowski@tu-berlin.de):
 https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
 
-TODO: Add L1 regularization
 TODO: Add cuda support
 """
 from __future__ import print_function, division
@@ -22,7 +21,7 @@ try:
 except NameError:
     pass
 
-N_EPOCHS = 100
+N_EPOCHS = 50
 BATCHSIZE = 256
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 
@@ -66,8 +65,13 @@ class GaussianNoise(nn.Module):
 
 
 class RoboticPriorsLoss(nn.Module):
-    def __init__(self):
+    def __init__(self, model, l1_reg=0):
         super(RoboticPriorsLoss, self).__init__()
+        # Retrieve only regularizable parameters (we should exclude biases)
+        self.reg_params = [param for name, param in model.named_parameters() if ".bias" not in name]
+        n_params = sum([reduce(lambda x,y: x*y, param.size()) for param in self.reg_params])
+        self.l1_coeff = (l1_reg / n_params)
+
 
     def forward(self, states, next_states, dissimilar_pairs, same_actions_pairs):
         """
@@ -90,7 +94,10 @@ class RoboticPriorsLoss(nn.Module):
         repeatability_loss = (
             similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
             (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
-        loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss + 5 * repeatability_loss
+
+        l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
+
+        loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss + 5 * repeatability_loss + self.l1_coeff * l1_loss
         return loss
 
 
@@ -110,6 +117,7 @@ class SRL4robotics:
 
         self.model = SRLNetwork(self.obs_dim, self.state_dim, self.batchsize)
         self.optimizer = th.optim.Adam(self.model.parameters(), lr=learning_rate)
+        self.l1_reg = l1_reg
 
     def _predFn(self, observations, restore_train=True):
         # test mode
@@ -156,7 +164,8 @@ class SRL4robotics:
                                dtype='int64') for minibatch in minibatchlist]
 
         # TRAINING -----------------------------------------------------------------------------------------------------
-        criterion = RoboticPriorsLoss()
+        criterion = RoboticPriorsLoss(self.model, self.l1_reg)
+
         self.model.train()
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
@@ -227,26 +236,17 @@ def plot_observations(observations, name='Observation Samples'):
 
 
 if __name__ == '__main__':
-    print('\nSIMPLE NAVIGATION TASK\n')
-
-    print('Loading and displaying training data ... ')
-    training_data = np.load('simple_navigation_task_train.npz')
-    plot_observations(training_data['observations'], name="Observation Samples (Subset of Training Data) -- Simple Navigation Task")
-
-    print('Learning a state representation ... ')
-    srl = SRL4robotics(16 * 16 * 3, 2, learning_rate=0.0001, l1_reg = 0.3)
-    training_states = srl.learn(**training_data)
-    plot_representation(training_states, training_data['rewards'],
-                            name='Observation-State-Mapping Applied to Training Data -- Simple Navigation Task',
-                            add_colorbar=True)
-
-    print('Loading and displaying test data ... ')
-    test_data = np.load('simple_navigation_task_test.npz')
-    plot_observations(test_data['observations'], name="Observation Samples (Subset of Test Data) -- Simple Navigation Task")
-
-    print('Testing the learned representation on this new data ... ')
-    test_states = srl.predStates(test_data['observations'])
-    plot_representation(test_states, test_data['rewards'], name='Observation-State-Mapping Applied to Test Data -- Simple Navigation Task', add_colorbar=True)
+    # print('\nSIMPLE NAVIGATION TASK\n')
+    #
+    # print('Loading and displaying training data ... ')
+    # training_data = np.load('simple_navigation_task_train.npz')
+    #
+    # print('Learning a state representation ... ')
+    # srl = SRL4robotics(16 * 16 * 3, 2, learning_rate=0.0001, l1_reg=0.3)
+    # training_states = srl.learn(**training_data)
+    # plot_representation(training_states, training_data['rewards'],
+    #                         name='Observation-State-Mapping Applied to Training Data -- Simple Navigation Task',
+    #                         add_colorbar=True)
 
     ####################################################################################################################
 
@@ -254,8 +254,6 @@ if __name__ == '__main__':
 
     print('Loading and displaying training data ... ')
     training_data = np.load('slot_car_task_train.npz')
-    plot_observations(training_data['observations'],
-                      name="Observation Samples (Subset of Training Data) -- Slot Car Task")
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(16 * 16 * 3, 2, learning_rate=0.001, l1_reg=0.001)
@@ -263,14 +261,5 @@ if __name__ == '__main__':
     plot_representation(training_states, training_data['rewards'],
                         name='Observation-State-Mapping Applied to Training Data -- Slot Car Task',
                         add_colorbar=True)
-
-    print('Loading and displaying test data ... ')
-    test_data = np.load('slot_car_task_test.npz')
-    plot_observations(test_data['observations'], name="Observation Samples (Subset of Test Data) -- Slot Car Task")
-
-    print('Testing the learned representation on this new data ... ')
-    test_states = srl.predStates(test_data['observations'])
-    plot_representation(test_states, test_data['rewards'], name='Observation-State-Mapping Applied to Test Data -- Slot Car Task',
-                            add_colorbar=True)
 
     input('\nPress any key to exit.')
