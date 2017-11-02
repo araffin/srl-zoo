@@ -30,8 +30,8 @@ N_ACTIONS = 26
 BOUND_INF = [0.42, -0.1, -0.11]
 BOUND_SUP = [0.75, 0.60, 0.35]
 # Resized image shape
-IMAGE_WIDTH = 16 # in px
-IMAGE_HEIGHT = 16 # in px
+IMAGE_WIDTH = 100 # in px
+IMAGE_HEIGHT = 100 # in px
 N_CHANNELS = 3
 
 def isInBound(coordinate):
@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
     assert args.experiment != "", "You must specify an experiment"
     assert args.mode in ['tf', 'caffe'], "Unknown mode"
-    
+
     print("Experiment: {}".format(args.experiment))
     print("Mode: {}".format(args.mode))
     print("Resized shape: ({}, {})".format(IMAGE_WIDTH, IMAGE_HEIGHT))
@@ -144,14 +144,15 @@ if __name__ == '__main__':
     data = {
         'observations': all_observations,
         'rewards': all_rewards,
-        'actions': all_actions,
-        'actions_deltas': action_to_idx.keys(),
+        'actions': all_actions.reshape(-1, 1),
+        'episode_starts': episode_starts,
     }
     print("Saving preprocessed data...")
     np.savez('{}/preprocessed_data.npz'.format(data_folder), **data)
 
     ground_truth = {
         'button_positions': button_positions,
-        'arm_states': all_arm_states
+        'arm_states': all_arm_states,
+        'actions_deltas': action_to_idx.keys()
     }
     np.savez('{}/ground_truth.npz'.format(data_folder), **ground_truth)

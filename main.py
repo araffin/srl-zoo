@@ -15,6 +15,7 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 from torch.autograd import Variable
+import torch.nn.functional as F
 
 # Python 2/3 compatibility
 try:
@@ -35,11 +36,16 @@ class SRLNetwork(nn.Module):
     """
     def __init__(self, obs_dim, state_dim=2, batchsize=256, cuda=False):
         super(SRLNetwork, self).__init__()
-        self.l1 = nn.Linear(obs_dim, state_dim)
+        n_hidden = 32
+        self.l1 = nn.Linear(obs_dim, n_hidden)
+        self.l2 = nn.Linear(n_hidden, n_hidden)
+        self.l3 = nn.Linear(n_hidden, state_dim)
         self.noise = GaussianNoise(batchsize, state_dim, NOISE_STD, cuda=cuda)
 
     def forward(self, x):
-        x = self.l1(x)
+        x = F.elu(self.l1(x))
+        x = F.elu(self.l2(x))
+        x = self.l3(x)
         x = self.noise(x)
         return x
 
@@ -149,6 +155,7 @@ class SRL4robotics:
         # PREPARE DATA -------------------------------------------------------------------------------------------------
         # here, we normalize the observations, organize the data into minibatches
         # and find pairs for the respective loss terms
+
         observations = observations.astype(np.float32)
 
         self.mean_obs = np.mean(observations, axis=0, keepdims=True)
@@ -269,34 +276,31 @@ if __name__ == '__main__':
                         help='random seed (default: 1)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
+    parser.add_argument('--path', type=str, default="", help='Path to npz folder')
+
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     N_EPOCHS = args.epochs
 
-    # print('\nSIMPLE NAVIGATION TASK\n')
-    #
-    # print('Loading and displaying training data ... ')
-    # training_data = np.load('simple_navigation_task_train.npz')
-    #
-    # print('Learning a state representation ... ')
-    # srl = SRL4robotics(16 * 16 * 3, 2, args.seed, learning_rate=0.0001, l1_reg=0.3,cuda=args.cuda)
-    # training_states = srl.learn(**training_data)
-    # plot_representation(training_states, training_data['rewards'],
-    #                         name='Observation-State-Mapping Applied to Training Data -- Simple Navigation Task',
-    #                         add_colorbar=True)
+    print('\nExperiment: {}\n'.format(args.path))
 
-    ####################################################################################################################
+    print('Loading data ... ')
+    training_data = np.load(args.path)
 
-    print('\nSLOT CAR TASK\n')
-
-    print('Loading and displaying training data ... ')
-    training_data = np.load('slot_car_task_train.npz')
+    observations, actions = training_data['observations'], training_data['actions']
+    rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
+    obs_dim = reduce(lambda x,y: x*y, observations.shape[1:])
+    print(observations.shape)
+    # observations = np.transpose(observations.reshape((-1, 16, 16, 3)), (0, 3, 1, 2))
+    if len(observations.shape) > 2:
+        # Channel first
+        observations = np.transpose(observations, (0, 3, 1, 2))
+        # Flatten the image
+        observations = observations.reshape((-1, obs_dim))
 
     print('Learning a state representation ... ')
-    srl = SRL4robotics(16 * 16 * 3, 2, args.seed, learning_rate=0.001, l1_reg=0.001, cuda=args.cuda)
-    training_states = srl.learn(**training_data)
-    plot_representation(training_states, training_data['rewards'],
-                        name='Observation-State-Mapping Applied to Training Data -- Slot Car Task',
-                        add_colorbar=True)
+    srl = SRL4robotics(obs_dim, 2, args.seed, learning_rate=0.001, l1_reg=0.001, cuda=args.cuda)
+    training_states = srl.learn(observations, actions, rewards, episode_starts)
+    plot_representation(training_states, training_data['rewards'], name='Training Data', add_colorbar=True)
 
     input('\nPress any key to exit.')
