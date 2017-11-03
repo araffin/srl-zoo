@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # coding: utf-8
+from __future__ import print_function, division
+
 import errno
 import json
 import sys
@@ -73,7 +75,7 @@ def save_config_to_file(config_dict, filename):
     Saves config into json file for only one file to include important constans
     to be read by whole learning pipeline of lua and python scripts
     """
-    print 'Saving config ', config_dict
+    print('Saving config ', config_dict)
     json.dump(config_dict, open(filename, 'wb'))
 
 
@@ -135,18 +137,18 @@ NONSTATIC_BUTTON = []
 
 def library_versions_tests():
     if not matplotlib.__version__.startswith('2.'):
-        print "Using a too old matplotlib version (can be critical for properly plotting reward colours, otherwise the colors are difficult to see), to update, you need to do it via Anaconda: "
-        print "Min version required is 2.0.0. Current version: ", matplotlib.__version__
-        print "Option 1) (Preferred)\n - pip install --upgrade matplotlib (In general, prefer pip install --user (WITHOUT SUDO) to anaconda"
-        print "2) To install anaconda (WARNING: can make sklearn PCA not work by installing a second version of numpy): \n -wget https://repo.continuum.io/archive/Anaconda2-4.4.0-Linux-x86_64.sh  \n -bash Anaconda2-4.4.0-Linux-x86_64.sh  \n -Restart terminal \n -conda update matplotlib"
+        print("Using a too old matplotlib version (can be critical for properly plotting reward colours, otherwise the colors are difficult to see), to update, you need to do it via Anaconda: ")
+        print("Min version required is 2.0.0. Current version: ", matplotlib.__version__)
+        print("Option 1) (Preferred)\n - pip install --upgrade matplotlib (In general, prefer pip install --user (WITHOUT SUDO) to anaconda")
+        print("2) To install anaconda (WARNING: can make sklearn PCA not work by installing a second version of numpy): \n -wget https://repo.continuum.io/archive/Anaconda2-4.4.0-Linux-x86_64.sh  \n -bash Anaconda2-4.4.0-Linux-x86_64.sh  \n -Restart terminal \n -conda update matplotlib")
         sys.exit(-1)
 
     numpy_versions_installed = np.__path__
-    print "numpy_versions_installed: ", numpy_versions_installed
+    print("numpy_versions_installed: ", numpy_versions_installed)
     if len(numpy_versions_installed) > 1:
-        print "Probably you have installed numpy with and without Anaconda, so there is a conflict because two numpy versions can be used."
-        print "Remove non-Anaconda numpy:\n 1) pip uninstall numpy \n and if needed, install 2.1) pip install --user numpy  \n "
-        print "2.2) If 1 does not work: last version in: \n -https://anaconda.org/anaconda/numpy"
+        print("Probably you have installed numpy with and without Anaconda, so there is a conflict because two numpy versions can be used.")
+        print("Remove non-Anaconda numpy:\n 1) pip uninstall numpy \n and if needed, install 2.1) pip install --user numpy  \n ")
+        print("2.2) If 1 does not work: last version in: \n -https://anaconda.org/anaconda/numpy")
 
     # common error, check your version: from sklearn.neighbors import NearestNeighbors
     # File "/home/seurin/anaconda2/lib/python2.7/site-packages/sklearn/__init__.py", line 134, in <module>
@@ -159,7 +161,7 @@ def library_versions_tests():
     #     from . import _ccallback_c
     # ImportError: /home/seurin/.local/lib/python2.7/site-packages/scipy/_lib/_ccallback_c.so: undefined symbol: PyFPE_jbuf
     import sklearn
-    print sklearn.__version__
+    print(sklearn.__version__)
     # If fail, try install a stable one: e.g. '0.16.1' does not work, but 0.16 does.      conda install -c anaconda scikit-learn=0.18.1
 
 
@@ -200,7 +202,7 @@ def get_data_folder_from_model_name(model_name):
     elif NONSTATIC_BUTTON in model_name:
         return NONSTATIC_BUTTON
     else:
-        print model_name
+        print(model_name)
         sys.exit(
             "get_data_folder_from_model_name: Unsupported dataset! model_name must contain one of the official datasets defined in utils.py, input is: " + model_name)
 
@@ -240,7 +242,7 @@ def get_data_folder_from_model_name(model_name):
 #     create_movie_from_folder(plot_path, model_name)
 
 def stitch_images_into_one_and_save(input_folder, output_folder, file_name):
-    print 'stitch_images_into_one_and_save wrote GIF movie to file: ', output_folder
+    print('stitch_images_into_one_and_save wrote GIF movie to file: ', output_folder)
 
 
 def create_mosaic_img_and_save(input_reference_img_to_show_on_top, list_of_input_imgs, path_to_image_directory,
@@ -248,8 +250,7 @@ def create_mosaic_img_and_save(input_reference_img_to_show_on_top, list_of_input
                                titles=None):
     if titles is None:
         titles = []
-    print "Creating mosaic from input reference image ", input_reference_img_to_show_on_top, '\nUsing images: ', list_of_input_imgs, 'saving it to ', path_to_image_directory
-
+    print("Creating mosaic from input reference image ", input_reference_img_to_show_on_top, '\nUsing images: ', list_of_input_imgs, 'saving it to ', path_to_image_directory)
     if not os.path.exists(path_to_image_directory):
         os.mkdir(path_to_image_directory)
 
@@ -286,7 +287,7 @@ def create_mosaic_img_and_save(input_reference_img_to_show_on_top, list_of_input
 
     plt.savefig(output_file, bbox_inches='tight')
     plt.close()  # efficiency: avoids keeping all images into RAM
-    print 'Created mosaic in ', output_file
+    print('Created mosaic in ', output_file)
 
 
 def produceRelevantImageStatesPlotMovie(mode, rewards, toplot, img_paths2repr, model_name, axes_labels=None,
@@ -312,8 +313,8 @@ def produceRelevantImageStatesPlotMovie(mode, rewards, toplot, img_paths2repr, m
         statesToPlot.append(img_paths2repr[img][0])
         rewardsToPlot.append(img_paths2repr[img][1])
         images.append(img)
-    print axis_limits
-    print images
+    print(axis_limits)
+    print(images)
     # rewardsToPlot = np.array(rewardsToPlot) #map(float, rewardsToPlot)
     # else:
     #     toplot_invisible.append(toplot[i])
@@ -348,7 +349,7 @@ def produceRelevantImageStatesPlotMovie(mode, rewards, toplot, img_paths2repr, m
         # images_states_to_plot = specific_images[:n_states_in_plot] #        colors_to_use = list_of_colors[:n_states_in_plot]
         # https://stackoverflow.com/questions/30686157/python-matplotlib-invisible-point  , alpha=0.5  ('2D', rewards, toplot, img_paths2repr, model_name)
         plot_filename = plot_filename_template.replace('*', str(n_states_in_plot - 1))
-        print 'Plotting rewards and states: ', rewards_visible, states, rewards_visible[-1]
+        print('Plotting rewards and states: ', rewards_visible, states, rewards_visible[-1])
         if n_states_in_plot:
             plotStates(mode, rewards_visible, states, plot_filename, dataset=data_folder,
                        title='State Representation Learned Space: ' + model_category + '\nDataset: ' + data_folder,
@@ -389,16 +390,15 @@ def plotStates(mode, rewards, toplot, plot_path, axes_labels=None,
         axis_limits = [[]]
     reward_values = set(rewards)
     rewards_cardinal = len(reward_values)
-    print'plotStates ', mode, ' for rewards cardinal: ', rewards_cardinal, ' (', reward_values, ' ', type(
-        reward_values), ': ', reward_values, '), states: ', type(toplot)  # , toplot.shape
+    print('plotStates ', mode, ' for rewards cardinal: ', rewards_cardinal, ' (', reward_values, ' ', type(reward_values), ': ', reward_values, '), states: ', type(toplot)) # , toplot.shape
 
     rewards = map(float, rewards)
 
     # custom Red Gray Blue colormap
     if len(list_of_colors) == 0:  # default for 3 values of reward possible
-        print "Using 3 default colors"
+        print("Using 3 default colors")
         list_of_colors = [(0.3, 0.3, 0.3), (0.0, 0.0, 1.0), (1, 0, 0)]
-        cmap = colors.ListedColormap(['gray', 'blue', 'red'])  # print "cmap: ",type(cmap)
+        cmap = colors.ListedColormap(['gray', 'blue', 'red'])
     else:
         cmap = colors.ListedColormap(
             ['gray', 'blue', 'red', 'Pastel1', 'Pastel2', 'Paired', 'Accent', 'Dark2'])  # 'orange', 'purple'])
@@ -408,11 +408,11 @@ def plotStates(mode, rewards, toplot, plot_path, axes_labels=None,
     else:
         n_bins = 100
     cmap_name = 'rgrayb'
-    print 'Using list_of_colors ', list_of_colors, type(list_of_colors)
+    print('Using list_of_colors ', list_of_colors, type(list_of_colors))
     cm = LinearSegmentedColormap.from_list(cmap_name, list_of_colors, n_bins)
 
-    colorblind_palette = sns.color_palette("colorblind",
-                                           rewards_cardinal)  # 3 is the number of different colours to use
+    # 3 is the number of different colours to use
+    colorblind_palette = sns.color_palette("colorblind", rewards_cardinal)
     # print(type(colorblind_palette))
     # cubehelix_pal_cmap = sns.cubehelix_palette(as_cmap=True)
     # print(type(cubehelix_pal_cmap))
@@ -456,9 +456,8 @@ def plotStates(mode, rewards, toplot, plot_path, axes_labels=None,
     else:
         if 'Representation Learned Space' in title:
             # plot only one state and therefore concatenating the dataset is redundant
-            ax.set_title(
-                title + '\n                                                                            Reward: ' + str(
-                    one_reward_value).replace('recorded_cameras_head_camera_2_image_compressed/', ''))
+            ax.set_title(title + '\nReward: ' +
+                         str(one_reward_value).replace('recorded_cameras_head_camera_2_image_compressed/', ''))
         else:
             ax.set_title(title + dataset)
 
@@ -522,7 +521,7 @@ def parse_true_state_file(dataset):
         if line[0] != '#':
             words = line.split()
             true_states[words[0]] = np.array(map(float, words[1:]))
-    print "parse_true_state_file: ", all_states_file, " returned #true_states: ", len(true_states)
+    print("parse_true_state_file: ", all_states_file, " returned #true_states: ", len(true_states))
     if len(true_states) == 0:
         sys.exit('parse_true_state_file could not find any states file!')
     return true_states
@@ -539,7 +538,7 @@ def parse_repr_file(learned_representations_file):
             words = line.split()
             images.append(words[0])
             representations.append(words[1:])
-    print "parse_repr_file: ", learned_representations_file, " returned #representations: ", len(representations)
+    print("parse_repr_file: ", learned_representations_file, " returned #representations: ", len(representations))
     if len(images) == 0:
         sys.exit('parse_repr_file could not find any images !')
     if len(representations) == 0:

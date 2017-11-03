@@ -1,3 +1,5 @@
+from __future__ import print_function, division
+
 import unittest
 from PIL import Image
 
@@ -20,30 +22,6 @@ image in the test set and it will assess the test set of 50 images defined in Co
 
 """
 
-
-# fig = plt.figure()
-#     fig.set_size_inches(60,35)
-#     a=fig.add_subplot(rows_in_mosaic, columns_in_mosaic, 2) # subplot(nrows, ncols, plot_number)
-#     a.axis('off')
-#     # img = mpimg.imread(img_name)
-#     img = Image.open(input_reference_img_to_show_on_top)
-#     imgplot = plt.imshow(img)
-
-#     if len(top_title)>0:
-#         a.set_title(top_title, fontsize = 60) 
-
-#     # DRAW BELOW ALL MODELS IMAGES (KNN)
-#     for i in range(0, len(list_of_input_imgs)):
-#         a=fig.add_subplot(rows_in_mosaic, columns_in_mosaic, 4+i)#2+i)
-#         img_name= list_of_input_imgs[i]
-#         # img = mpimg.imread(img_name)
-#         img = Image.open(img_name)
-#         imgplot = plt.imshow(img)
-
-#         if len(titles)>0:
-#             a.set_title(titles[i], fontsize = 40) 
-#         a.axis('off')
-
 def create_GIF_from_imgs_in_folder(folder_rel_path, output_folder, output_file_name):
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
@@ -54,7 +32,7 @@ def create_GIF_from_imgs_in_folder(folder_rel_path, output_folder, output_file_n
         for filename in filenames:
             image = imageio.imread(filename)
             writer.append_data(image)
-    print 'Made GIF from images in ', folder_rel_path, ' saved in ', output_file_name
+    print('Made GIF from images in ', folder_rel_path, ' saved in ', output_file_name)
 
 
 def create_1_row_mosaic(path_to_folder_with_input_images, output_mosaic_path, titles, title):
@@ -64,7 +42,7 @@ def create_1_row_mosaic(path_to_folder_with_input_images, output_mosaic_path, ti
     rows = 1
     columns = len(input_images)
     output_file_name = 'DatasetsMosaic.png'
-    print 'Computing mosaic for images ', input_images
+    print('Computing mosaic for images ', input_images)
 
     fig = plt.figure()
     fig.set_size_inches(60, 35)
@@ -89,16 +67,15 @@ def create_1_row_mosaic(path_to_folder_with_input_images, output_mosaic_path, ti
     plt.tight_layout()
     output_mosaic_path = path_to_folder_with_input_images + output_file_name
     plt.savefig(output_mosaic_path, bbox_inches='tight')
-    print 'Saved mosaic in ', output_mosaic_path
+    print('Saved mosaic in ', output_mosaic_path)
     plt.close()  # efficiency: avoids keeping all images into RAM
 
 
 path_to_folder_with_input_images = './data_minisample/'
-titles = ['Mobile Robot', 'Static-Button-Distractors\n3D', 'Complex-Data-Distractors\n(3D Cont.Act. 2 Arms)',
-          'Colorful75']
+titles = ['Mobile Robot', 'Static-Button-Distractors\n3D', 'Complex-Data-Distractors\n(3D Cont.Act. 2 Arms)', 'Colorful75']
 # BENCHMARK_DATASETS ;titles.reverse()
 #  INTERESTING! reverse returns nil, as it is inplace method!
-print titles
+print(titles)
 # create_1_row_mosaic(path_to_folder_with_input_images, path_to_folder_with_input_images, titles, 'Datasets')
 
 # TODO

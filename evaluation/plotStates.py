@@ -1,4 +1,6 @@
 # coding: utf-8
+from __future__ import print_function, division
+
 from utils import library_versions_tests, get_data_folder_from_model_name, plotStates, read_config
 from utils import MOBILE_ROBOT, LEARNED_REPRESENTATIONS_FILE, SKIP_RENDERING, DEFAULT_DATASET, SUPERVISED
 import numpy as np
@@ -18,7 +20,7 @@ plotGroundTruthStates = False
 with_title = False  # do you want the title on your plots or nop ? Not implemented at the moment
 
 library_versions_tests()
-print"\n\n >> Running plotStates.py....plotGroundTruthStates: ", plotGroundTruthStates, " SKIP_RENDERING = ", SKIP_RENDERING
+print("\n\n >> Running plotStates.py....plotGroundTruthStates: ", plotGroundTruthStates, " SKIP_RENDERING = ", SKIP_RENDERING)
 CONFIG_DICT = read_config()
 STATES_DIMENSION = CONFIG_DICT['STATES_DIMENSION']
 
@@ -34,11 +36,13 @@ if len(sys.argv) < 2:  # regular pipeline in gridsearch script
         data_folder = DEFAULT_DATASET
     if plotGroundTruthStates:
         state_file_str = 'allStatesGT_' + data_folder + '.txt'
-        print "*********************\nPLOTTING GROUND TRUTH (OBSERVED) STATES for model: ", model_name  # (Baxter left wrist position for 3D PUSHING_BUTTON_AUGMENTED dataset, or grid 2D position for MOBILE_ROBOT dataset)
+        # (Baxter left wrist position for 3D PUSHING_BUTTON_AUGMENTED dataset, or grid 2D position for MOBILE_ROBOT dataset)
+        print("*********************\nPLOTTING GROUND TRUTH (OBSERVED) STATES for model: ", model_name)
         plot_path = path + 'GroundTruthStatesPlot_' + model_name + '.png'
     else:
         state_file_str = path + LEARNED_REPRESENTATIONS_FILE
-        print "*********************\nPLOTTING LEARNT STATES for model: ", model_name  # (3D for Baxter PUSHING_BUTTON_AUGMENTED dataset, or 2D position for MOBILE_ROBOT dataset): ", state_file_str
+        # (3D for Baxter PUSHING_BUTTON_AUGMENTED dataset, or 2D position for MOBILE_ROBOT dataset): ",state_file_str
+        print("*********************\nPLOTTING LEARNT STATES for model: ", model_name)
         plot_path = path + 'LearnedStatesPlot_' + model_name + '.png'
     lastModelFile.close()
 
@@ -46,7 +50,7 @@ else:
     state_file_str = sys.argv[1]
     path_list = state_file_str.split('/')[-2:]
 
-    print "path_list", path_list, ' Warning: plotting particular case, should not be the general pipeline case...'
+    print("path_list", path_list, ' Warning: plotting particular case, should not be the general pipeline case...')
 
     if path_list[0][:2] == 'co':
         data_folder = COMPLEX_DATA
@@ -62,9 +66,7 @@ if not os.path.isfile(state_file_str):
     subprocess.call(['th', 'create_plotStates_file_for_all_seq.lua', '-use_cuda', '-use_continuous', '-data_folder',
                      data_folder])  # TODO: READ CMD LINE ARGS FROM FILE INSTEAD (and set accordingly here) TO NOT HAVING TO MODIFY INSTEAD train_predict_plotStates and the python files
 if not os.path.isfile(reward_file_str):
-    print(
-    'Calling subprocess to write to file all GT rewards: create_all_reward in file and for dataset: ', reward_file_str,
-    data_folder)
+    print('Calling subprocess to write to file all GT rewards: create_all_reward in file and for dataset: ', reward_file_str, data_folder)
     subprocess.call(['th', 'create_all_reward.lua', '-use_cuda', '-use_continuous', '-data_folder', data_folder])
 
 total_rewards = 0
@@ -73,14 +75,14 @@ states_l = []
 rewards_l = []
 
 if 'recorded_robot' in state_file_str:
-    print 'Plotting ', MOBILE_ROBOT, ' observed states and rewards in ', state_file_str
+    print('Plotting ', MOBILE_ROBOT, ' observed states and rewards in ', state_file_str)
     for line in state_file:
         if line[0] != '#':
             words = line.split(' ')
             states_l.append([float(words[0]), float(words[1])])
     states = np.asarray(states_l)
 else:  # general case
-    print 'GT states file name: ', state_file_str
+    print('GT states file name: ', state_file_str)
     with open(state_file_str) as f:
         for line in f:
             if line[0] != '#':
@@ -105,7 +107,7 @@ with open(reward_file_str) as f:
 
 rewards = rewards_l
 toplot = states
-print "Ploting total states and total rewards: ", total_states, " ", total_rewards, " in files: ", state_file_str, " and ", reward_file_str
+print("Ploting total states and total rewards: ", total_states, " ", total_rewards, " in files: ", state_file_str, " and ", reward_file_str)
 test.assertEqual(total_rewards, total_states,
                  "Datapoints size discordance! Length of rewards and state files should be equal, and it is " + str(
                      len(rewards)) + " and " + str(
@@ -119,7 +121,7 @@ test.assertEqual(REPRESENTATIONS_DIMENSIONS, STATES_DIMENSION,
 PLOT_DIMENSIONS = 3
 
 if REPRESENTATIONS_DIMENSIONS > 3:
-    print "[Applying PCA to visualize the ", REPRESENTATIONS_DIMENSIONS, "D learnt representations space (PLOT_DIMENSIONS = ", PLOT_DIMENSIONS, ")"
+    print("[Applying PCA to visualize the ", REPRESENTATIONS_DIMENSIONS, "D learnt representations space (PLOT_DIMENSIONS = ", PLOT_DIMENSIONS, ")")
     pca = PCA(n_components=PLOT_DIMENSIONS)  # default to 3
     pca.fit(states)
     toplot = pca.transform(states)
@@ -135,7 +137,7 @@ if PLOT_DIMENSIONS == 2:
 elif PLOT_DIMENSIONS == 3:
     plotStates('3D', rewards, toplot, plot_path, dataset=model_name)
 else:
-    print " PLOT_DIMENSIONS other than 2 or 3 not supported"
+    print(" PLOT_DIMENSIONS other than 2 or 3 not supported")
 
 
 # def parse_arguments(): # TODO in future

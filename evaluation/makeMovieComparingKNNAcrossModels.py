@@ -1,4 +1,6 @@
 # coding: utf-8
+from __future__ import print_function, division
+
 import sys
 
 import os.path
@@ -13,20 +15,17 @@ use_ground_truth = False
 FOLDER_CONTAINING_ALL_MODELS = './Log/ALL_MODELS_KNNS'
 datasets = BENCHMARK_DATASETS
 
-print"\n\n >> Running makeMovieFromComparingKNNAcrossModels.py... FOLDER_CONTAINING_ALL_MODELS: ", FOLDER_CONTAINING_ALL_MODELS
+print("\n\n >> Running makeMovieFromComparingKNNAcrossModels.py... FOLDER_CONTAINING_ALL_MODELS: ", FOLDER_CONTAINING_ALL_MODELS)
 # , '\nALL_KNN_MOVIE_TEST_SETS: ', ALL_KNN_MOVIE_TEST_SETS
 model_name = ''
-# from glob import glob
-# paths = glob(FOLDER_CONTAINING_ALL_MODELS)
-# print paths
 
 if len(sys.argv) == 2:
     datasets = [sys.argv[1]]
     ALL_KNN_MOVIE_TEST_SETS = [get_movie_test_set_for_data_folder(sys.argv[1])]
-    print 'Using dataset only: ', datasets
+    print('Using dataset only: ', datasets)
 # Some parameters
 
-print 'Using datasets and KNN_TEST_SETS: ', datasets, ALL_KNN_MOVIE_TEST_SETS
+print('Using datasets and KNN_TEST_SETS: ', datasets, ALL_KNN_MOVIE_TEST_SETS)
 for data_folder, test_set in zip(datasets, ALL_KNN_MOVIE_TEST_SETS):
     models_for_a_dataset = get_immediate_subdirectories_path(
         FOLDER_CONTAINING_ALL_MODELS + '/' + data_folder)  # list_only_directories_in_path(FOLDER_CONTAINING_ALL_MODELS)
@@ -34,7 +33,7 @@ for data_folder, test_set in zip(datasets, ALL_KNN_MOVIE_TEST_SETS):
     AE_imgs = []
     supervised_imgs = []
     priors_imgs = []
-    print 'Computing mosaics for models: ', models_for_a_dataset
+    print('Computing mosaics for models: ', models_for_a_dataset)
     for model_folder in models_for_a_dataset:
         path_to_neighbors = FOLDER_CONTAINING_ALL_MODELS + '/' + data_folder + '/' + model_folder + FOLDER_NAME_FOR_KNN_GIF_SEQS
         # print 'Processing model ', model_folder, ' from dataset ', data_folder, '\n path_to_neighbors: ', path_to_neighbors
@@ -42,21 +41,21 @@ for data_folder, test_set in zip(datasets, ALL_KNN_MOVIE_TEST_SETS):
             supervised_imgs = get_immediate_files_in_path(path_to_neighbors, containing_pattern_in_name='_frame')
             if len(supervised_imgs) > 0:
                 if len(supervised_imgs) != len(test_set):
-                    print 'Sizes Model KNNs and Input KNNs: ', len(supervised_imgs), ' and ', len(test_set)
+                    print('Sizes Model KNNs and Input KNNs: ', len(supervised_imgs), ' and ', len(test_set))
                     sys.exit(
                         "The size of the image sets in each model's folder should coincide! It does not for model_folder " + model_folder + ' and supervised_imgs')
         elif 'AE' in model_folder:
             AE_imgs = get_immediate_files_in_path(path_to_neighbors, containing_pattern_in_name='_frame')
             if len(AE_imgs) > 0:
                 if len(AE_imgs) != len(test_set):
-                    print 'Sizes Model KNNs and Input KNNs:', len(AE_imgs), ' and ', len(test_set)
+                    print('Sizes Model KNNs and Input KNNs:', len(AE_imgs), ' and ', len(test_set))
                     sys.exit(
                         "The size of the image sets in each model's folder should coincide! It does not for model_folder " + model_folder + ' and AE_imgs')
         elif 'GT' in model_folder or 'ground_truth' in model_folder:
             GT_imgs = get_immediate_files_in_path(path_to_neighbors, containing_pattern_in_name='_frame')
             if len(GT_imgs) > 0:
                 if len(GT_imgs) != len(test_set):
-                    print 'Sizes Model KNNs and Input KNNs:', len(GT_imgs), ' and ', len(test_set)
+                    print('Sizes Model KNNs and Input KNNs:', len(GT_imgs), ' and ', len(test_set))
                     sys.exit(
                         "The size of the image sets in each model's folder should coincide! It does not for model_folder " + model_folder + ' and GT_imgs')
         else:
@@ -66,7 +65,7 @@ for data_folder, test_set in zip(datasets, ALL_KNN_MOVIE_TEST_SETS):
                                                           containing_pattern_in_name='_frame')  # list_only_files_in_path(path_to_neighbors, containing_pattern_in_name='_frame')
                 if len(priors_imgs) > 0:
                     if len(priors_imgs) != len(test_set):
-                        print 'Sizes Model KNNs and Input KNNs:', len(priors_imgs), ' and ', len(test_set)
+                        print('Sizes Model KNNs and Input KNNs:', len(priors_imgs), ' and ', len(test_set))
                         sys.exit(
                             "The size of the image sets in each model's folder should coincide! It does not for model_folder " + model_folder + ' and priors_imgs')
             else:
@@ -83,7 +82,7 @@ for data_folder, test_set in zip(datasets, ALL_KNN_MOVIE_TEST_SETS):
     if not os.path.exists(PATH_TO_MOSAICS):
         os.mkdir(PATH_TO_MOSAICS)
     if len(test_set) > 0 and len(AE_imgs) > 0 and len(supervised_imgs) > 0 and len(priors_imgs) > 0:
-        print 'Stitching images into a mosaic for dataset ', data_folder, ' Using models: ', models_for_a_dataset
+        print('Stitching images into a mosaic for dataset ', data_folder, ' Using models: ', models_for_a_dataset)
         index = 0
         if use_ground_truth:
             if use_ground_truth and len(GT_imgs) == 0:
@@ -109,4 +108,4 @@ for data_folder, test_set in zip(datasets, ALL_KNN_MOVIE_TEST_SETS):
                 # TODO : AT THE MOMENT THE SPEED IS TOO FAST, SO using GIFMAKER.ME INSTEAD
                 # create_GIF_from_imgs_in_folder(path_to_mosaic_images, './DEMO_GIFs/'+data_folder+'_KNN.gif')
     else:
-        print 'Missing models for dataset (must be 4 at least): ', data_folder, ' Skipping this dataset for now'
+        print('Missing models for dataset (must be 4 at least): ', data_folder, ' Skipping this dataset for now')

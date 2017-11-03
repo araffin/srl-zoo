@@ -1,4 +1,5 @@
 # coding: utf-8
+from __future__ import print_function, division
 
 import os.path
 import sys
@@ -16,7 +17,7 @@ from utils import GLOBAL_SCORE_LOG_FILE, MODELS_CONFIG_LOG_FILE, ALL_STATS_FILE,
 ####   MAIN program
 
 ############ PLOT ALL EXPERIMENTS SCORES
-print"\n\n >> Running report_results.py...."
+print("\n\n >> Running report_results.py....")
 
 header = ['Model', 'KNN_MSE', 'DATA_FOLDER', 'MODEL_ARCHITECTURE_FILE', 'MAX_COS_DIST_AMONG_ACTIONS_THRESHOLD',
           'CONTINUOUS_ACTION_SIGMA', 'STATES_DIMENSION']
@@ -24,20 +25,20 @@ header = ['Model', 'KNN_MSE', 'DATA_FOLDER', 'MODEL_ARCHITECTURE_FILE', 'MAX_COS
 
 def plot_all_config_performance(df):
     # Plot all MSE_KNN scores for each experiment
-    print "Reporting all experiments KNN_MSE scores for a varying number of MAX_COS_DIST_AMONG_ACTIONS_THRESHOLD and  CONTINUOUS_ACTION_SIGMA "
+    print("Reporting all experiments KNN_MSE scores for a varying number of MAX_COS_DIST_AMONG_ACTIONS_THRESHOLD and  CONTINUOUS_ACTION_SIGMA ")
 
 
 def print_leader_board(df, datasets):
-    print "\n****************************************\n LEADERBOARD OF WINNING MODELS PER DATASET: \n****************************************"
+    print("\n****************************************\n LEADERBOARD OF WINNING MODELS PER DATASET: \n****************************************")
     for dataset in datasets:
         # sub_dataframe = df[df['KNN_MSE'].notnull() & df[df['DATA_FOLDER'].notnull() & (df['DATA_FOLDER']== dataset)] #df.loc[df['DATA_FOLDER'] == dataset]  #df[['DATA_FOLDER'] == dataset]
         sub_dataframe = df[df['DATA_FOLDER'].notnull() & (df['DATA_FOLDER'] == dataset)]
         best_KNN_MSE = sub_dataframe['KNN_MSE'].min()
         if not pd.isnull(best_KNN_MSE):
             best_model_name = sub_dataframe[sub_dataframe['KNN_MSE'] == best_KNN_MSE].Model.values[0]
-            print "\nDATASET ", dataset, " Min KNN_MSE: ", best_KNN_MSE, ": ", best_model_name
+            print("\nDATASET ", dataset, " Min KNN_MSE: ", best_KNN_MSE, ": ", best_model_name)
         else:
-            print "\nDATASET ", dataset, '[No data available yet/all KNN_MSE were nan, delete old files, and run train_predict_plotStates.sh again]'
+            print("\nDATASET ", dataset, '[No data available yet/all KNN_MSE were nan, delete old files, and run train_predict_plotStates.sh again]')
             #  (see first cat globalScoreLog.csv  ; cat modelsConfigLog.csv  ; cat allStats.csv )
 
 
@@ -55,13 +56,13 @@ if os.path.isfile(GLOBAL_SCORE_LOG_FILE):
                                                                how='outer')
         final = all_scores_logs[header]
         final.sort_values(by='Model', inplace=True)
-        print "Latest scores logged so far: \n", final.tail(5)
+        print("Latest scores logged so far: \n", final.tail(5))
         print_leader_board(final, ALL_DATASETS)
         final.to_csv(ALL_STATS_FILE, header=header)
 
     else:
-        print 'Error: the following files must exist to plot MSE over configuration values: ', MODELS_CONFIG_LOG_FILE
+        print('Error: the following files must exist to plot MSE over configuration values: ', MODELS_CONFIG_LOG_FILE)
         sys.exit(-1)
 else:
-    print 'Error: the following files must exist to plot MSE over configuration values: ', GLOBAL_SCORE_LOG_FILE
+    print('Error: the following files must exist to plot MSE over configuration values: ', GLOBAL_SCORE_LOG_FILE)
     sys.exit(-1)
