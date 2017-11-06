@@ -48,22 +48,22 @@ def isInBound(coordinate):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Preprocess extracted ros bags')
-    parser.add_argument('--experiment', type=str, default="", help='Experiment name')
+    parser.add_argument('--data_folder', type=str, default="", help='Dataset folder name')
     parser.add_argument('--mode', type=str, default="image_net", help='Preprocessing mode: One of "image_net", "tf".')
     parser.add_argument('--no-warnings', action='store_true', default=False,
                         help='disables warnings')
     args = parser.parse_args()
 
-    assert args.experiment != "", "You must specify an experiment"
+    assert args.data_folder != "", "You must specify a data_folder parameter "
     assert args.mode in ['tf', 'image_net'], "Unknown mode"
 
-    print("Experiment: {}".format(args.experiment))
+    print("Dataset folder: {}".format(args.data_folder))
     print("Mode: {}".format(args.mode))
     print("Resized shape: ({}, {})".format(IMAGE_WIDTH, IMAGE_HEIGHT))
     print("Max records: {}".format(MAX_RECORDS))
 
-    experiment_name = args.experiment
-    data_folder = "{}/data/{}/".format(base_path, experiment_name)
+    data_folder = args.data_folder
+    data_folder = "{}/data/{}/".format(base_path, data_folder)
     record_folders = [item for item in os.listdir(data_folder) if os.path.isdir('{}/{}'.format(data_folder, item))]
     # Sort folders
     record_folders.sort(key=lambda item: int(item.split('_')[1]))
