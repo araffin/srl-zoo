@@ -80,6 +80,7 @@ def save_config_to_file(config_dict, filename):
 def read_config(filename=CONFIG_JSON_FILE):
     # load the data from json file into a dictionary
     CONFIG_DICT = json.load(open(filename, 'rb'))
+    global USING_BUTTONS_RELATIVE_POSITION, STATES_DIMENSION
     USING_BUTTONS_RELATIVE_POSITION = CONFIG_DICT['USING_BUTTONS_RELATIVE_POSITION']
     STATES_DIMENSION = CONFIG_DICT['STATES_DIMENSION']
     DATA_FOLDER = CONFIG_DICT['DATA_FOLDER']
