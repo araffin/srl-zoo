@@ -7,8 +7,8 @@ import numpy as np
 import sys
 import os.path
 import subprocess
-from sklearn.decomposition import \
-    PCA  # with some version of sklearn fails with ImportError: undefined symbol: PyFPE_jbuf
+# with some version of sklearn fails with ImportError: undefined symbol: PyFPE_jbuf
+from sklearn.decomposition import PCA
 import unittest
 
 test = unittest.TestCase('__init__')

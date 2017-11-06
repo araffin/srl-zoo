@@ -15,4 +15,7 @@
 data_folder=staticButtonSimplest
 mode=image_net
 
+# Remove Warnings:
 python -m preprocessing.preprocess --data_folder $data_folder --no-warnings --mode $mode
+# With warnings:
+# python -m preprocessing.preprocess --data_folder $data_folder --mode $mode
