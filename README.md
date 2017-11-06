@@ -9,12 +9,18 @@ preprocess.sh
 ```
 calls to:
 ```
-python -m preprocessing.preprocess --experiment $dataset_folder_in_data --mode $mode
+python -m preprocessing.preprocess --data_folder $dataset_folder_in_data --mode $mode
 ```
 
 ### Traiing model
 
-python main.py --path slot_car_task_train.npz --epoch 50 --state_dim 3 -lr 0.005
+python main.py --path path_to_preprocessed_npz_data --epoch E --state_dim S -lr LR
+```
+e.g.
+```
+python main.py --path ../learning-state-representations-with-robotic-priors/slot_car_task_train.npz
+```
+
 
 
 ## Requirements
