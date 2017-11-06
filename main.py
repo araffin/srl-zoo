@@ -205,6 +205,9 @@ class SRL4robotics:
         # split indices into minibatches
         minibatchlist = [np.array(sorted(indices[start_idx:start_idx + self.batchsize]))
                          for start_idx in range(0, num_samples - self.batchsize + 1, self.batchsize)]
+        if len(minibatchlist[-1]) < self.batchsize:
+            print("Removing last minibatch of size {} < batchsize".format(len(minibatchlist[-1])))
+            del  minibatchlist[-1]
 
         find_same_actions = lambda index, minibatch: \
             np.where(np.prod(actions[minibatch] == actions[minibatch[index]], axis=1))[0]
@@ -332,6 +335,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
+    parser.add_argument('-bs', '--batchsize', type=int, default=256, help='batchsize (default: 256)')
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -341,6 +345,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     N_EPOCHS = args.epochs
+    BATCHSIZE = args.batchsize
 
     print('\nExperiment: {}\n'.format(args.path))
 
