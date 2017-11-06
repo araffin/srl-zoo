@@ -36,10 +36,24 @@ except ImportError:
     pass
 
 EPOCH_FLAG = 1  # Plot every 1 epoch
-BATCHSIZE = 128
+BATCHSIZE = 256
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
-# 10 dissimilar and similar observations per sample (cf causality  and proportionality loss)
-MAX_PAIR_PER_SAMPLE = 10
+MAX_BACTHSIZE_GPU = 512 # For plotting, max batchsize before having memory issues
+
+def observationsGenerator(observations, batchsize=64, cuda=False):
+    """
+    :param observations: (torch tensor)
+    :param  bacthsize: (int)
+    :param cuda: (bool)
+    """
+    n_minibatches = len(observations) // batchsize + 1
+    for i in range(n_minibatches):
+        start_idx, end_idx = batchsize * i, batchsize * (i + 1)
+        obs_var = Variable(observations[start_idx:end_idx], volatile=True)
+        if cuda:
+            obs_var = obs_var.cuda()
+        yield obs_var
+
 
 class SRLNetwork(nn.Module):
     """
@@ -167,6 +181,12 @@ class SRL4robotics:
             return states.data.cpu().numpy()
         return states.data.numpy()
 
+    def _predStates(self, observations):
+        predictions = []
+        for obs_var in observationsGenerator(th.from_numpy(observations), MAX_BACTHSIZE_GPU, cuda=self.cuda):
+            predictions.append(self._predFn(obs_var))
+        return np.concatenate(predictions, axis=0)
+
     def learn(self, observations, actions, rewards, episode_starts):
 
         # PREPARE DATA -------------------------------------------------------------------------------------------------
@@ -175,11 +195,6 @@ class SRL4robotics:
 
         # We assume that observations are already preprocessed
         observations = observations.astype(np.float32)
-
-        # For testing
-        obs_var = Variable(th.from_numpy(observations), volatile=True)
-        if self.cuda:
-            obs_var = obs_var.cuda()
 
         num_samples = observations.shape[0] - 1  # number of samples
 
@@ -215,8 +230,8 @@ class SRL4robotics:
             enumerated_minibatches = list(enumerate(minibatchlist))
             np.random.shuffle(enumerated_minibatches)
             for i, batch in enumerated_minibatches:
-                diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])[:MAX_PAIR_PER_SAMPLE * self.batchsize]]
-                same = same_actions[i][np.random.permutation(same_actions[i].shape[0])[:MAX_PAIR_PER_SAMPLE * self.batchsize]]
+                diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])] # [:MAX_PAIR_PER_SAMPLE * self.batchsize]
+                same = same_actions[i][np.random.permutation(same_actions[i].shape[0])] # [:MAX_PAIR_PER_SAMPLE * self.batchsize]
                 diss, same = th.from_numpy(diss), th.from_numpy(same)
                 obs = Variable(th.from_numpy(observations[batch]))
                 next_obs = Variable(th.from_numpy(observations[batch + 1]))
@@ -238,13 +253,13 @@ class SRL4robotics:
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
 
                 # Optionally plot the current state space
-                plot_representation(self._predFn(obs_var), rewards, add_colorbar=epoch == 0,
+                plot_representation(self._predStates(observations), rewards, add_colorbar=epoch == 0,
                                     name="Learned State Representation (Training Data)")
 
         plt.close("Learned State Representation (Training Data)")
 
         # return predicted states for training observations
-        return self._predFn(obs_var)
+        return self._predStates(observations)
 
     def predStates(self, observations):
         observations = observations.astype(np.float32)
@@ -332,8 +347,8 @@ if __name__ == '__main__':
     print('Loading data ... ')
     training_data = np.load(args.path)
     # Limiting data for memory issue (for now)
-    observations, actions = training_data['observations'][:1600], training_data['actions'][:1600]
-    rewards, episode_starts = training_data['rewards'][:1600], training_data['episode_starts'][:1600]
+    observations, actions = training_data['observations'], training_data['actions']
+    rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
 
     # Demo with rico's original data
     if len(observations.shape) == 2:
