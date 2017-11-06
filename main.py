@@ -36,9 +36,10 @@ except ImportError:
     pass
 
 EPOCH_FLAG = 1  # Plot every 1 epoch
-BATCHSIZE = 256
+BATCHSIZE = 128
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
-
+# 10 dissimilar and similar observations per sample (cf causality  and proportionality loss)
+MAX_PAIR_PER_SAMPLE = 10
 
 class SRLNetwork(nn.Module):
     """
@@ -214,8 +215,8 @@ class SRL4robotics:
             enumerated_minibatches = list(enumerate(minibatchlist))
             np.random.shuffle(enumerated_minibatches)
             for i, batch in enumerated_minibatches:
-                diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])]  # [:10*self.batchsize]
-                same = same_actions[i][np.random.permutation(same_actions[i].shape[0])]  # [:10*self.batchsize]
+                diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])[:MAX_PAIR_PER_SAMPLE * self.batchsize]]
+                same = same_actions[i][np.random.permutation(same_actions[i].shape[0])[:MAX_PAIR_PER_SAMPLE * self.batchsize]]
                 diss, same = th.from_numpy(diss), th.from_numpy(same)
                 obs = Variable(th.from_numpy(observations[batch]))
                 next_obs = Variable(th.from_numpy(observations[batch + 1]))
@@ -259,11 +260,11 @@ def plot_3d_representation(states, rewards, name="Learned State Representation",
     plt.clf()
     ax = fig.add_subplot(111, projection='3d')
     im = ax.scatter(states[:, 0], states[:, 1], states[:, 2], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
-    ax.set_xlim([-2, 2])
+    # ax.set_xlim([-2, 2])
     ax.set_xlabel('State dimension 1')
-    ax.set_ylim([-2, 2])
+    # ax.set_ylim([-2, 2])
     ax.set_ylabel('State dimension 2')
-    ax.set_zlim([-2, 2])
+    # ax.set_zlim([-2, 2])
     ax.set_zlabel('State dimension 3')
     if add_colorbar:
         fig.colorbar(im, label='Reward')
@@ -287,9 +288,9 @@ def plot_2d_representation(states, rewards, name="Learned State Representation",
     plt.figure(name)
     plt.clf()
     plt.scatter(states[:, 0], states[:, 1], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
-    plt.xlim([-2, 2])
+    # plt.xlim([-2, 2])
     plt.xlabel('State dimension 1')
-    plt.ylim([-2, 2])
+    # plt.ylim([-2, 2])
     plt.ylabel('State dimension 2')
     if add_colorbar:
         plt.colorbar(label='Reward')
@@ -317,6 +318,7 @@ if __name__ == '__main__':
                         help='random seed (default: 1)')
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
+    parser.add_argument('--l1', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
     parser.add_argument('--path', type=str, default="", help='Path to npz folder')
@@ -329,9 +331,22 @@ if __name__ == '__main__':
 
     print('Loading data ... ')
     training_data = np.load(args.path)
+    # Limiting data for memory issue (for now)
+    observations, actions = training_data['observations'][:1600], training_data['actions'][:1600]
+    rewards, episode_starts = training_data['rewards'][:1600], training_data['episode_starts'][:1600]
 
-    observations, actions = training_data['observations'], training_data['actions']
-    rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
+    # Demo with rico's original data
+    if len(observations.shape) == 2:
+        import cv2
+        from preprocessing.preprocess import IMAGE_WIDTH, IMAGE_HEIGHT
+        from preprocessing.utils import preprocessInput
+        observations = observations.reshape(-1, 16, 16, 3) * 255.
+        obs = np.zeros((observations.shape[0], IMAGE_WIDTH, IMAGE_HEIGHT, 3))
+        for i in range(len(observations)):
+            obs[i] = cv2.resize(observations[i], (IMAGE_WIDTH, IMAGE_HEIGHT))
+        del observations
+        observations = preprocessInput(obs)
+
     # (batchsize, width, height, n_channels) -> (batchsize, n_channels, height, width)
     observations = np.transpose(observations, (0, 3, 2, 1))
     print("Observations shape: {}".format(observations.shape))
@@ -339,6 +354,6 @@ if __name__ == '__main__':
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, args.seed, learning_rate=args.learning_rate, l1_reg=0.00, cuda=args.cuda)
     training_states = srl.learn(observations, actions, rewards, episode_starts)
-    plot_representation(training_states, training_data['rewards'], name='Training Data', add_colorbar=True)
+    plot_representation(training_states, rewards, name='Training Data', add_colorbar=True)
 
     input('\nPress any key to exit.')
