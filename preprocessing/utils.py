@@ -4,7 +4,6 @@ import os
 import re
 from collections import OrderedDict
 
-import cv2
 import numpy as np
 import pandas as pd
 
@@ -101,8 +100,8 @@ def preprocessInput(x, mode="image_net"):
         x[..., 2] -= 0.406
         # Scaling
         x[..., 0] /= 0.229
-        x[..., 0] /= 0.224
-        x[..., 0] /= 0.225
+        x[..., 1] /= 0.224
+        x[..., 2] /= 0.225
     else:
         raise ValueError("Unknown mode for preprocessing")
     return x

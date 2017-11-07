@@ -404,7 +404,7 @@ if __name__ == '__main__':
         for i in range(len(observations)):
             obs[i] = cv2.resize(observations[i], (IMAGE_WIDTH, IMAGE_HEIGHT))
         del observations
-        observations = preprocessInput(obs)
+        observations = preprocessInput(obs, mode="image_net")
 
     # (batchsize, width, height, n_channels) -> (batchsize, n_channels, height, width)
     observations = np.transpose(observations, (0, 3, 2, 1))
