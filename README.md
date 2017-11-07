@@ -11,7 +11,14 @@ calls to:
 ```
 python -m preprocessing.preprocess --data_folder $dataset_folder_in_data --mode $mode
 ```
-
+e.g.
+```
+python -m preprocessing.preprocess --data_folder staticButtonSimplest
+```
+or if small GPU memory, try setting one of the other GPU:
+```
+CUDA_VISIBLE_DEVICES=1,2 python -m preprocessing.preprocess --data_folder $dataset_folder_in_data --mode $mode
+```
 ### Training model
 
 python main.py --path path_to_preprocessed_npz_data --epoch E --state_dim S -lr LR
@@ -53,9 +60,12 @@ git clone git@github.com:tu-rbo/learning-state-representations-with-robotic-prio
     return f(input, weight, bias)
 RuntimeError: cuda runtime error (2) : out of memory at /b/wheel/pytorch-src/torch/lib/THC/generic/THCStorage.cu:66
 
+SOLUTION 1: CUDA_VISIBLE_DEVICES – Masking GPUs
 
+CUDA_VISIBLE_DEVICES=0,1	Devices 0 and 1 will be visible  
+NOTE: DO NOT USE 2 if you only have two devices, because it will use your CPU and freeze all your computer!
 
-SOLUTION: change batchsize to 60 in GPUs with little memory.
+SOLUTION: change batchsize to 60 in GPUs with little memory. TODO:  a solution could be using both gpu 0 and 1  at the same time
 
 
 2.  File "main.py", line 240, in learn

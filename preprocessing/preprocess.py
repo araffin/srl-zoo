@@ -2,6 +2,8 @@
 Preprocessing script to extract actions, rewards, ground truth from text files
 
 TODO: improve image preprocessing speed, reduce memory usage
+TODO: normalize with data loaders from pytorch https://github.com/pytorch/examples/blob/42e5b996718797e45c46a25c55b031e6768f8440/imagenet/main.py#L89-L101 as in normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
 """
 from __future__ import print_function, division, absolute_import
 
@@ -14,7 +16,7 @@ import pandas as pd
 import numpy as np
 
 from .utils import detectBasePath, getActions, findClosestAction, getDataFrame, preprocessInput
-from const import np2file, ALL_REWARDS_FILE
+from const import np2fileIntegers, ALL_REWARDS_FILE
 
 
 base_path = detectBasePath(__file__)
@@ -49,6 +51,8 @@ def isInBound(coordinate):
 
 
 if __name__ == '__main__':
+    np2fileIntegers(np.array([]), ALL_REWARDS_FILE, '\n') #save_to_file(all_rewards, ALL_REWARDS_FILE)
+
     parser = argparse.ArgumentParser(description='Preprocess extracted ros bags')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder name')
     parser.add_argument('--mode', type=str, default="image_net", help='Preprocessing mode: One of "image_net", "tf".')
@@ -161,4 +165,4 @@ if __name__ == '__main__':
     }
     np.savez('{}/ground_truth.npz'.format(data_folder), **ground_truth)
 
-    np2file(all_rewards, ALL_REWARDS_FILE, '\n') #save_to_file(all_rewards, ALL_REWARDS_FILE)
+    np2fileIntegers(all_rewards, ALL_REWARDS_FILE, '\n') #save_to_file(all_rewards, ALL_REWARDS_FILE)

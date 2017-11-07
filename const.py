@@ -146,8 +146,6 @@ NONSTATIC_BUTTON = []
 
 
 
-
-
 def library_versions_tests():
     if not matplotlib.__version__.startswith('2.'):
         print "Using a too old matplotlib version (can be critical for properly plotting reward colours, otherwise the colors are difficult to see), to update, you need to do it via Anaconda: "
@@ -193,14 +191,12 @@ def library_versions_tests():
 #     print 'Made GIF from images in ', folder_rel_path, ' saved in ',output_file_name
 
 def np2file(array, filename, extension, delimiter):
-    a = numpy.asarray(array)
+    a = np.asarray(array)
     np.savetxt(filename+"."+extension, a, delimiter=delimiter)
 
-def np2file(array, filename, delimiter):
-    a = numpy.asarray(array)
+def np2fileIntegers(array, filename, delimiter):
+    a = np.asarray(array.astype(np.int))
     np.savetxt(filename, a, delimiter=delimiter)
-
-
 
 def get_data_folder_from_model_name(model_name):
 
@@ -1000,6 +996,6 @@ BENCHMARK_DATASETS = [COLORFUL75, COMPLEX_DATA, STATIC_BUTTON_SIMPLEST, MOBILE_R
 
 #### Tests
 
-library_versions_tests()
+#library_versions_tests()
 # save_config_to_file(CONFIG_DICT, CONFIG_JSON_FILE)
 # read_config(CONFIG_JSON_FILE)

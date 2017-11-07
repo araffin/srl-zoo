@@ -15,7 +15,7 @@ import matplotlib
 import seaborn as sns
 from PIL import Image
 import json
-
+/home/seurin/baxter_representation_learning_3D/Utils.py
 
 """
 Documentation for colorblind-supported plots: #http://seaborn.pydata.org/introduction.html
@@ -23,15 +23,15 @@ Documentation for colorblind-supported plots: #http://seaborn.pydata.org/introdu
 
 SKIP_RENDERING = True  # Make True when running remotely via ssh for the batch/grid_search programs to save the plots and KNN figures folder
 #DATASETS AVAILABLE:  NOTE: when adding a new dataset, add also to ALL_DATASETS for stats and logging consistency purposes
-BABBLING = 'data/babbling'
-MOBILE_ROBOT = 'data/mobileRobot'
-SIMPLEDATA3D = 'data/simpleData3D'
-PUSHING_BUTTON_AUGMENTED = 'data/pushingButton3DAugmented'
-STATIC_BUTTON_SIMPLEST = 'data/staticButtonSimplest'
-COMPLEX_DATA = 'data/complexData'
-COLORFUL = 'data/colorful'  # 150 data recording sequences
-COLORFUL75 = 'data/colorful75' # a smaller version half size of colorful
-NONSTATIC_BUTTON = 'data/nonStaticButton'
+BABBLING = 'babbling'
+MOBILE_ROBOT = 'mobileRobot'
+SIMPLEDATA3D = 'simpleData3D'
+PUSHING_BUTTON_AUGMENTED = 'pushingButton3DAugmented'
+STATIC_BUTTON_SIMPLEST = 'staticButtonSimplest'
+COMPLEX_DATA = 'complexData'
+COLORFUL = 'colorful'  # 150 data recording sequences
+COLORFUL75 = 'colorful75' # a smaller version half size of colorful
+NONSTATIC_BUTTON = 'nonStaticButton'
 
 ALL_DATASETS = [BABBLING, MOBILE_ROBOT, SIMPLEDATA3D, PUSHING_BUTTON_AUGMENTED, STATIC_BUTTON_SIMPLEST,COMPLEX_DATA, COLORFUL75, COLORFUL, NONSTATIC_BUTTON] #COLORFUL not in use yet due to memory issues
 SUPERVISED = 'Supervised'
@@ -39,7 +39,7 @@ DEFAULT_DATASET = NONSTATIC_BUTTON  #COLORFUL75  # needs to be set for running a
 DIMENSIONS_OUT = 3 # default
 
 # 2 options of plotting:
-LEARNED_REPRESENTATIONS_FILE = "imagePathsAndLearnedRepresentations.txt"
+LEARNED_REPRESENTATIONS_FILE = "saveImagesAndRepr.txt"
 GLOBAL_SCORE_LOG_FILE = 'globalScoreLog.csv'
 MODELS_CONFIG_LOG_FILE  = 'modelsConfigLog.csv'
 ALL_STATE_FILE = 'allStatesGT.txt'
@@ -53,7 +53,6 @@ PATH_TO_MOSAICS = './Mosaics/'
 CONFIG_JSON_FILE = 'Config.json'
 FILENAME_FOR_BUTTON_POSITION = 'recorded_button1_position.txt'  # content example: # x y z     # 0.599993419271 0.29998631216 -0.160117283495
 USING_BUTTONS_RELATIVE_POSITION = False  # by default
-CURRENT_MODEL_SIGNATURE = ''
 
 # Priors
 REP = "Rep"
@@ -89,8 +88,7 @@ else:  # Default values
         'DATA_FOLDER': DEFAULT_DATASET,
         'STATES_DIMENSION': DIMENSIONS_OUT,
         'PRIORS_CONFIGS_TO_APPLY': [PROP, TEMP, CAUS, REP, BRING_CLOSER_REF_POINT],
-        'USING_BUTTONS_RELATIVE_POSITION': USING_BUTTONS_RELATIVE_POSITION,
-        'CURRENT_MODEL_SIGNATURE': CURRENT_MODEL_SIGNATURE
+        'USING_BUTTONS_RELATIVE_POSITION': USING_BUTTONS_RELATIVE_POSITION
     }
     save_config_to_file(CONFIG_DICT, CONFIG_JSON_FILE)
 
@@ -895,7 +893,7 @@ NONSTATIC_BUTTON_TEST_SET = {
 
 #########
 # IMPORTANT NOTE: MOVIE TEST SETS MUST BE AN ARRAY TO PRESERVE ORDER IN A SMOOTH TRANSITION IN THE MOVIE:
-COLORFUL75_MOVIE_TEST_SET = get_immediate_files_in_path('data/colorful75/record_031/recorded_cameras_head_camera_2_image_compressed', containing_pattern_in_name='frame')
+COLORFUL75_MOVIE_TEST_SET = get_immediate_files_in_path('colorful75/record_031/recorded_cameras_head_camera_2_image_compressed', containing_pattern_in_name='frame')
 COLORFUL75_MOVIE_TEST_SET.sort()
 
 # THE FOLLOWING SEQUENCE (N 150) IS AD-HOC CREATED WITH  MULTIMPLE NON_SMOOTH LOOKING COLOUR CHANGING IN BETWEEN THE SEQUENCE. FOR MAKING MOVIE< USE THE ABOVE ONE
@@ -951,15 +949,15 @@ COLORFUL75_MOVIE_TEST_SET.sort()
 # 'colorful75/record_150/recorded_cameras_head_camera_2_image_compressed/frame00048.jpg',
 # 'colorful75/record_150/recorded_cameras_head_camera_2_image_compressed/frame00049.jpg']
 
-COMPLEX_DATA_MOVIE_TEST_SET = get_immediate_files_in_path('data/complexData/record_024/recorded_cameras_head_camera_2_image_compressed', containing_pattern_in_name='frame')
+COMPLEX_DATA_MOVIE_TEST_SET = get_immediate_files_in_path('complexData/record_024/recorded_cameras_head_camera_2_image_compressed', containing_pattern_in_name='frame')
 COMPLEX_DATA_MOVIE_TEST_SET.sort()
 
 # former dataset: record_011
-STATIC_BUTTON_SIMPLEST_MOVIE_TEST_SET = get_immediate_files_in_path('data/staticButtonSimplest/record_022/recorded_cameras_head_camera_2_image_compressed', containing_pattern_in_name='frame')
+STATIC_BUTTON_SIMPLEST_MOVIE_TEST_SET = get_immediate_files_in_path('staticButtonSimplest/record_022/recorded_cameras_head_camera_2_image_compressed', containing_pattern_in_name='frame')
 STATIC_BUTTON_SIMPLEST_MOVIE_TEST_SET.sort()
 
 # NOTICE index starts from 1 here (only for mobileRobot dataset)
-MOBILE_ROBOT_MOVIE_TEST_SET = get_immediate_files_in_path('data/mobileRobot/record_004/recorded_camera_top', containing_pattern_in_name='frame')
+MOBILE_ROBOT_MOVIE_TEST_SET = get_immediate_files_in_path('mobileRobot/record_004/recorded_camera_top', containing_pattern_in_name='frame')
 MOBILE_ROBOT_MOVIE_TEST_SET.sort()
 
 

@@ -289,7 +289,8 @@ class SRL4robotics:
 
     def saveImagesAndReprToTxt(self, path_to_logged_experiment, observations):
         header = ['image_path', 'state']
-        state_representations = predStates(observations)
+        state_representations = self.predStates(observations)
+        print("state_representations: {}".format(state_representations))
         #for image_path, state_array in zip(img_paths, state_representations):
         img_paths = np.array([]) #TODOload()
         images2states = {
@@ -359,6 +360,14 @@ def plot_observations(observations, name='Observation Samples'):
         plt.yticks([])
     plt.pause(0.0001)
 
+def set_cuda(use_cuda):
+    if use_cuda:
+        #th.cuda.set_device(1)  # Mat Uses 0, Tim 1   In most cases it’s better to use CUDA_VISIBLE_DEVICES environmental variable.
+        # To tackle GPU memory issues, th.cuda.set_default_device(1) and set_device() are both discouraged, use instead A) MLP network, SqueezeNet instead of ResNet or B)
+        #See how second gpu memory is less used, therefore we can set it (recommended as setDevice is discouraged): CUDA_VISIBLE_DEVICES=1 python main.py (to set the second gpu memory for use)
+        #A future enhancement TODO for running on multiple GPU: CUDA_VISIBLE_DEVICES=2,3 python main.py   and then also model = torch.nn.DataParallel(model, device_ids=[0,1]).cuda()
+        device = th.cuda.current_device()+1
+        print ("Current device is the {}{}".format(device,'nd' if device==2 else 'st'))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch SRL with robotic priors')
@@ -377,6 +386,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
+    set_cuda(args.cuda)
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     EXPERIMENT_PATH = args.experiment_path
@@ -408,7 +418,7 @@ if __name__ == '__main__':
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, args.seed, learning_rate=args.learning_rate, l1_reg=0.00, cuda=args.cuda)
     learned_states = srl.learn(observations, actions, rewards, episode_starts)
-    srl.agesAndReprToTxt(learned_states, rewards)
+    #srl.saveImagesAndReprToTxt(learned_states, rewards)
     plot_representation(learned_states, rewards, name='Training Data', add_colorbar=True)
 
 
