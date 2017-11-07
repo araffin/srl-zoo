@@ -21,6 +21,7 @@ import seaborn as sns
 import numpy as np
 import torch as th
 import torch.nn as nn
+import torch.nn.functional as F
 import torchvision.models as models
 from torch.autograd import Variable
 import sys, os, os.path
@@ -60,18 +61,19 @@ def observationsGenerator(observations, batch_size=64, cuda=False):
         yield obs_var
 
 
-class SRLNetwork(nn.Module):
+class SRLConvolutionalNetwork(nn.Module):
     """
-    Neural Net for State Representation Learning (SRL)
+    Convolutional Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
     :param state_dim: (int)
     :param batch_size: (int)
     :param cuda: (bool)
     """
 
-    def __init__(self, state_dim=2, batch_size=256, cuda=False):
-        super(SRLNetwork, self).__init__()
+    def __init__(self, state_dim=2, batchsize=256, cuda=False):
+        super(SRLConvolutionalNetwork, self).__init__()
         self.resnet = models.resnet18(pretrained=True)
+        # Freeze params
         for param in self.resnet.parameters():
             param.requires_grad = False
         # Replace the last fully-connected layer
@@ -84,6 +86,32 @@ class SRLNetwork(nn.Module):
 
     def forward(self, x):
         x = self.resnet(x)
+        x = self.noise(x)
+        return x
+
+class SRLDenseNetwork(nn.Module):
+    """
+    Feedforward Neural Net for State Representation Learning (SRL)
+    input shape : 3-channel RGB images of shape (3 x H x W) (to be consistent with CNN network)
+    :param input_dim: (int) 3 x H x H
+    :param state_dim: (int)
+    :param batchsize: (int)
+    :param cuda: (bool)
+    :param n_hidden: (int)
+    """
+
+    def __init__(self, input_dim, state_dim=2,
+                 batchsize=256, cuda=False, n_hidden=32):
+        super(SRLDenseNetwork, self).__init__()
+        self.fc1 = nn.Linear(input_dim, n_hidden)
+        self.fc2 = nn.Linear(n_hidden, state_dim)
+        self.noise = GaussianNoise(batchsize, state_dim, NOISE_STD, cuda=cuda)
+
+    def forward(self, x):
+        # Flatten input
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
         x = self.noise(x)
         return x
 
@@ -157,13 +185,15 @@ class RoboticPriorsLoss(nn.Module):
 class SRL4robotics:
     """
     :param state_dim: (int)
+    :param model_type: (str) one of "cnn" or "mlp"
     :param seed: (int)
     :param learning_rate: (float)
     :param l1_reg: (float)
     :param cuda: (bool)
     """
 
-    def __init__(self, state_dim, seed=1, learning_rate=0.001, l1_reg=0.001, cuda=False):
+    def __init__(self, state_dim, model_type="cnn",
+                 seed=1, learning_rate=0.001, l1_reg=0.001, cuda=False):
 
         self.state_dim = state_dim
         self.batch_size = BATCH_SIZE
@@ -174,7 +204,15 @@ class SRL4robotics:
         if cuda:
             th.cuda.manual_seed(seed)
 
-        self.model = SRLNetwork(self.state_dim, self.batch_size, cuda)
+        if model_type == "cnn":
+            self.model = SRLConvolutionalNetwork(self.state_dim, self.batchsize, cuda)
+        elif model_type == "mlp":
+            input_dim = 224*224*3
+            self.model = SRLDenseNetwork(input_dim, self.state_dim, self.batchsize, cuda)
+        else:
+            raise ValueError("Unknown model: {}".format(model_type))
+        print("Using {} model".format(model_type))
+
         if cuda:
             self.model.cuda()
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
@@ -380,7 +418,8 @@ if __name__ == '__main__':
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training') #TODO everywhere else is use_cuda, change, but keep to default true (use_cuda = true)?
+                        help='disables CUDA training')  #TODO everywhere else is use_cuda, change, but keep to default true (use_cuda = true)?
+    parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
     parser.add_argument('--path', type=str, default="", help='Path to npz folder')
     parser.add_argument('--experiment_path', type=str, default='log/defaultexperimentmodelname', help='Folder within log/experiment_name/model_name_including_timestamp_and_dataset, where the experiment model and KNN images and plots will be saved')
 
@@ -409,17 +448,17 @@ if __name__ == '__main__':
         for i in range(len(observations)):
             obs[i] = cv2.resize(observations[i], (IMAGE_WIDTH, IMAGE_HEIGHT))
         del observations
-        observations = preprocessInput(obs)
+        observations = preprocessInput(obs, mode="image_net")
 
     # (batch_size, width, height, n_channels) -> (batch_size, n_channels, height, width)
     observations = np.transpose(observations, (0, 3, 2, 1))
     print("Observations shape: {}".format(observations.shape))
 
     print('Learning a state representation ... ')
-    srl = SRL4robotics(args.state_dim, args.seed, learning_rate=args.learning_rate, l1_reg=0.00, cuda=args.cuda)
+    srl = SRL4robotics(args.state_dim, args.model_type, args.seed,
+                       learning_rate=args.learning_rate, l1_reg=0.00, cuda=args.cuda)
     learned_states = srl.learn(observations, actions, rewards, episode_starts)
     #srl.saveImagesAndReprToTxt(learned_states, rewards)
     plot_representation(learned_states, rewards, name='Training Data', add_colorbar=True)
-
 
     input('\nPress any key to exit.')

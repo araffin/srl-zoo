@@ -33,11 +33,15 @@ N_ACTIONS = 26
 # Bound for negative rewards
 BOUND_INF = [0.42, -0.1, -0.11]
 BOUND_SUP = [0.75, 0.60, 0.35]
+# Button simplest
+BOUND_INF = [0.42,-0.2,-10] # for x,y,z
+BOUND_SUP = [0.8,0.7,10] # for x,y,z
+
 # Resized image shape
 IMAGE_WIDTH = 224 # in px
 IMAGE_HEIGHT = 224 # in px
 N_CHANNELS = 3
-MAX_RECORDS = 10
+MAX_RECORDS = 50
 
 def isInBound(coordinate):
     """
@@ -87,6 +91,8 @@ if __name__ == '__main__':
 
         assert len(image_folders) == 1, "Multiple image folders are not supported yet"
         images = [item for item in os.listdir('{}/{}/'.format(record_folder, image_folders[0])) if item.endswith(".jpg")]
+        images.sort(key=lambda item: int(item.split('.')[0].split('frame')[1]))
+
         observations = np.zeros((len(images), IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS))
         for idx, image in enumerate(images):
             im = cv2.imread('{}/{}/{}'.format(record_folder, image_folders[0], image))
