@@ -27,6 +27,10 @@ e.g.
 ```
 python main.py --path ../learning-state-representations-with-robotic-priors/slot_car_task_train.npz
 ```
+or
+```
+python main.py --path ../learning-state-representations-with-robotic-priors/slot_car_task_train.npz --model_type mlp -lr 0.001
+```
 
 
 
@@ -64,8 +68,16 @@ SOLUTION 1: CUDA_VISIBLE_DEVICES – Masking GPUs
 
 CUDA_VISIBLE_DEVICES=0,1	Devices 0 and 1 will be visible  
 NOTE: DO NOT USE 2 if you only have two devices, because it will use your CPU and freeze all your computer!
+#th.cuda.set_device(1) # discouraged, instead, use CUDA_VISIBLE_DEVICES environmental variable
 
-SOLUTION: change batchsize to 60 in GPUs with little memory. TODO:  a solution could be using both gpu 0 and 1  at the same time
+SOLUTION 2: change batch_size to smaller, e.g. 8 or 16 in GPUs with little memory. Priors will not work for now
+
+SOLUTION 3:  (dense cnn model uses LR 0.005)
+python main.py --path ../learning-state-representations-with-robotic-priors/slot_car_task_train.npz --model_type mlp -lr 0.001
+
+SOLUTION 4: TODO:  a solution could be using both GPUs 0 and 1  at the same time
+
+
 
 
 2.  File "main.py", line 240, in learn

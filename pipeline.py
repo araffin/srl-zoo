@@ -34,6 +34,7 @@ def create_experiment_model_name(data_folder, architecture_name):
 print  priorsToString(PRIORS_CONFIGS_TO_APPLY)
 data_folder = 'staticButtonSimplest' #nonStaticButton' #colorful75' #staticButtonSimplest' #mobileRobot' #'nonStaticButton' #'complexData' #colorful75'  #'mobileRobot' # 'complexData'
 experiment_name = 'Experiment1'#ToBeTakenFromPARAM_LINE
-EXPERIMENT_MODEL_PATH = create_experiment_model_name(data_folder, experiment_name)
+EXPERIMENT_PATH = create_experiment_model_name(data_folder, experiment_name)
 
-print ('Running pipeline and saving model to {}'.format(EXPERIMENT_MODEL_PATH))
+print ('Running pipeline and saving model to {}'.format(EXPERIMENT_PATH))
+# TODO save EXPERIMENT_PATH to  CONFIG.json file

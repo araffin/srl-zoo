@@ -41,7 +41,7 @@ try:
 except ImportError:
     pass
 
-EPOCH_FLAG = 1  # Plot every 1 epoch
+EPOCH_FLAG = 5  # Plot every 1 epoch
 BATCH_SIZE = 8 #64 # 120 gives memory error: THCudaCheck FAIL file=/b/wheel/pytorch-src/torch/lib/THC/generic/THCStorage.cu line=66 error=2 : out of memory  for slot_car_task_train (On zeus machine, 256 is handleable).
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 MAX_BACTHSIZE_GPU = 512 # For plotting, max batch_size before having memory issues
@@ -70,9 +70,10 @@ class SRLConvolutionalNetwork(nn.Module):
     :param cuda: (bool)
     """
 
-    def __init__(self, state_dim=2, batchsize=256, cuda=False):
+    def __init__(self, state_dim=2, batch_size=256, cuda=False):
         super(SRLConvolutionalNetwork, self).__init__()
         self.resnet = models.resnet18(pretrained=True)
+        self.squeezeNet = models.squeezenet1_0(pretrained=True)
         # Freeze params
         for param in self.resnet.parameters():
             param.requires_grad = False
@@ -95,17 +96,17 @@ class SRLDenseNetwork(nn.Module):
     input shape : 3-channel RGB images of shape (3 x H x W) (to be consistent with CNN network)
     :param input_dim: (int) 3 x H x H
     :param state_dim: (int)
-    :param batchsize: (int)
+    :param batch_size: (int)
     :param cuda: (bool)
     :param n_hidden: (int)
     """
 
     def __init__(self, input_dim, state_dim=2,
-                 batchsize=256, cuda=False, n_hidden=32):
+                 batch_size=256, cuda=False, n_hidden=32):
         super(SRLDenseNetwork, self).__init__()
         self.fc1 = nn.Linear(input_dim, n_hidden)
         self.fc2 = nn.Linear(n_hidden, state_dim)
-        self.noise = GaussianNoise(batchsize, state_dim, NOISE_STD, cuda=cuda)
+        self.noise = GaussianNoise(batch_size, state_dim, NOISE_STD, cuda=cuda)
 
     def forward(self, x):
         # Flatten input
@@ -114,7 +115,6 @@ class SRLDenseNetwork(nn.Module):
         x = self.fc2(x)
         x = self.noise(x)
         return x
-
 
 class GaussianNoise(nn.Module):
     """
@@ -162,24 +162,24 @@ class RoboticPriorsLoss(nn.Module):
         state_diff = next_states - states
         state_diff_norm = state_diff.norm(2, dim=1)
         similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
-        try:
-            temp_coherence_loss = (state_diff_norm ** 2).mean()
-            causality_loss = similarity(states[dissimilar_pairs[:, 0]],
-                                    states[dissimilar_pairs[:, 1]]).mean()
-            proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
-                                     state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
+        # try:
+        temp_coherence_loss = (state_diff_norm ** 2).mean()
+        causality_loss = similarity(states[dissimilar_pairs[:, 0]],
+                                states[dissimilar_pairs[:, 1]]).mean()
+        proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
+                                 state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
 
-            repeatability_loss = (
-                similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
-                (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
+        repeatability_loss = (
+            similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
+            (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
 
-            l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
+        l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
-            loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss + 5 * repeatability_loss + self.l1_coeff * l1_loss
-            return loss
-        except Exception:
-            print('WATCHDOG! skipping fwd pass... (BATCH_SIZE is not large enough and as a watchdog, no equal actions/states are found to apply the priors. Increase your BATCH_SIZE or memory for the priors to be applied!)')
-            pass
+        loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss + 5 * repeatability_loss + self.l1_coeff * l1_loss
+        return loss
+        # except Exception:
+        #     print('WATCHDOG! skipping fwd pass... (BATCH_SIZE is not large enough and as a watchdog, no equal actions/states are found to apply the priors. Increase your BATCH_SIZE or memory for the priors to be applied!)')
+        #     pass
 
 
 class SRL4robotics:
@@ -205,10 +205,10 @@ class SRL4robotics:
             th.cuda.manual_seed(seed)
 
         if model_type == "cnn":
-            self.model = SRLConvolutionalNetwork(self.state_dim, self.batchsize, cuda)
+            self.model = SRLConvolutionalNetwork(self.state_dim, self.batch_size, cuda)
         elif model_type == "mlp":
             input_dim = 224*224*3
-            self.model = SRLDenseNetwork(input_dim, self.state_dim, self.batchsize, cuda)
+            self.model = SRLDenseNetwork(input_dim, self.state_dim, self.batch_size, cuda)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -400,10 +400,9 @@ def plot_observations(observations, name='Observation Samples'):
 
 def set_cuda(use_cuda):
     if use_cuda:
-        #th.cuda.set_device(1)  # Mat Uses 0, Tim 1   In most cases it’s better to use CUDA_VISIBLE_DEVICES environmental variable.
         # To tackle GPU memory issues, th.cuda.set_default_device(1) and set_device() are both discouraged, use instead A) MLP network, SqueezeNet instead of ResNet or B)
-        #See how second gpu memory is less used, therefore we can set it (recommended as setDevice is discouraged): CUDA_VISIBLE_DEVICES=1 python main.py (to set the second gpu memory for use)
-        #A future enhancement TODO for running on multiple GPU: CUDA_VISIBLE_DEVICES=2,3 python main.py   and then also model = torch.nn.DataParallel(model, device_ids=[0,1]).cuda()
+        # See how second gpu memory is less used, therefore we can set it (recommended as setDevice is discouraged): CUDA_VISIBLE_DEVICES=1 python main.py (to set the second gpu memory for use)
+        # A future enhancement TODO for running on multiple GPU: CUDA_VISIBLE_DEVICES=2,3 python main.py   and then also model = torch.nn.DataParallel(model, device_ids=[0,1]).cuda()
         device = th.cuda.current_device()+1
         print ("Current device is the {}{}".format(device,'nd' if device==2 else 'st'))
 
@@ -419,7 +418,7 @@ if __name__ == '__main__':
     parser.add_argument('--l1', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')  #TODO everywhere else is use_cuda, change, but keep to default true (use_cuda = true)?
-    parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
+    parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn"). Options: "mlp"')
     parser.add_argument('--path', type=str, default="", help='Path to npz folder')
     parser.add_argument('--experiment_path', type=str, default='log/defaultexperimentmodelname', help='Folder within log/experiment_name/model_name_including_timestamp_and_dataset, where the experiment model and KNN images and plots will be saved')
 

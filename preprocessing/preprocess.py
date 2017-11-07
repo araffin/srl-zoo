@@ -55,7 +55,6 @@ def isInBound(coordinate):
 
 
 if __name__ == '__main__':
-    np2fileIntegers(np.array([]), ALL_REWARDS_FILE, '\n') #save_to_file(all_rewards, ALL_REWARDS_FILE)
 
     parser = argparse.ArgumentParser(description='Preprocess extracted ros bags')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder name')
@@ -78,9 +77,10 @@ if __name__ == '__main__':
     # Sort folders
     record_folders.sort(key=lambda item: int(item.split('_')[1]))
 
-    all_actions, all_rewards, episodes_starts = None, None, None
+    all_actions, all_rewards, episodes_starts, all_image_paths = None, None, None, None
     button_positions, all_arm_states, all_observations = [], None, None
     action_to_idx = getActions(DELTA_POS, N_ACTIONS)
+    image_paths = []
 
     print("Found {} folder(s)".format(len(record_folders)))
     # Iterate through record folders
@@ -95,12 +95,14 @@ if __name__ == '__main__':
 
         observations = np.zeros((len(images), IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS))
         for idx, image in enumerate(images):
-            im = cv2.imread('{}/{}/{}'.format(record_folder, image_folders[0], image))
+            image_path = '{}/{}/{}'.format(record_folder, image_folders[0], image)
+            #print(image_path)
+            im = cv2.imread(image_path)
             im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
             obs = preprocessInput(im.astype(np.float32), mode=args.mode)
             obs = np.expand_dims(obs, axis=0)
             observations[idx] = obs
-
+            image_paths.append(image_path.replace('//', '/'))
         # Retrieve frame indices where the button was pressed
         df = getDataFrame('{}/{}'.format(record_folder, text_files['is_pressed']))
         rewards = df['value'].values
@@ -140,6 +142,7 @@ if __name__ == '__main__':
         if all_actions is None:
             all_actions = actions
             all_rewards = rewards
+            all_image_paths = image_paths
             episode_starts = episode_start[:]
             all_arm_states = arm_states
             all_observations = [observations]
@@ -149,6 +152,7 @@ if __name__ == '__main__':
             episode_starts = np.concatenate((episode_starts, episode_start), axis=0)
             all_arm_states = np.concatenate((all_arm_states, arm_states), axis=0)
             all_observations.append(observations)
+            all_image_paths.append(image_paths)
         # Update progressbar
         pbar.update(1)
 
@@ -160,7 +164,14 @@ if __name__ == '__main__':
         'rewards': all_rewards,
         'actions': all_actions.reshape(-1, 1),
         'episode_starts': episode_starts,
+        'path_to_images': all_image_paths
     }
+
+    assert len(all_rewards) == len(all_image_paths)
+    print(''.format(all_image_paths))
+    print(''.format( len(all_image_paths)))
+    #np2fileIntegers(all_rewards, ALL_REWARDS_FILE, '\n') #save_to_file(all_rewards, ALL_REWARDS_FILE)
+
     print("Saving preprocessed data...")
     np.savez('{}/preprocessed_data.npz'.format(data_folder), **data)
 
@@ -170,5 +181,3 @@ if __name__ == '__main__':
         'actions_deltas': action_to_idx.keys()
     }
     np.savez('{}/ground_truth.npz'.format(data_folder), **ground_truth)
-
-    np2fileIntegers(all_rewards, ALL_REWARDS_FILE, '\n') #save_to_file(all_rewards, ALL_REWARDS_FILE)
