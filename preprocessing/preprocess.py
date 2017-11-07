@@ -14,6 +14,8 @@ import pandas as pd
 import numpy as np
 
 from .utils import detectBasePath, getActions, findClosestAction, getDataFrame, preprocessInput
+from ..const import np2file, ALL_REWARDS_FILE
+
 
 base_path = detectBasePath(__file__)
 text_files = {
@@ -158,3 +160,5 @@ if __name__ == '__main__':
         'actions_deltas': action_to_idx.keys()
     }
     np.savez('{}/ground_truth.npz'.format(data_folder), **ground_truth)
+
+    np2file(all_rewards, ALL_REWARDS_FILE, '\n') #save_to_file(all_rewards, ALL_REWARDS_FILE)

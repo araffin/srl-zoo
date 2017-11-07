@@ -27,9 +27,6 @@ for states_dimension in 4 5 6 7 8 9 10 15 20 50 100 200 500 1000
         python train.py  -use_cuda -states_dimension $states_dimension  -data_folder $data_folder
         has_command_finished_correctly
 
-        python writeImageAndLearnedRepresentationsToTxt.py  -use_cuda -data_folder $data_folder
-        has_command_finished_correctly
-
         python generateNNImages.py 10
         #   ----- Note: includes the call to:
         #                python writeStatesAndRewardsToTxt.py

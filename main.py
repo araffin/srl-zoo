@@ -1,3 +1,4 @@
+# coding: utf-8
 """
 This is a PyTorch implementation of the method for state representation learning described in the paper "Learning State
 Representations with Robotic Priors" (Jonschkowski & Brock, 2015).
@@ -20,6 +21,8 @@ import torch as th
 import torch.nn as nn
 import torchvision.models as models
 from torch.autograd import Variable
+import sys, os, os.path
+from const import get_data_folder_from_model_name, plotStates, LEARNED_REPRESENTATIONS_FILE
 
 # Init seaborn
 sns.set()
@@ -36,7 +39,7 @@ except ImportError:
     pass
 
 EPOCH_FLAG = 1  # Plot every 1 epoch
-BATCHSIZE = 128
+BATCH_SIZE = 8 #64 # 120 gives memory error: THCudaCheck FAIL file=/b/wheel/pytorch-src/torch/lib/THC/generic/THCStorage.cu line=66 error=2 : out of memory  for slot_car_task_train (On zeus machine, 256 is handleable).
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 # 10 dissimilar and similar observations per sample (cf causality  and proportionality loss)
 MAX_PAIR_PER_SAMPLE = 10
@@ -103,6 +106,8 @@ class RoboticPriorsLoss(nn.Module):
         n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
         self.l1_coeff = (l1_reg / n_params)
 
+        print('Saving model in {}'.format(self.reg_params.experiment_name))
+
     def forward(self, states, next_states, dissimilar_pairs, same_actions_pairs):
         """
         :param states: (th Variable)
@@ -114,20 +119,24 @@ class RoboticPriorsLoss(nn.Module):
         state_diff = next_states - states
         state_diff_norm = state_diff.norm(2, dim=1)
         similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
-        temp_coherence_loss = (state_diff_norm ** 2).mean()
-        causality_loss = similarity(states[dissimilar_pairs[:, 0]],
+        try:
+            temp_coherence_loss = (state_diff_norm ** 2).mean()
+            causality_loss = similarity(states[dissimilar_pairs[:, 0]],
                                     states[dissimilar_pairs[:, 1]]).mean()
-        proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
-                                 state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
+            proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
+                                     state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
 
-        repeatability_loss = (
-            similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
-            (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
+            repeatability_loss = (
+                similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
+                (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
 
-        l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
+            l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
-        loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss + 5 * repeatability_loss + self.l1_coeff * l1_loss
-        return loss
+            loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss + 5 * repeatability_loss + self.l1_coeff * l1_loss
+            return loss
+        except Exception:
+            print('WATCHDOG! skipping fwd pass... (BATCH_SIZE is not large enough and as a watchdog, no equal actions/states are found to apply the priors. Increase your BATCH_SIZE or memory for the priors to be applied!)')
+            pass
 
 
 class SRL4robotics:
@@ -142,7 +151,7 @@ class SRL4robotics:
     def __init__(self, state_dim, seed=1, learning_rate=0.001, l1_reg=0.001, cuda=False):
 
         self.state_dim = state_dim
-        self.batchsize = BATCHSIZE
+        self.batchsize = BATCH_SIZE
         self.cuda = cuda
 
         np.random.seed(seed)
@@ -226,20 +235,15 @@ class SRL4robotics:
 
                 states, next_states = self.model(obs), self.model(next_obs)
                 self.optimizer.zero_grad()
-                loss = criterion(states, next_states, diss, same)
-                loss.backward()
-                self.optimizer.step()
-                epoch_loss += loss.data[0]
-                epoch_batches += 1
-
-            # Then we print the results for this epoch:
-            if (epoch + 1) % EPOCH_FLAG == 0:
-                print("Epoch {:3}/{}, loss:{:.4f}".format(epoch + 1, N_EPOCHS, epoch_loss / epoch_batches))
-                print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
-
-                # Optionally plot the current state space
-                plot_representation(self._predFn(obs_var), rewards, add_colorbar=epoch == 0,
-                                    name="Learned State Representation (Training Data)")
+                try:
+                    loss = criterion(states, next_states, diss, same)
+                    loss.backward()
+                    self.optimizer.step()
+                    epoch_loss += loss.data[0]
+                    epoch_batches += 1
+                except Exception:
+                    print('WATCHDOG! skipping epoch... (BATCH_SIZE is not large enough and as a watchdog, no equal actions/states are found to apply the priors. Increase your BATCH_SIZE or memory for the priors to be applied!)')
+                    pass
 
         plt.close("Learned State Representation (Training Data)")
 
@@ -253,6 +257,23 @@ class SRL4robotics:
             obs_var = obs_var.cuda()
         states = self._predFn(obs_var, restore_train=False)
         return states
+
+    def saveImagesAndReprToTxt(self, path_to_logged_experiment, observations):
+        header = ['image_path', 'state']
+        state_representations = predStates(observations)
+        #for image_path, state_array in zip(img_paths, state_representations):
+        img_paths = np.array([]) #TODOload()
+        images2states = {
+                'image_path': img_paths,
+                'state': state_representations  }
+
+        np.savez(PATH_TO_EXPERIMENT_MODEL+'Images2States.npz', **data)  # data is a dict here  (if not, use *data) #  representations_df = pd.read_csv(, usecols=['image_path','state'])
+        representations_df.sort_values(by='image_path', inplace=True )
+
+        print ("Latest scores logged so far: \n".format( representations_df.tail(5)))
+        representations_df.to_csv(LEARNED_REPRESENTATIONS_FILE, header = header)
+        print('saved pairs of img-path and their learned representation  to file ')
+        print('saved npz file {}'.format(np.load(my_npz_file)))
 
 def plot_3d_representation(states, rewards, name="Learned State Representation", add_colorbar=True):
     plt.ion()
@@ -320,8 +341,9 @@ if __name__ == '__main__':
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training')
+                        help='disables CUDA training') #TODO everywhere else is use_cuda, change, but keep to default true (use_cuda = true)?
     parser.add_argument('--path', type=str, default="", help='Path to npz folder')
+    parser.add_argument('--experiment_model', type=str, default='log/defaultexperimentmodelname', help='Folder within log/experiment_name/model_name_including_timestamp_and_dataset')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -353,7 +375,9 @@ if __name__ == '__main__':
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, args.seed, learning_rate=args.learning_rate, l1_reg=0.00, cuda=args.cuda)
-    training_states = srl.learn(observations, actions, rewards, episode_starts)
-    plot_representation(training_states, rewards, name='Training Data', add_colorbar=True)
+    learned_states = srl.learn(observations, actions, rewards, episode_starts)
+    srl.agesAndReprToTxt(learned_states, rewards)
+    plot_representation(learned_states, rewards, name='Training Data', add_colorbar=True)
+
 
     input('\nPress any key to exit.')
