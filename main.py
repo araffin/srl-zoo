@@ -7,14 +7,16 @@ This program is based on the original implementation by Rico Jonschkowski (rico.
 https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
 
 Example to run this program:
- python main.py --path ../learning-state-representations-with-robotic-priors/slot_car_task_train.npz
+ python main.py --path slot_car_task_train.npz
 
 
 TODO: generator to load images on the fly
 """
 from __future__ import print_function, division
+
 import argparse
 import time
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
@@ -24,8 +26,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 from torch.autograd import Variable
-import sys, os, os.path
-from const import get_data_folder_from_model_name, plotStates, LEARNED_REPRESENTATIONS_FILE
 
 # Init seaborn
 sns.set()
@@ -42,14 +42,15 @@ except ImportError:
     pass
 
 EPOCH_FLAG = 1  # Plot every 1 epoch
-BATCH_SIZE = 8 #64 # 120 gives memory error: THCudaCheck FAIL file=/b/wheel/pytorch-src/torch/lib/THC/generic/THCStorage.cu line=66 error=2 : out of memory  for slot_car_task_train (On zeus machine, 256 is handleable).
+BATCH_SIZE = 256  #
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
-MAX_BACTHSIZE_GPU = 512 # For plotting, max batch_size before having memory issues
+MAX_BACTHSIZE_GPU = 512  # For plotting, max batch_size before having memory issues
+
 
 def observationsGenerator(observations, batch_size=64, cuda=False):
     """
     :param observations: (torch tensor)
-    :param  bacthsize: (int)
+    :param  batch_size: (int)
     :param cuda: (bool)
     """
     n_minibatches = len(observations) // batch_size + 1
@@ -70,7 +71,7 @@ class SRLConvolutionalNetwork(nn.Module):
     :param cuda: (bool)
     """
 
-    def __init__(self, state_dim=2, batchsize=256, cuda=False):
+    def __init__(self, state_dim=2, batch_size=256, cuda=False):
         super(SRLConvolutionalNetwork, self).__init__()
         self.resnet = models.resnet18(pretrained=True)
         # Freeze params
@@ -89,23 +90,24 @@ class SRLConvolutionalNetwork(nn.Module):
         x = self.noise(x)
         return x
 
+
 class SRLDenseNetwork(nn.Module):
     """
     Feedforward Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W) (to be consistent with CNN network)
     :param input_dim: (int) 3 x H x H
     :param state_dim: (int)
-    :param batchsize: (int)
+    :param batch_size: (int)
     :param cuda: (bool)
     :param n_hidden: (int)
     """
 
     def __init__(self, input_dim, state_dim=2,
-                 batchsize=256, cuda=False, n_hidden=32):
+                 batch_size=256, cuda=False, n_hidden=32):
         super(SRLDenseNetwork, self).__init__()
         self.fc1 = nn.Linear(input_dim, n_hidden)
         self.fc2 = nn.Linear(n_hidden, state_dim)
-        self.noise = GaussianNoise(batchsize, state_dim, NOISE_STD, cuda=cuda)
+        self.noise = GaussianNoise(batch_size, state_dim, NOISE_STD, cuda=cuda)
 
     def forward(self, x):
         # Flatten input
@@ -150,7 +152,6 @@ class RoboticPriorsLoss(nn.Module):
         n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
         self.l1_coeff = (l1_reg / n_params)
 
-
     def forward(self, states, next_states, dissimilar_pairs, same_actions_pairs):
         """
         :param states: (th Variable)
@@ -162,24 +163,20 @@ class RoboticPriorsLoss(nn.Module):
         state_diff = next_states - states
         state_diff_norm = state_diff.norm(2, dim=1)
         similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
-        try:
-            temp_coherence_loss = (state_diff_norm ** 2).mean()
-            causality_loss = similarity(states[dissimilar_pairs[:, 0]],
+        temp_coherence_loss = (state_diff_norm ** 2).mean()
+        causality_loss = similarity(states[dissimilar_pairs[:, 0]],
                                     states[dissimilar_pairs[:, 1]]).mean()
-            proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
-                                     state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
+        proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
+                                 state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
 
-            repeatability_loss = (
-                similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
-                (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
+        repeatability_loss = (
+            similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
+            (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
 
-            l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
+        l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
-            loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss + 5 * repeatability_loss + self.l1_coeff * l1_loss
-            return loss
-        except Exception:
-            print('WATCHDOG! skipping fwd pass... (BATCH_SIZE is not large enough and as a watchdog, no equal actions/states are found to apply the priors. Increase your BATCH_SIZE or memory for the priors to be applied!)')
-            pass
+        loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss + 5 * repeatability_loss + self.l1_coeff * l1_loss
+        return loss
 
 
 class SRL4robotics:
@@ -193,7 +190,7 @@ class SRL4robotics:
     """
 
     def __init__(self, state_dim, model_type="cnn",
-                 seed=1, learning_rate=0.001, l1_reg=0.001, cuda=False):
+                 seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False):
 
         self.state_dim = state_dim
         self.batch_size = BATCH_SIZE
@@ -205,10 +202,10 @@ class SRL4robotics:
             th.cuda.manual_seed(seed)
 
         if model_type == "cnn":
-            self.model = SRLConvolutionalNetwork(self.state_dim, self.batchsize, cuda)
+            self.model = SRLConvolutionalNetwork(self.state_dim, self.batch_size, cuda)
         elif model_type == "mlp":
-            input_dim = 224*224*3
-            self.model = SRLDenseNetwork(input_dim, self.state_dim, self.batchsize, cuda)
+            input_dim = 224 * 224 * 3
+            self.model = SRLDenseNetwork(input_dim, self.state_dim, self.batch_size, cuda)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -229,7 +226,7 @@ class SRL4robotics:
             return states.data.cpu().numpy()
         return states.data.numpy()
 
-    def _predStates(self, observations):
+    def _batchPredStates(self, observations):
         predictions = []
         for obs_var in observationsGenerator(th.from_numpy(observations), MAX_BACTHSIZE_GPU, cuda=self.cuda):
             predictions.append(self._predFn(obs_var))
@@ -255,7 +252,7 @@ class SRL4robotics:
                          for start_idx in range(0, num_samples - self.batch_size + 1, self.batch_size)]
         if len(minibatchlist[-1]) < self.batch_size:
             print("Removing last minibatch of size {} < batch_size".format(len(minibatchlist[-1])))
-            del  minibatchlist[-1]
+            del minibatchlist[-1]
 
         find_same_actions = lambda index, minibatch: \
             np.where(np.prod(actions[minibatch] == actions[minibatch[index]], axis=1))[0]
@@ -270,6 +267,12 @@ class SRL4robotics:
         dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in find_dissimilar(i, minibatch) if j > i],
                                dtype='int64') for minibatch in minibatchlist]
 
+        for item in same_actions + dissimilar:
+            if len(item) == 0:
+                msg = "No similar or dissimilar pair found for at least one minibatch\n"
+                msg += "=> Consider increasing the batch_size or changing the seed"
+                raise ValueError(msg)
+
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = RoboticPriorsLoss(self.model, self.l1_reg)
 
@@ -281,8 +284,8 @@ class SRL4robotics:
             enumerated_minibatches = list(enumerate(minibatchlist))
             np.random.shuffle(enumerated_minibatches)
             for i, batch in enumerated_minibatches:
-                diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])] # [:MAX_PAIR_PER_SAMPLE * self.batch_size]
-                same = same_actions[i][np.random.permutation(same_actions[i].shape[0])] # [:MAX_PAIR_PER_SAMPLE * self.batch_size]
+                diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])]
+                same = same_actions[i][np.random.permutation(same_actions[i].shape[0])]  # [:MAX_PAIR_PER_SAMPLE * self.batch_size]
                 diss, same = th.from_numpy(diss), th.from_numpy(same)
                 obs = Variable(th.from_numpy(observations[batch]))
                 next_obs = Variable(th.from_numpy(observations[batch + 1]))
@@ -292,16 +295,11 @@ class SRL4robotics:
 
                 states, next_states = self.model(obs), self.model(next_obs)
                 self.optimizer.zero_grad()
-                try:
-                    loss = criterion(states, next_states, diss, same)
-                    loss.backward()
-                    self.optimizer.step()
-                    epoch_loss += loss.data[0]
-                    epoch_batches += 1
-                except Exception:
-                    print('WATCHDOG! skipping epoch... (BATCH_SIZE is not large enough and as a watchdog, no equal actions/states are found to apply the priors. Increase your BATCH_SIZE or memory for the priors to be applied!)')
-                    pass
-
+                loss = criterion(states, next_states, diss, same)
+                loss.backward()
+                self.optimizer.step()
+                epoch_loss += loss.data[0]
+                epoch_batches += 1
 
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:
@@ -309,13 +307,13 @@ class SRL4robotics:
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
 
                 # Optionally plot the current state space
-                plot_representation(self._predStates(observations), rewards, add_colorbar=epoch == 0,
+                plot_representation(self._batchPredStates(observations), rewards, add_colorbar=epoch == 0,
                                     name="Learned State Representation (Training Data)")
 
         plt.close("Learned State Representation (Training Data)")
 
         # return predicted states for training observations
-        return self._predStates(observations)
+        return self._batchPredStates(observations)
 
     def predStates(self, observations):
         observations = observations.astype(np.float32)
@@ -325,35 +323,35 @@ class SRL4robotics:
         states = self._predFn(obs_var, restore_train=False)
         return states
 
-    def saveImagesAndReprToTxt(self, path_to_logged_experiment, observations):
-        header = ['image_path', 'state']
-        state_representations = self.predStates(observations)
-        print("state_representations: {}".format(state_representations))
-        #for image_path, state_array in zip(img_paths, state_representations):
-        img_paths = np.array([]) #TODOload()
-        images2states = {
-                'image_path': img_paths,
-                'state': state_representations  }
 
-        np.savez(PATH_TO_EXPERIMENT+'Images2States.npz', **data)  # data is a dict here  (if not, use *data) #  representations_df = pd.read_csv(, usecols=['image_path','state'])
-        representations_df.sort_values(by='image_path', inplace=True )
+def saveImagesAndReprToTxt(state_representations, log_folder):
+    raise NotImplementedError("states to txt not finished yet")
+    header = ['image_path', 'state']
+    print("state_representations: {}".format(state_representations))
+    # for image_path, state_array in zip(img_paths, state_representations):
+    img_paths = np.array()  # TODO: load()
+    images2states = {'image_path': img_paths, 'state': state_representations}
 
-        print ("Latest scores logged so far: \n".format( representations_df.tail(5)))
-        representations_df.to_csv(LEARNED_REPRESENTATIONS_FILE, header = header)
-        print('saved pairs of img-path and their learned representation  to file ')
-        print('saved npz file {}'.format(np.load(my_npz_file)))
+    # data is a dict here  (if not, use *data)
+    # representations_df = pd.read_csv(, usecols=['image_path','state'])
+    np.savez('{}/Images2States.npz', **data)
+    representations_df.sort_values(by='image_path', inplace=True)
+
+    print("Latest scores logged so far: \n".format(representations_df.tail(5)))
+    representations_df.to_csv("{}/imagePathsAndLearnedRepresentations.txt", header=header)
+    print('saved pairs of img-path and their learned representation  to file ')
+    print('Saved npz file {}'.format(np.load(my_npz_file)))
+
 
 def plot_3d_representation(states, rewards, name="Learned State Representation", add_colorbar=True):
     plt.ion()
     fig = plt.figure(name)
     plt.clf()
     ax = fig.add_subplot(111, projection='3d')
-    im = ax.scatter(states[:, 0], states[:, 1], states[:, 2], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
-    # ax.set_xlim([-2, 2])
+    im = ax.scatter(states[:, 0], states[:, 1], states[:, 2],
+                    s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
     ax.set_xlabel('State dimension 1')
-    # ax.set_ylim([-2, 2])
     ax.set_ylabel('State dimension 2')
-    # ax.set_zlim([-2, 2])
     ax.set_zlabel('State dimension 3')
     if add_colorbar:
         fig.colorbar(im, label='Reward')
@@ -377,9 +375,7 @@ def plot_2d_representation(states, rewards, name="Learned State Representation",
     plt.figure(name)
     plt.clf()
     plt.scatter(states[:, 0], states[:, 1], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
-    # plt.xlim([-2, 2])
     plt.xlabel('State dimension 1')
-    # plt.ylim([-2, 2])
     plt.ylabel('State dimension 2')
     if add_colorbar:
         plt.colorbar(label='Reward')
@@ -398,14 +394,6 @@ def plot_observations(observations, name='Observation Samples'):
         plt.yticks([])
     plt.pause(0.0001)
 
-def set_cuda(use_cuda):
-    if use_cuda:
-        #th.cuda.set_device(1)  # Mat Uses 0, Tim 1   In most cases it’s better to use CUDA_VISIBLE_DEVICES environmental variable.
-        # To tackle GPU memory issues, th.cuda.set_default_device(1) and set_device() are both discouraged, use instead A) MLP network, SqueezeNet instead of ResNet or B)
-        #See how second gpu memory is less used, therefore we can set it (recommended as setDevice is discouraged): CUDA_VISIBLE_DEVICES=1 python main.py (to set the second gpu memory for use)
-        #A future enhancement TODO for running on multiple GPU: CUDA_VISIBLE_DEVICES=2,3 python main.py   and then also model = torch.nn.DataParallel(model, device_ids=[0,1]).cuda()
-        device = th.cuda.current_device()+1
-        print ("Current device is the {}{}".format(device,'nd' if device==2 else 'st'))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch SRL with robotic priors')
@@ -417,24 +405,23 @@ if __name__ == '__main__':
     parser.add_argument('-bs', '--batch_size', type=int, default=256, help='batch_size (default: 256)')
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
-    parser.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training')  #TODO everywhere else is use_cuda, change, but keep to default true (use_cuda = true)?
+    parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
-    parser.add_argument('--path', type=str, default="", help='Path to npz folder')
-    parser.add_argument('--experiment_path', type=str, default='log/defaultexperimentmodelname', help='Folder within log/experiment_name/model_name_including_timestamp_and_dataset, where the experiment model and KNN images and plots will be saved')
+    parser.add_argument('--path', type=str, default="", help='Path to npz file')
+    parser.add_argument('--experiment_path', type=str, default='logs/default',
+                        help='Folder within logs/ where the experiment model and KNN images and plots will be saved')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
-    set_cuda(args.cuda)
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     EXPERIMENT_PATH = args.experiment_path
 
-    print('\nExperiment: {}\n'.format(args.path))
-    print('Saving model in {}'.format(args.experiment_path))
+    print('\nDataset npz file: {}\n'.format(args.path))
+    print('Expriment path: {}'.format(args.experiment_path))
+
     print('Loading data ... ')
     training_data = np.load(args.path)
-    # Limiting data for memory issue (for now)
     observations, actions = training_data['observations'], training_data['actions']
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
 
@@ -443,6 +430,7 @@ if __name__ == '__main__':
         import cv2
         from preprocessing.preprocess import IMAGE_WIDTH, IMAGE_HEIGHT
         from preprocessing.utils import preprocessInput
+
         observations = observations.reshape(-1, 16, 16, 3) * 255.
         obs = np.zeros((observations.shape[0], IMAGE_WIDTH, IMAGE_HEIGHT, 3))
         for i in range(len(observations)):
@@ -456,9 +444,9 @@ if __name__ == '__main__':
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, args.model_type, args.seed,
-                       learning_rate=args.learning_rate, l1_reg=0.00, cuda=args.cuda)
+                       learning_rate=args.learning_rate, l1_reg=args.l1, cuda=args.cuda)
     learned_states = srl.learn(observations, actions, rewards, episode_starts)
-    #srl.saveImagesAndReprToTxt(learned_states, rewards)
+    # saveImagesAndReprToTxt(learned_states, EXPERIMENT_PATH)
     plot_representation(learned_states, rewards, name='Training Data', add_colorbar=True)
 
     input('\nPress any key to exit.')
