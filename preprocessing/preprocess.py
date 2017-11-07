@@ -14,7 +14,7 @@ import pandas as pd
 import numpy as np
 
 from .utils import detectBasePath, getActions, findClosestAction, getDataFrame, preprocessInput
-from ..const import np2file, ALL_REWARDS_FILE
+from const import np2file, ALL_REWARDS_FILE
 
 
 base_path = detectBasePath(__file__)

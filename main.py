@@ -6,13 +6,15 @@ Representations with Robotic Priors" (Jonschkowski & Brock, 2015).
 This program is based on the original implementation by Rico Jonschkowski (rico.jonschkowski@tu-berlin.de):
 https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
 
+Example to run this program:
+ python main.py --path ../learning-state-representations-with-robotic-priors/slot_car_task_train.npz
+
+
 TODO: generator to load images on the fly
 """
 from __future__ import print_function, division
-
 import argparse
 import time
-
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
@@ -41,17 +43,17 @@ except ImportError:
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 8 #64 # 120 gives memory error: THCudaCheck FAIL file=/b/wheel/pytorch-src/torch/lib/THC/generic/THCStorage.cu line=66 error=2 : out of memory  for slot_car_task_train (On zeus machine, 256 is handleable).
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
-MAX_BACTHSIZE_GPU = 512 # For plotting, max batchsize before having memory issues
+MAX_BACTHSIZE_GPU = 512 # For plotting, max batch_size before having memory issues
 
-def observationsGenerator(observations, batchsize=64, cuda=False):
+def observationsGenerator(observations, batch_size=64, cuda=False):
     """
     :param observations: (torch tensor)
     :param  bacthsize: (int)
     :param cuda: (bool)
     """
-    n_minibatches = len(observations) // batchsize + 1
+    n_minibatches = len(observations) // batch_size + 1
     for i in range(n_minibatches):
-        start_idx, end_idx = batchsize * i, batchsize * (i + 1)
+        start_idx, end_idx = batch_size * i, batch_size * (i + 1)
         obs_var = Variable(observations[start_idx:end_idx], volatile=True)
         if cuda:
             obs_var = obs_var.cuda()
@@ -63,11 +65,11 @@ class SRLNetwork(nn.Module):
     Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
     :param state_dim: (int)
-    :param batchsize: (int)
+    :param batch_size: (int)
     :param cuda: (bool)
     """
 
-    def __init__(self, state_dim=2, batchsize=256, cuda=False):
+    def __init__(self, state_dim=2, batch_size=256, cuda=False):
         super(SRLNetwork, self).__init__()
         self.resnet = models.resnet18(pretrained=True)
         for param in self.resnet.parameters():
@@ -78,7 +80,7 @@ class SRLNetwork(nn.Module):
         self.resnet.fc = nn.Linear(n_units, state_dim)
         if cuda:
             self.resnet.cuda()
-        self.noise = GaussianNoise(batchsize, state_dim, NOISE_STD, cuda=cuda)
+        self.noise = GaussianNoise(batch_size, state_dim, NOISE_STD, cuda=cuda)
 
     def forward(self, x):
         x = self.resnet(x)
@@ -89,18 +91,18 @@ class SRLNetwork(nn.Module):
 class GaussianNoise(nn.Module):
     """
     Gaussian Noise layer
-    :param batchsize: (int)
+    :param batch_size: (int)
     :param input_dim: (int)
     :param std: (float) standard deviation
     :param mean: (float)
     :param cuda: (bool)
     """
 
-    def __init__(self, batchsize, input_dim, std, mean=0, cuda=False):
+    def __init__(self, batch_size, input_dim, std, mean=0, cuda=False):
         super(GaussianNoise, self).__init__()
         self.std = std
         self.mean = mean
-        self.noise = Variable(th.zeros(batchsize, input_dim))
+        self.noise = Variable(th.zeros(batch_size, input_dim))
         if cuda:
             self.noise = self.noise.cuda()
 
@@ -120,7 +122,6 @@ class RoboticPriorsLoss(nn.Module):
         n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
         self.l1_coeff = (l1_reg / n_params)
 
-        print('Saving model in {}'.format(self.reg_params.experiment_name))
 
     def forward(self, states, next_states, dissimilar_pairs, same_actions_pairs):
         """
@@ -165,7 +166,7 @@ class SRL4robotics:
     def __init__(self, state_dim, seed=1, learning_rate=0.001, l1_reg=0.001, cuda=False):
 
         self.state_dim = state_dim
-        self.batchsize = BATCH_SIZE
+        self.batch_size = BATCH_SIZE
         self.cuda = cuda
 
         np.random.seed(seed)
@@ -173,7 +174,7 @@ class SRL4robotics:
         if cuda:
             th.cuda.manual_seed(seed)
 
-        self.model = SRLNetwork(self.state_dim, self.batchsize, cuda)
+        self.model = SRLNetwork(self.state_dim, self.batch_size, cuda)
         if cuda:
             self.model.cuda()
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
@@ -212,23 +213,23 @@ class SRL4robotics:
         np.random.shuffle(indices)
 
         # split indices into minibatches
-        minibatchlist = [np.array(sorted(indices[start_idx:start_idx + self.batchsize]))
-                         for start_idx in range(0, num_samples - self.batchsize + 1, self.batchsize)]
-        if len(minibatchlist[-1]) < self.batchsize:
-            print("Removing last minibatch of size {} < batchsize".format(len(minibatchlist[-1])))
+        minibatchlist = [np.array(sorted(indices[start_idx:start_idx + self.batch_size]))
+                         for start_idx in range(0, num_samples - self.batch_size + 1, self.batch_size)]
+        if len(minibatchlist[-1]) < self.batch_size:
+            print("Removing last minibatch of size {} < batch_size".format(len(minibatchlist[-1])))
             del  minibatchlist[-1]
 
         find_same_actions = lambda index, minibatch: \
             np.where(np.prod(actions[minibatch] == actions[minibatch[index]], axis=1))[0]
         same_actions = [
-            np.array([[i, j] for i in range(self.batchsize) for j in find_same_actions(i, minibatch) if j > i],
+            np.array([[i, j] for i in range(self.batch_size) for j in find_same_actions(i, minibatch) if j > i],
                      dtype='int64') for minibatch in minibatchlist]
 
         # check with samples should be dissimilar because they lead to different rewards aften the same actions
         find_dissimilar = lambda index, minibatch: \
             np.where(np.prod(actions[minibatch] == actions[minibatch[index]], axis=1) *
                      (rewards[minibatch + 1] != rewards[minibatch[index] + 1]))[0]
-        dissimilar = [np.array([[i, j] for i in range(self.batchsize) for j in find_dissimilar(i, minibatch) if j > i],
+        dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in find_dissimilar(i, minibatch) if j > i],
                                dtype='int64') for minibatch in minibatchlist]
 
         # TRAINING -----------------------------------------------------------------------------------------------------
@@ -242,8 +243,8 @@ class SRL4robotics:
             enumerated_minibatches = list(enumerate(minibatchlist))
             np.random.shuffle(enumerated_minibatches)
             for i, batch in enumerated_minibatches:
-                diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])] # [:MAX_PAIR_PER_SAMPLE * self.batchsize]
-                same = same_actions[i][np.random.permutation(same_actions[i].shape[0])] # [:MAX_PAIR_PER_SAMPLE * self.batchsize]
+                diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])] # [:MAX_PAIR_PER_SAMPLE * self.batch_size]
+                same = same_actions[i][np.random.permutation(same_actions[i].shape[0])] # [:MAX_PAIR_PER_SAMPLE * self.batch_size]
                 diss, same = th.from_numpy(diss), th.from_numpy(same)
                 obs = Variable(th.from_numpy(observations[batch]))
                 next_obs = Variable(th.from_numpy(observations[batch + 1]))
@@ -295,7 +296,7 @@ class SRL4robotics:
                 'image_path': img_paths,
                 'state': state_representations  }
 
-        np.savez(PATH_TO_EXPERIMENT_MODEL+'Images2States.npz', **data)  # data is a dict here  (if not, use *data) #  representations_df = pd.read_csv(, usecols=['image_path','state'])
+        np.savez(PATH_TO_EXPERIMENT+'Images2States.npz', **data)  # data is a dict here  (if not, use *data) #  representations_df = pd.read_csv(, usecols=['image_path','state'])
         representations_df.sort_values(by='image_path', inplace=True )
 
         print ("Latest scores logged so far: \n".format( representations_df.tail(5)))
@@ -366,21 +367,22 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
-    parser.add_argument('-bs', '--batchsize', type=int, default=256, help='batchsize (default: 256)')
+    parser.add_argument('-bs', '--batch_size', type=int, default=256, help='batch_size (default: 256)')
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training') #TODO everywhere else is use_cuda, change, but keep to default true (use_cuda = true)?
     parser.add_argument('--path', type=str, default="", help='Path to npz folder')
-    parser.add_argument('--experiment_model', type=str, default='log/defaultexperimentmodelname', help='Folder within log/experiment_name/model_name_including_timestamp_and_dataset')
+    parser.add_argument('--experiment_path', type=str, default='log/defaultexperimentmodelname', help='Folder within log/experiment_name/model_name_including_timestamp_and_dataset, where the experiment model and KNN images and plots will be saved')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     N_EPOCHS = args.epochs
-    BATCHSIZE = args.batchsize
+    BATCH_SIZE = args.batch_size
+    EXPERIMENT_PATH = args.experiment_path
 
     print('\nExperiment: {}\n'.format(args.path))
-
+    print('Saving model in {}'.format(args.experiment_path))
     print('Loading data ... ')
     training_data = np.load(args.path)
     # Limiting data for memory issue (for now)
@@ -399,7 +401,7 @@ if __name__ == '__main__':
         del observations
         observations = preprocessInput(obs)
 
-    # (batchsize, width, height, n_channels) -> (batchsize, n_channels, height, width)
+    # (batch_size, width, height, n_channels) -> (batch_size, n_channels, height, width)
     observations = np.transpose(observations, (0, 3, 2, 1))
     print("Observations shape: {}".format(observations.shape))
 

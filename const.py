@@ -41,7 +41,9 @@ REWARD_PREDICTION_CRITERION= 'Prediction Reward'
 
 PRIORS_CONFIGS_TO_APPLY =[PROP, TEMP, CAUS, REP, BRING_CLOSER_REF_POINT]
 
-################
+##################################################################################################
+
+
 SKIP_RENDERING = True  # Make True when running remotely via ssh for the batch/grid_search programs to save the plots and KNN figures folder
 #DATASETS AVAILABLE:  NOTE: when adding a new dataset, add also to ALL_DATASETS for stats and logging consistency purposes
 BABBLING = 'data/babbling'
