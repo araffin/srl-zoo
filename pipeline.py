@@ -44,6 +44,7 @@ def getLogFolder(exp_config):
     srl_str = "{}_ST_DIM{}_SEED{}".format(priorsToString(exp_config['priors']), exp_config['state_dim'], exp_config['seed'])
 
     if exp_config['use_continuous']:
+        raise NotImplementedError("Continous actions not supported yet")
         continuous_str = "_cont_MCD{}_S{}".format(MAX_COS_DIST_AMONG_ACTIONS_THRESHOLD, CONTINUOUS_ACTION_SIGMA)
         continuous_str = continuous_str.replace(".", "_") # replace decimal points by '_' for folder naming
     else:
@@ -90,7 +91,7 @@ def stateRepresentationLearningCall(exp_config):
     args = ['--path', npz_file, '--no-plots']
     for arg in ['learning_rate', 'l1_reg', 'batch_size',
                 'state_dim', 'epochs', 'seed', 'model_type',
-                'log_folder']:
+                'log_folder', 'data_folder']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
     ok = subprocess.call(['python', 'train.py'] + args)

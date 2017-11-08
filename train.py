@@ -16,10 +16,8 @@ from __future__ import print_function, division
 
 import argparse
 import time
+import json
 
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import seaborn as sns
 import numpy as np
 import torch as th
 import torch.nn as nn
@@ -27,8 +25,7 @@ import torch.nn.functional as F
 import torchvision.models as models
 from torch.autograd import Variable
 
-# Init seaborn
-sns.set()
+from plotting.representation_plot import plot_representation
 
 # Python 2/3 compatibility
 try:
@@ -190,7 +187,7 @@ class SRL4robotics:
     :param cuda: (bool)
     """
 
-    def __init__(self, state_dim, model_type="cnn",
+    def __init__(self, state_dim, model_type="cnn", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False):
 
         self.state_dim = state_dim
@@ -216,6 +213,7 @@ class SRL4robotics:
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.l1_reg = l1_reg
+        self.log_folder = log_folder
 
     def _predFn(self, observations, restore_train=True):
         # test mode
@@ -276,6 +274,7 @@ class SRL4robotics:
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = RoboticPriorsLoss(self.model, self.l1_reg)
+        best_error = np.inf
 
         self.model.train()
         start_time = time.time()
@@ -302,6 +301,11 @@ class SRL4robotics:
                 epoch_loss += loss.data[0]
                 epoch_batches += 1
 
+            # Save best model
+            # TODO: use a validation set
+            if epoch_loss / epoch_batches < best_error:
+                th.save(self.model.state_dict(), "{}/srl_model.pyth.pkl".format(self.log_folder))
+
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:
                 print("Epoch {:3}/{}, loss:{:.4f}".format(epoch + 1, N_EPOCHS, epoch_loss / epoch_batches))
@@ -325,75 +329,20 @@ class SRL4robotics:
         return states
 
 
-def saveImagesAndReprToTxt(state_representations, log_folder):
-    raise NotImplementedError("states to txt not finished yet")
-    header = ['image_path', 'state']
-    print("state_representations: {}".format(state_representations))
-    # for image_path, state_array in zip(img_paths, state_representations):
-    img_paths = np.array()  # TODO: load()
-    images2states = {'image_path': img_paths, 'state': state_representations}
-
-    # data is a dict here  (if not, use *data)
-    # representations_df = pd.read_csv(, usecols=['image_path','state'])
-    np.savez('{}/Images2States.npz', **data)
-    representations_df.sort_values(by='image_path', inplace=True)
-
-    print("Latest scores logged so far: \n".format(representations_df.tail(5)))
-    representations_df.to_csv("{}/imagePathsAndLearnedRepresentations.txt", header=header)
-    print('saved pairs of img-path and their learned representation  to file ')
-    print('Saved npz file {}'.format(np.load(my_npz_file)))
-
-
-def plot_3d_representation(states, rewards, name="Learned State Representation", add_colorbar=True):
-    plt.ion()
-    fig = plt.figure(name)
-    plt.clf()
-    ax = fig.add_subplot(111, projection='3d')
-    im = ax.scatter(states[:, 0], states[:, 1], states[:, 2],
-                    s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
-    ax.set_xlabel('State dimension 1')
-    ax.set_ylabel('State dimension 2')
-    ax.set_zlabel('State dimension 3')
-    if add_colorbar:
-        fig.colorbar(im, label='Reward')
-    plt.draw()
-    plt.pause(0.0001)
-
-
-def plot_representation(states, rewards, name="Learned State Representation", add_colorbar=True):
-    state_dim = states.shape[1]
-    if state_dim == 2:
-        plot_2d_representation(states, rewards, name, add_colorbar)
-    elif state_dim == 3:
-        plot_3d_representation(states, rewards, name, add_colorbar)
-    else:
-        # TODO: 1d plot + PCA for more dimensions
-        print("[WARNING] state dim = {} is not supported for plotting".format(state_dim))
-
-
-def plot_2d_representation(states, rewards, name="Learned State Representation", add_colorbar=True):
-    plt.ion()
-    plt.figure(name)
-    plt.clf()
-    plt.scatter(states[:, 0], states[:, 1], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
-    plt.xlabel('State dimension 1')
-    plt.ylabel('State dimension 2')
-    if add_colorbar:
-        plt.colorbar(label='Reward')
-    plt.pause(0.0001)
-
-
-def plot_observations(observations, name='Observation Samples'):
-    plt.ion()
-    plt.figure(name)
-    m, n = 8, 10
-    for i in range(m * n):
-        plt.subplot(m, n, i + 1)
-        plt.imshow(observations[i].reshape(16, 16, 3), interpolation='nearest')
-        plt.gca().invert_yaxis()
-        plt.xticks([])
-        plt.yticks([])
-    plt.pause(0.0001)
+def saveStates(states, images_path, rewards, log_folder):
+    """
+    :param states: (numpy array)
+    :param images_path: ([str])
+    :param rewards: (rewards)
+    :param log_folder: (str)
+    """
+    print("Saving image path to state representation")
+    image_to_state = {path:list(map(str, state)) for path, state in zip(images_path, states)}
+    with open("{}/image_to_state.json".format(log_folder), 'wb') as f:
+        json.dump(image_to_state, f)
+    print("Saving states and rewards")
+    states_rewards = {'states': states, 'rewards': rewards}
+    np.savez('{}/states_rewards.npz'.format(log_folder), **states_rewards)
 
 
 if __name__ == '__main__':
@@ -410,6 +359,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
     parser.add_argument('--path', type=str, default="", help='Path to npz file')
+    parser.add_argument('--data_folder', type=str, default="", help='Dataset folder')
     parser.add_argument('--log_folder', type=str, default='logs/default',
                         help='Folder within logs/ where the experiment model and KNN images and plots will be saved')
 
@@ -445,11 +395,18 @@ if __name__ == '__main__':
     print("Observations shape: {}".format(observations.shape))
 
     print('Learning a state representation ... ')
-    srl = SRL4robotics(args.state_dim, args.model_type, args.seed,
-                       learning_rate=args.learning_rate, l1_reg=args.l1_reg, cuda=args.cuda)
+    srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
+                       log_folder=args.log_folder, learning_rate=args.learning_rate,
+                       l1_reg=args.l1_reg, cuda=args.cuda)
     learned_states = srl.learn(observations, actions, rewards, episode_starts)
-    # saveImagesAndReprToTxt(learned_states, args.log_folder)
-    if DISPLAY_PLOTS:
-        plot_representation(learned_states, rewards, name='Training Data', add_colorbar=True)
+    
+    if args.data_folder != "":
+        ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
+        saveStates(learned_states, ground_truth['images_path'], rewards, args.log_folder)
 
+    name = "Learned State Representation\n {}".format(args.log_folder.split('/')[-1])
+    path = "{}/learned_states.png".format(args.log_folder)
+    plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
+
+    if DISPLAY_PLOTS:
         input('\nPress any key to exit.')

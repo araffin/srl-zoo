@@ -99,7 +99,10 @@ if __name__ == '__main__':
         images.sort(key=lambda item: int(item.split('.')[0].split('frame')[1]))
 
         observations = np.zeros((len(images), IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS))
+        images_path = []
         for idx, image in enumerate(images):
+            # Save only the path starting from the data folder
+            images_path.append('{}/{}/{}/{}'.format(args.data_folder, record_folder.split("/")[-1], image_folders[0], image))
             im = cv2.imread('{}/{}/{}'.format(record_folder, image_folders[0], image))
             im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
             obs = preprocessInput(im.astype(np.float32), mode=args.mode)
@@ -148,16 +151,19 @@ if __name__ == '__main__':
             episode_starts = episode_start[:]
             all_arm_states = arm_states
             all_observations = [observations]
+            all_images_path = [images_path]
         else:
             all_actions = np.concatenate((all_actions, actions), axis=0)
             all_rewards = np.concatenate((all_rewards, rewards), axis=0)
             episode_starts = np.concatenate((episode_starts, episode_start), axis=0)
             all_arm_states = np.concatenate((all_arm_states, arm_states), axis=0)
             all_observations.append(observations)
+            all_images_path.append(images_path)
         # Update progressbar
         pbar.update(1)
 
     all_observations = np.concatenate(all_observations)
+    all_images_path = np.concatenate(all_images_path)
     pbar.close()
     # Save Everything
     data = {
@@ -172,6 +178,7 @@ if __name__ == '__main__':
     ground_truth = {
         'button_positions': button_positions,
         'arm_states': all_arm_states,
-        'actions_deltas': action_to_idx.keys()
+        'actions_deltas': action_to_idx.keys(),
+        'images_path': all_images_path
     }
     np.savez('{}/ground_truth.npz'.format(data_folder), **ground_truth)
