@@ -1,3 +1,0 @@
-#
-
-# Old file: imagesAndReprToTxt.lua
