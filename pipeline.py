@@ -46,7 +46,7 @@ def getLogFolder(exp_config):
     if exp_config['use_continuous']:
         raise NotImplementedError("Continous actions not supported yet")
         continuous_str = "_cont_MCD{}_S{}".format(MAX_COS_DIST_AMONG_ACTIONS_THRESHOLD, CONTINUOUS_ACTION_SIGMA)
-        continuous_str = continuous_str.replace(".", "_") # replace decimal points by '_' for folder naming
+        continuous_str = continuous_str.replace(".", "_")  # replace decimal points by '_' for folder naming
     else:
         continuous_str = ""
 

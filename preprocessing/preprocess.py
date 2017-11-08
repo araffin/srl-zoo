@@ -52,6 +52,7 @@ def isInBound(coordinate):
 
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser(description='Preprocess extracted ros bags')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder name')
     parser.add_argument('--mode', type=str, default="image_net", help='Preprocessing mode: One of "image_net", "tf".')
@@ -79,11 +80,15 @@ if __name__ == '__main__':
     else:
         print("No dataset config file found, using default values")
 
-    record_folders = [item for item in os.listdir(data_folder) if os.path.isdir('{}/{}'.format(data_folder, item))]
+    record_folders = []
+    for item in os.listdir(data_folder):
+        path = '{}/{}'.format(data_folder, item)
+        if os.path.isdir(path) and "record" in item:
+            record_folders.append(item)
     # Sort folders
     record_folders.sort(key=lambda item: int(item.split('_')[1]))
 
-    all_actions, all_rewards, episodes_starts = None, None, None
+    all_actions, all_rewards, episodes_starts, all_images_path = None, None, None, None
     button_positions, all_arm_states, all_observations = [], None, None
     action_to_idx = getActions(DELTA_POS, N_ACTIONS)
 
@@ -95,9 +100,9 @@ if __name__ == '__main__':
         image_folders = [item for item in os.listdir(record_folder) if os.path.isdir('{}/{}'.format(record_folder, item))]
 
         assert len(image_folders) == 1, "Multiple image folders are not supported yet"
+        # skip time file created by ROS and other unwanted non image files
         images = [item for item in os.listdir('{}/{}/'.format(record_folder, image_folders[0])) if item.endswith(".jpg")]
         images.sort(key=lambda item: int(item.split('.')[0].split('frame')[1]))
-
         observations = np.zeros((len(images), IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS))
         images_path = []
         for idx, image in enumerate(images):
@@ -112,7 +117,6 @@ if __name__ == '__main__':
         # Retrieve frame indices where the button was pressed
         df = getDataFrame('{}/{}'.format(record_folder, text_files['is_pressed']))
         rewards = df['value'].values
-
         # Retrieve button position
         with open('{}/{}'.format(record_folder, text_files['button_position'])) as f:
             button_position = map(float, f.readlines()[1].split(' '))
@@ -172,6 +176,9 @@ if __name__ == '__main__':
         'actions': all_actions.reshape(-1, 1),
         'episode_starts': episode_starts,
     }
+
+    assert len(all_rewards) == len(all_images_path), "n_rewards != n_images: {} != {}".format(len(all_rewards), len(all_images_path))
+
     print("Saving preprocessed data...")
     np.savez('{}/preprocessed_data.npz'.format(data_folder), **data)
 

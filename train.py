@@ -72,6 +72,7 @@ class SRLConvolutionalNetwork(nn.Module):
     def __init__(self, state_dim=2, batch_size=256, cuda=False):
         super(SRLConvolutionalNetwork, self).__init__()
         self.resnet = models.resnet18(pretrained=True)
+        self.squeezeNet = models.squeezenet1_0(pretrained=True)
         # Freeze params
         for param in self.resnet.parameters():
             param.requires_grad = False
@@ -114,7 +115,6 @@ class SRLDenseNetwork(nn.Module):
         x = self.fc2(x)
         x = self.noise(x)
         return x
-
 
 class GaussianNoise(nn.Module):
     """
@@ -161,9 +161,10 @@ class RoboticPriorsLoss(nn.Module):
         state_diff = next_states - states
         state_diff_norm = state_diff.norm(2, dim=1)
         similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
+        # try:
         temp_coherence_loss = (state_diff_norm ** 2).mean()
         causality_loss = similarity(states[dissimilar_pairs[:, 0]],
-                                    states[dissimilar_pairs[:, 1]]).mean()
+                                states[dissimilar_pairs[:, 1]]).mean()
         proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
                                  state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
 
@@ -175,7 +176,6 @@ class RoboticPriorsLoss(nn.Module):
 
         loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss + 5 * repeatability_loss + self.l1_coeff * l1_loss
         return loss
-
 
 class SRL4robotics:
     """
@@ -339,11 +339,18 @@ def saveStates(states, images_path, rewards, log_folder):
     print("Saving image path to state representation")
     image_to_state = {path:list(map(str, state)) for path, state in zip(images_path, states)}
     with open("{}/image_to_state.json".format(log_folder), 'wb') as f:
-        json.dump(image_to_state, f)
+        json.dump(image_to_state, f, sort_keys=True)
     print("Saving states and rewards")
     states_rewards = {'states': states, 'rewards': rewards}
     np.savez('{}/states_rewards.npz'.format(log_folder), **states_rewards)
 
+def set_cuda(use_cuda):
+    if use_cuda:
+        # To tackle GPU memory issues, th.cuda.set_default_device(1) and set_device() are both discouraged, use instead A) MLP network, SqueezeNet instead of ResNet or B)
+        # See how second gpu memory is less used, therefore we can set it (recommended as setDevice is discouraged): CUDA_VISIBLE_DEVICES=1 python main.py (to set the second gpu memory for use)
+        # A future enhancement TODO for running on multiple GPU: CUDA_VISIBLE_DEVICES=2,3 python main.py   and then also model = torch.nn.DataParallel(model, device_ids=[0,1]).cuda()
+        device = th.cuda.current_device()+1
+        print ("Current device is the {}{}. setDevice is discouraged, run instead: CUDA_VISIBLE_DEVICES=1 python main.py (to set the second gpu memory)".format(device,'nd' if device==2 else 'st'))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch SRL with robotic priors')
@@ -399,7 +406,7 @@ if __name__ == '__main__':
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda)
     learned_states = srl.learn(observations, actions, rewards, episode_starts)
-    
+
     if args.data_folder != "":
         ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
         saveStates(learned_states, ground_truth['images_path'], rewards, args.log_folder)
