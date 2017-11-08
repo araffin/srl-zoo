@@ -43,7 +43,7 @@ def plot_representation(states, rewards, name="Learned State Representation",
             print("Fitting PCA with 3 components")
             pca = PCA(n_components=3)
             pca.fit(states)
-            plot_3d_representation(pca.transform(states), name, add_colorbar, path)
+            plot_3d_representation(pca.transform(states), rewards, name, add_colorbar, path)
         else:
             # TODO: 1d plot
             print("[WARNING] state dim = {} is not supported for plotting".format(state_dim))
@@ -62,6 +62,7 @@ def plot_2d_representation(states, rewards, name="Learned State Representation",
     plt.pause(0.0001)
     if path is not None:
         plt.savefig(path)
+
 
 def plot_observations(observations, name='Observation Samples'):
     plt.ion()

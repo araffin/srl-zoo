@@ -8,40 +8,20 @@ import os
 from collections import OrderedDict
 from pprint import pprint
 
-from termcolor import colored
-
-# from const import LOG_FOLDER, MODEL_APPROACH, USE_CONTINUOUS, MAX_COS_DIST_AMONG_ACTIONS_THRESHOLD
-# from const import CONTINUOUS_ACTION_SIGMA, STATES_DIMENSION, PRIORS_CONFIGS_TO_APPLY, PROP, TEMP, CAUS, REP, \
-#     BRING_CLOSER_REF_POINT
-
-def printGreen(str):
-    print(colored(str, 'green'))
-
-def printYellow(str):
-    print(colored(str, 'yellow'))
-
-def printRed(str):
-    print(colored(str, 'red'))
-
-def printBlue(str):
-    print(colored(str, 'blue'))
-
-def priorsToString(listOfPriors):
-    string = '_'
-    for index, priors in enumerate(listOfPriors):
-        string = string + priors[0:3]
-    return string
+from utils import printRed, printGreen, printBlue, printYellow, priorsToString
 
 
-def getLogFolder(exp_config):
+def getLogFolderName(exp_config):
     """
     :param exp_config: (dict)
     :return: (str, str)
     """
     now = datetime.datetime.now()
-    date = "Y{}_M{:02d}_D{:02d}_H{:02d}M{:02d}S{:02d}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
-    model_str = "_{}".format(exp_config['architecture_name']) # exp_config['data_folder'],
-    srl_str = "{}_ST_DIM{}_SEED{}".format(priorsToString(exp_config['priors']), exp_config['state_dim'], exp_config['seed'])
+    date = "Y{}_M{:02d}_D{:02d}_H{:02d}M{:02d}S{:02d}".format(now.year, now.month, now.day, now.hour, now.minute,
+                                                              now.second)
+    model_str = "_{}".format(exp_config['architecture_name'])  # exp_config['data_folder'],
+    srl_str = "{}_ST_DIM{}_SEED{}".format(priorsToString(exp_config['priors']), exp_config['state_dim'],
+                                          exp_config['seed'])
 
     if exp_config['use_continuous']:
         raise NotImplementedError("Continous actions not supported yet")
@@ -62,6 +42,7 @@ def getLogFolder(exp_config):
 
     return log_folder, experiment_name
 
+
 def preprocessingCall(exp_config, force=False):
     """
     :param exp_config: (dict)
@@ -80,6 +61,7 @@ def preprocessingCall(exp_config, force=False):
         pprint(exp_config)
         raise RuntimeError("Error during preprocessing (config file above)")
     print("End of preprocessing.\n")
+
 
 def stateRepresentationLearningCall(exp_config):
     """
@@ -103,6 +85,24 @@ def stateRepresentationLearningCall(exp_config):
     print("End of state representation learning.\n")
 
 
+def knnCall(exp_config):
+    try:
+        os.makedirs('{}/NearestNeighbors/'.format(exp_config['log_folder']))
+    except OSError:
+        print("NearestNeighbors folder already exist")
+
+    printGreen("\nEvaluating the state representation with KNN")
+    args = ['--seed', str(exp_config['knn_seed']), '--n_samples', str(exp_config['knn_samples'])]
+    for arg in ['log_folder', 'data_folder', 'n_neighbors']:
+        args.extend(['--{}'.format(arg), str(exp_config[arg])])
+
+    ok = subprocess.call(['python', '-m', 'plotting.knn_images'] + args)
+    if ok != 0:
+        printRed("An error occured")
+        pprint(exp_config)
+        raise RuntimeError("Error during knn plotting (config file above)")
+    print("End of evluation.\n")
+
 def saveConfig(exp_config):
     """
     :param exp_config: (dict)
@@ -113,6 +113,7 @@ def saveConfig(exp_config):
     with open("{}/exp_config.json".format(exp_config['log_folder']), "wb") as f:
         json.dump(exp_config, f)
     print("Saved config to log folder: {}".format(exp_config['log_folder']))
+
 
 parser = argparse.ArgumentParser(description='Pipeline script for state representation learning')
 parser.add_argument('-c', '--exp_config', type=str, default="", help='Path to an experiment config file')
@@ -130,15 +131,17 @@ if args.exp_config != "":
     data_folder = exp_config['data_folder']
     printGreen("\nDataset folder: {}".format(data_folder))
     # Update and save config
-    log_folder, experiment_name = getLogFolder(exp_config)
+    log_folder, experiment_name = getLogFolderName(exp_config)
     exp_config['log_folder'] = log_folder
     exp_config['experiment_name'] = experiment_name
+    # Save config in log folder
     saveConfig(exp_config)
-    # Try preprocessing the data (will be skipped if the preprocessing
-    # is already done)
+    # Preprocess data if needed
     preprocessingCall(exp_config)
+    # Learn a state representation and plot it
     stateRepresentationLearningCall(exp_config)
-
+    # Evaluate the representation with kNN
+    knnCall(exp_config)
 
 elif args.data_folder != "":
     if "data/" in args.data_folder:
@@ -149,6 +152,7 @@ elif args.data_folder != "":
 
     printGreen("\n Grid search on a dataset folder: {} \n".format(args.data_folder))
 
+    # TODO: replace default argument by a json config file (see configs/ folder)
     exp_config = {
         'data_folder': args.data_folder,
         'use_continuous': False,
@@ -170,17 +174,23 @@ elif args.data_folder != "":
     exp_config['batch_size'] = 256
     exp_config['epochs'] = 1
     exp_config['architecture_name'] = "resnet"
+    exp_config['knn_seed'] = 1
+    exp_config['n_neighbors'] = 5
+    exp_config['knn_samples'] = 5  # 5 test images for KNN
+
     # Grid search
     for seed in [1]:
         exp_config['seed'] = seed
-        for state_dim in [2]:
+        for state_dim in [3]:
+            # Update config
             exp_config['state_dim'] = state_dim
-            log_folder, experiment_name = getLogFolder(exp_config)
+            log_folder, experiment_name = getLogFolderName(exp_config)
             exp_config['log_folder'] = log_folder
             exp_config['experiment_name'] = experiment_name
+            # Run the pipeline
             saveConfig(exp_config)
             stateRepresentationLearningCall(exp_config)
-
+            knnCall(exp_config)
 
 else:
     print("Please specify one of --exp_config or --data_folder")
