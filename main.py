@@ -163,16 +163,10 @@ class RoboticPriorsLoss(nn.Module):
         state_diff = next_states - states
         state_diff_norm = state_diff.norm(2, dim=1)
         similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
-<<<<<<< HEAD
         # try:
         temp_coherence_loss = (state_diff_norm ** 2).mean()
         causality_loss = similarity(states[dissimilar_pairs[:, 0]],
                                 states[dissimilar_pairs[:, 1]]).mean()
-=======
-        temp_coherence_loss = (state_diff_norm ** 2).mean()
-        causality_loss = similarity(states[dissimilar_pairs[:, 0]],
-                                    states[dissimilar_pairs[:, 1]]).mean()
->>>>>>> c34a8eddc1c5292a6b65da774ad4a5a64e981219
         proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
                                  state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
 
@@ -184,13 +178,6 @@ class RoboticPriorsLoss(nn.Module):
 
         loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss + 5 * repeatability_loss + self.l1_coeff * l1_loss
         return loss
-<<<<<<< HEAD
-        # except Exception:
-        #     print('WATCHDOG! skipping fwd pass... (BATCH_SIZE is not large enough and as a watchdog, no equal actions/states are found to apply the priors. Increase your BATCH_SIZE or memory for the priors to be applied!)')
-        #     pass
-=======
->>>>>>> c34a8eddc1c5292a6b65da774ad4a5a64e981219
-
 
 class SRL4robotics:
     """

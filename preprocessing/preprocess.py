@@ -73,14 +73,13 @@ if __name__ == '__main__':
 
     data_folder = args.data_folder
     data_folder = "{}/data/{}/".format(base_path, data_folder)
-    record_folders = [item for item in os.listdir(data_folder) if os.path.isdir('{}/{}'.format(data_folder, item))]
+    record_folders = [item for item in os.listdir(data_folder) if os.path.isdir('{}/{}'.format(data_folder, item)) and 'record' in '{}/{}'.format(data_folder, item)]
     # Sort folders
     record_folders.sort(key=lambda item: int(item.split('_')[1]))
 
     all_actions, all_rewards, episodes_starts, all_image_paths = None, None, None, None
     button_positions, all_arm_states, all_observations = [], None, None
     action_to_idx = getActions(DELTA_POS, N_ACTIONS)
-    image_paths = []
 
     print("Found {} folder(s)".format(len(record_folders)))
     # Iterate through record folders
@@ -88,11 +87,10 @@ if __name__ == '__main__':
     for record_folder_name in record_folders[:MAX_RECORDS]:
         record_folder = '{}/{}'.format(data_folder, record_folder_name)
         image_folders = [item for item in os.listdir(record_folder) if os.path.isdir('{}/{}'.format(record_folder, item))]
-
+        image_paths = []
         assert len(image_folders) == 1, "Multiple image folders are not supported yet"
-        images = [item for item in os.listdir('{}/{}/'.format(record_folder, image_folders[0])) if item.endswith(".jpg")]
+        images = [item for item in os.listdir('{}/{}/'.format(record_folder, image_folders[0])) if item.endswith(".jpg")] #and 'frame' in image_path: # skip time file created by ROS and other unwanted non image files
         images.sort(key=lambda item: int(item.split('.')[0].split('frame')[1]))
-
         observations = np.zeros((len(images), IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS))
         for idx, image in enumerate(images):
             image_path = '{}/{}/{}'.format(record_folder, image_folders[0], image)
@@ -103,10 +101,10 @@ if __name__ == '__main__':
             obs = np.expand_dims(obs, axis=0)
             observations[idx] = obs
             image_paths.append(image_path.replace('//', '/'))
+        print (str(len(image_paths)))
         # Retrieve frame indices where the button was pressed
         df = getDataFrame('{}/{}'.format(record_folder, text_files['is_pressed']))
         rewards = df['value'].values
-
         # Retrieve button position
         with open('{}/{}'.format(record_folder, text_files['button_position'])) as f:
             button_position = map(float, f.readlines()[1].split(' '))
@@ -152,7 +150,7 @@ if __name__ == '__main__':
             episode_starts = np.concatenate((episode_starts, episode_start), axis=0)
             all_arm_states = np.concatenate((all_arm_states, arm_states), axis=0)
             all_observations.append(observations)
-            all_image_paths.append(image_paths)
+            all_image_paths.extend(image_paths)  #append would result in total 182 elements instead of 180?!
         # Update progressbar
         pbar.update(1)
 
@@ -166,10 +164,8 @@ if __name__ == '__main__':
         'episode_starts': episode_starts,
         'path_to_images': all_image_paths
     }
+    assert len(all_rewards) == len(all_image_paths),"Number of rewards and images processed should coincide, it is {} and {}".format(len(all_rewards), len(all_image_paths))
 
-    assert len(all_rewards) == len(all_image_paths)
-    print(''.format(all_image_paths))
-    print(''.format( len(all_image_paths)))
     #np2fileIntegers(all_rewards, ALL_REWARDS_FILE, '\n') #save_to_file(all_rewards, ALL_REWARDS_FILE)
 
     print("Saving preprocessed data...")
