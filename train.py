@@ -41,6 +41,7 @@ try:
 except ImportError:
     pass
 
+DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 256  #
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
@@ -305,12 +306,12 @@ class SRL4robotics:
             if (epoch + 1) % EPOCH_FLAG == 0:
                 print("Epoch {:3}/{}, loss:{:.4f}".format(epoch + 1, N_EPOCHS, epoch_loss / epoch_batches))
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
-
-                # Optionally plot the current state space
-                plot_representation(self._batchPredStates(observations), rewards, add_colorbar=epoch == 0,
-                                    name="Learned State Representation (Training Data)")
-
-        plt.close("Learned State Representation (Training Data)")
+                if DISPLAY_PLOTS:
+                    # Optionally plot the current state space
+                    plot_representation(self._batchPredStates(observations), rewards, add_colorbar=epoch == 0,
+                                        name="Learned State Representation (Training Data)")
+        if DISPLAY_PLOTS:
+            plt.close("Learned State Representation (Training Data)")
 
         # return predicted states for training observations
         return self._batchPredStates(observations)
@@ -404,21 +405,22 @@ if __name__ == '__main__':
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('-bs', '--batch_size', type=int, default=256, help='batch_size (default: 256)')
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
-    parser.add_argument('--l1', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
+    parser.add_argument('--l1_reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
+    parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
     parser.add_argument('--path', type=str, default="", help='Path to npz file')
-    parser.add_argument('--experiment_path', type=str, default='logs/default',
+    parser.add_argument('--log_folder', type=str, default='logs/default',
                         help='Folder within logs/ where the experiment model and KNN images and plots will be saved')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
+    DISPLAY_PLOTS = not args.no_plots
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
-    EXPERIMENT_PATH = args.experiment_path
 
     print('\nDataset npz file: {}\n'.format(args.path))
-    print('Expriment path: {}'.format(args.experiment_path))
+    print('Log folder: {}'.format(args.log_folder))
 
     print('Loading data ... ')
     training_data = np.load(args.path)
@@ -444,9 +446,10 @@ if __name__ == '__main__':
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, args.model_type, args.seed,
-                       learning_rate=args.learning_rate, l1_reg=args.l1, cuda=args.cuda)
+                       learning_rate=args.learning_rate, l1_reg=args.l1_reg, cuda=args.cuda)
     learned_states = srl.learn(observations, actions, rewards, episode_starts)
-    # saveImagesAndReprToTxt(learned_states, EXPERIMENT_PATH)
-    plot_representation(learned_states, rewards, name='Training Data', add_colorbar=True)
+    # saveImagesAndReprToTxt(learned_states, args.log_folder)
+    if DISPLAY_PLOTS:
+        plot_representation(learned_states, rewards, name='Training Data', add_colorbar=True)
 
-    input('\nPress any key to exit.')
+        input('\nPress any key to exit.')

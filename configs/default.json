@@ -1,0 +1,16 @@
+{
+  "architecture_name": "resnet",
+  "batch_size": 256,
+  "epochs": 1,
+  "l1_reg": 0,
+  "learning_rate": 0.001,
+  "model_approach": "priors",
+  "model_type": "cnn",
+  "priors": [
+    "Proportionality",
+    "Temporal",
+    "Causality",
+    "Repetability"
+  ],
+  "use_continuous": false
+}

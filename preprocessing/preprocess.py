@@ -8,6 +8,7 @@ TODO: normalize with data loaders from pytorch https://github.com/pytorch/exampl
 from __future__ import print_function, division, absolute_import
 
 import argparse
+import json
 import os
 
 from tqdm import tqdm
@@ -16,7 +17,6 @@ import pandas as pd
 import numpy as np
 
 from .utils import detectBasePath, getActions, findClosestAction, getDataFrame, preprocessInput
-from const import np2fileIntegers, ALL_REWARDS_FILE
 
 
 base_path = detectBasePath(__file__)
@@ -33,9 +33,6 @@ N_ACTIONS = 26
 # Bound for negative rewards
 BOUND_INF = [0.42, -0.1, -0.11]
 BOUND_SUP = [0.75, 0.60, 0.35]
-# Button simplest
-BOUND_INF = [0.42,-0.2,-10] # for x,y,z
-BOUND_SUP = [0.8,0.7,10] # for x,y,z
 
 # Resized image shape
 IMAGE_WIDTH = 224 # in px
@@ -55,8 +52,6 @@ def isInBound(coordinate):
 
 
 if __name__ == '__main__':
-    np2fileIntegers(np.array([]), ALL_REWARDS_FILE, '\n') #save_to_file(all_rewards, ALL_REWARDS_FILE)
-
     parser = argparse.ArgumentParser(description='Preprocess extracted ros bags')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder name')
     parser.add_argument('--mode', type=str, default="image_net", help='Preprocessing mode: One of "image_net", "tf".')
@@ -74,6 +69,16 @@ if __name__ == '__main__':
 
     data_folder = args.data_folder
     data_folder = "{}/data/{}/".format(base_path, data_folder)
+
+    if os.path.isfile('{}dataset_config.json'.format(data_folder)):
+        print("Loading dataset config...")
+        with open('{}dataset_config.json'.format(data_folder), 'rb') as f:
+            dataset_config = json.load(f)
+        BOUND_INF = dataset_config['bound_inf']
+        BOUND_SUP = dataset_config['bound_sup']
+    else:
+        print("No dataset config file found, using default values")
+
     record_folders = [item for item in os.listdir(data_folder) if os.path.isdir('{}/{}'.format(data_folder, item))]
     # Sort folders
     record_folders.sort(key=lambda item: int(item.split('_')[1]))
@@ -170,5 +175,3 @@ if __name__ == '__main__':
         'actions_deltas': action_to_idx.keys()
     }
     np.savez('{}/ground_truth.npz'.format(data_folder), **ground_truth)
-
-    np2fileIntegers(all_rewards, ALL_REWARDS_FILE, '\n') #save_to_file(all_rewards, ALL_REWARDS_FILE)
