@@ -7,6 +7,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
+
 def detectBasePath(filename, folder_name="srl-robotic-priors-pytorch", default_path=""):
     """
     Try to auto-detect the base path of the project

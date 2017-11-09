@@ -1,3 +1,8 @@
+# coding: utf-8
+"""
+Pipeline script to preprocess data, learn state representation and evaluate the representation.
+It can also perform grid search or reproduce an experiment
+"""
 from __future__ import print_function, division
 
 import argparse
@@ -11,9 +16,17 @@ from pprint import pprint
 
 from utils import printRed, printGreen, printBlue, printYellow, priorsToString
 
+# Fix for matplotlib non-zero return
+# Apparently due to seg fault
+# (https://stackoverflow.com/questions/24139389/unable-to-find-out-what-return-code-of-11-means)
+MATPLOTLIB_WARNING_CODE = -11
+
 
 def getLogFolderName(exp_config):
     """
+    Create experiment name using experiment config and current time.
+    It also try to create the experiment folder.
+    It returns both full path to the log folder and experiment_name
     :param exp_config: (dict)
     :return: (str, str)
     """
@@ -46,6 +59,9 @@ def getLogFolderName(exp_config):
 
 def preprocessingCall(exp_config, force=False):
     """
+    Preprocess the data, if the data are already preprocessed
+    (i.e. the file preprocessed_data.npz exists) it will skip it
+    unless you set the `force` flag to True
     :param exp_config: (dict)
     :param force: (bool)
     """
@@ -58,7 +74,7 @@ def preprocessingCall(exp_config, force=False):
     args = ['--data_folder', exp_config['data_folder'], '--no-warnings']
     ok = subprocess.call(['python', '-m', 'preprocessing.preprocess'] + args)
     if ok != 0:
-        printRed("An error occured")
+        printRed("An error occured, error code: {}".format(ok))
         pprint(exp_config)
         raise RuntimeError("Error during preprocessing (config file above)")
     print("End of preprocessing.\n")
@@ -79,14 +95,20 @@ def stateRepresentationLearningCall(exp_config):
 
     ok = subprocess.call(['python', 'train.py'] + args)
     if ok != 0:
-        printRed("An error occured")
-        pprint(exp_config)
-        raise RuntimeError("Error during state representation learning (config file above)")
+        printRed("An error occured, error code: {}".format(ok))
+        if ok != MATPLOTLIB_WARNING_CODE:
+            pprint(exp_config)
+            raise RuntimeError("Error during state representation learning (config file above)")
 
     print("End of state representation learning.\n")
 
 
 def knnCall(exp_config):
+    """
+    Evaluate the representation using knn
+    and compute knn-mse on a set of images.
+    :param exp_config: (dict)
+    """
     try:
         os.makedirs('{}/NearestNeighbors/'.format(exp_config['log_folder']))
     except OSError:
@@ -99,13 +121,15 @@ def knnCall(exp_config):
 
     ok = subprocess.call(['python', '-m', 'plotting.knn_images'] + args)
     if ok != 0:
-        printRed("An error occured")
+        printRed("An error occured, error code: {}".format(ok))
         pprint(exp_config)
         raise RuntimeError("Error during knn plotting (config file above)")
-    print("End of evluation.\n")
+    print("End of evaluation.\n")
+
 
 def saveConfig(exp_config, print_config=False):
     """
+    Save the experiment config to a json file
     :param exp_config: (dict)
     :param print_config: (bool)
     """
@@ -123,7 +147,8 @@ parser = argparse.ArgumentParser(description='Pipeline script for state represen
 parser.add_argument('-c', '--exp_config', type=str, default="", help='Path to an experiment config file')
 parser.add_argument('--data_folder', type=str, default="", help='Path to a dataset folder')
 parser.add_argument('--base_config', type=str, default="configs/default.json",
-                    help='Path to overall config file, it contains variables independent from datasets (default: /configs/default.json)')
+                    help='Path to overall config file, it contains variables independent from datasets (default: '
+                         '/configs/default.json)')
 args = parser.parse_args()
 
 if args.exp_config != "":
@@ -182,9 +207,12 @@ elif args.data_folder != "":
             log_folder, experiment_name = getLogFolderName(exp_config)
             exp_config['log_folder'] = log_folder
             exp_config['experiment_name'] = experiment_name
-            # Run the pipeline
+            # Save config in log folder
             saveConfig(exp_config, print_config=True)
+
+            # Learn a state representation and plot it
             stateRepresentationLearningCall(exp_config)
+            # Evaluate the representation with kNN
             knnCall(exp_config)
 
 else:

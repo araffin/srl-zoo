@@ -1,15 +1,23 @@
 # State Representation Learning with Robotic Priors in PyTorch
 
+Related papers:
 - "Learning State Representations with Robotic Priors" (Jonschkowski and Brock, 2015), paper: [http://tinyurl.com/gly9sma](http://tinyurl.com/gly9sma)
 - "Unsupervised state representation learning with robotic priors: a robustness benchmark" (Lesort, Seurin et al., 2017), paper: [https://arxiv.org/pdf/1709.05185.pdf](https://arxiv.org/pdf/1709.05185.pdf)
 
 ### Config files
+
+#### Base config
 Config common to all dataset can found in [configs/default.json](configs/default.json).
 
-### Dataset config files
+### Dataset config
 All dataset must be placed in the `data/` folder.
-Each dataset should can contain a `dataset_config.json` file, an example can fe found [here](configs/example_dataset_config.json).
+Each dataset should can contain a `dataset_config.json` file, an example can be found [here](configs/example_dataset_config.json).
 This config file describes variables specifics to this dataset.
+
+
+### Experiment config
+Experiment config file is generate by the `pipeline.py` script. An example can be found [here](configs/example_exp_config.json))
+
 
 ### Pipeline Script
 It preprocess data, learn a state representation and evaluate it using knn.
@@ -119,7 +127,7 @@ For display enhancement:
 ## Example Data
 You can reproduce Rico Jonschkowski's results by downloading npz files from the original [github repository](https://github.com/tu-rbo/learning-state-representations-with-robotic-priors).
 
-It was tested with the following commit: [araffin/srl-robotic-priors-pytorch@5175b88a891c240f393b717dd1866435c73ebbda]( araffin/srl-robotic-priors-pytorch@5175b88a891c240f393b717dd1866435c73ebbda)
+It was tested with the following commit: [https://github.com/araffin/srl-robotic-priors-pytorch/commit/5175b88a891c240f393b717dd1866435c73ebbda](https://github.com/araffin/srl-robotic-priors-pytorch/commit/5175b88a891c240f393b717dd1866435c73ebbda)
 
 
 ## Troubleshooting

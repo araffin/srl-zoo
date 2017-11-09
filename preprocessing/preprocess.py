@@ -2,7 +2,9 @@
 Preprocessing script to extract actions, rewards, ground truth from text files
 
 TODO: improve image preprocessing speed, reduce memory usage
-TODO: normalize with data loaders from pytorch https://github.com/pytorch/examples/blob/42e5b996718797e45c46a25c55b031e6768f8440/imagenet/main.py#L89-L101 as in normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+TODO: normalize with data loaders from pytorch
+https://github.com/pytorch/examples/blob/42e5b996718797e45c46a25c55b031e6768f8440/imagenet/main.py#L89-L101
+as in normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
 """
 from __future__ import print_function, division, absolute_import
@@ -11,13 +13,11 @@ import argparse
 import json
 import os
 
-from tqdm import tqdm
 import cv2
-import pandas as pd
 import numpy as np
+from tqdm import tqdm
 
 from .utils import detectBasePath, getActions, findClosestAction, getDataFrame, preprocessInput
-
 
 base_path = detectBasePath(__file__)
 text_files = {
@@ -35,10 +35,11 @@ BOUND_INF = [0.42, -0.1, -0.11]
 BOUND_SUP = [0.75, 0.60, 0.35]
 
 # Resized image shape
-IMAGE_WIDTH = 224 # in px
-IMAGE_HEIGHT = 224 # in px
+IMAGE_WIDTH = 224  # in px
+IMAGE_HEIGHT = 224  # in px
 N_CHANNELS = 3
 MAX_RECORDS = 50
+
 
 def isInBound(coordinate):
     """
@@ -97,17 +98,20 @@ if __name__ == '__main__':
     pbar = tqdm(total=len(record_folders))
     for record_folder_name in record_folders[:MAX_RECORDS]:
         record_folder = '{}/{}'.format(data_folder, record_folder_name)
-        image_folders = [item for item in os.listdir(record_folder) if os.path.isdir('{}/{}'.format(record_folder, item))]
+        image_folders = [item for item in os.listdir(record_folder) if
+                         os.path.isdir('{}/{}'.format(record_folder, item))]
 
         assert len(image_folders) == 1, "Multiple image folders are not supported yet"
         # skip time file created by ROS and other unwanted non image files
-        images = [item for item in os.listdir('{}/{}/'.format(record_folder, image_folders[0])) if item.endswith(".jpg")]
+        images = [item for item in os.listdir('{}/{}/'.format(record_folder, image_folders[0]))
+                  if item.endswith(".jpg")]
         images.sort(key=lambda item: int(item.split('.')[0].split('frame')[1]))
         observations = np.zeros((len(images), IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS))
         images_path = []
         for idx, image in enumerate(images):
             # Save only the path starting from the data folder
-            images_path.append('{}/{}/{}/{}'.format(args.data_folder, record_folder.split("/")[-1], image_folders[0], image))
+            images_path.append(
+                '{}/{}/{}/{}'.format(args.data_folder, record_folder.split("/")[-1], image_folders[0], image))
             im = cv2.imread('{}/{}/{}'.format(record_folder, image_folders[0], image))
             im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
             obs = preprocessInput(im.astype(np.float32), mode=args.mode)
@@ -177,7 +181,7 @@ if __name__ == '__main__':
         'episode_starts': episode_starts,
     }
 
-    assert len(all_rewards) == len(all_images_path), "n_rewards != n_images: {} != {}".format(len(all_rewards), len(all_images_path))
+    assert len(all_rewards) == len(all_images_path),"n_rewards != n_images: {} != {}".format(len(all_rewards), len(all_images_path))
 
     print("Saving preprocessed data...")
     np.savez('{}/preprocessed_data.npz'.format(data_folder), **data)

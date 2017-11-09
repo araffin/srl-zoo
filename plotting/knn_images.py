@@ -1,8 +1,9 @@
 from __future__ import print_function, division, absolute_import
 
 import argparse
-import os
 import random
+import json
+import os
 import re
 
 import matplotlib.pyplot as plt
@@ -53,12 +54,14 @@ random.seed(args.seed)
 # Load ground truth and images path
 ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
 states = np.load('{}/states_rewards.npz'.format(args.log_folder))['states']
-images_path = ground_truth['images_path']
 # TODO: relative states for moving button
 true_states = ground_truth['arm_states']
+images_path = ground_truth['images_path']
+
 base_path = detectBasePath(__file__)
 knn_path = '{}/{}/NearestNeighbors'.format(base_path, args.log_folder)
 
+print("Computing KNN... with k={}".format(args.n_neighbors))
 # Do not consider the reference state as a neighbor
 knn = NearestNeighbors(n_neighbors=n_neighbors + 1, algorithm='ball_tree').fit(states)
 distances, neighbors_indices = knn.kneighbors(states)
@@ -66,13 +69,15 @@ distances, neighbors_indices = knn.kneighbors(states)
 print('\nUsing a random test set of images for KNN MSE evaluation...')
 print('seed={}\n'.format(args.seed))
 
+# Sample random images
 images_indices = np.arange(len(images_path))
-data = random.sample(zip(images_path, neighbors_indices, distances, states, images_indices), n_samples)
+data = random.sample(zip(images_path, neighbors_indices, distances, images_indices), n_samples)
 # Progressbar
 pbar = tqdm(total=n_samples)
 n_images, total_error = 0, 0
+images_titles = []
 
-for img_name, neigbour_indices, dist, state, image_idx in data:
+for image_path, neigbour_indices, distance, image_idx in data:
     fig = plt.figure()
     fig.set_size_inches(60, 35)
 
@@ -80,28 +85,29 @@ for img_name, neigbour_indices, dist, state, image_idx in data:
     record_folder = images_path[image_idx].split("/")[1]
     frame_name = images_path[image_idx].split("/")[-1].split(".")[0]
     # Add reference image
+    # subplot: (i, j, k) ith plot, j rows, k columns
     ref_image = fig.add_subplot(n_lines + 1, 5, 3)
-    img = Image.open("{}data/{}".format(base_path, img_name))
-    imgplot = plt.imshow(img)
+    img = Image.open("{}data/{}".format(base_path, image_path))
+    plt.imshow(img)
     state_str = ", ".join(map(lambda x: '{:.3f}'.format(x), states[image_idx]))
     state_str = "[{}]".format(state_str)
 
     ref_image.axis('off')
     ref_image.set_title('{}/{}\n {}\n{}'.format(record_folder, frame_name, state_str, ref_coord))
+    images_titles.append('{}/{}'.format(record_folder, frame_name))
 
     for i in range(0, n_neighbors):
-        # subplot: (i, j, k) ith plot, j rows, k columns
         subplot = fig.add_subplot(n_lines + 1, 5, 6 + i)
         # Do not consider the reference state as a neighbor
         neighbor_idx = neigbour_indices[i + 1]
-        img_name = images_path[neighbor_idx]
-        neighbor_record_folder = img_name.split("/")[1]
-        neighbor_frame_name = img_name.split("/")[-1].split(".")[0]
+        image_path = images_path[neighbor_idx]
+        neighbor_record_folder = image_path.split("/")[1]
+        neighbor_frame_name = image_path.split("/")[-1].split(".")[0]
 
-        img = Image.open("{}/data/{}".format(base_path, img_name))
+        img = Image.open("{}/data/{}".format(base_path, image_path))
         plt.imshow(img)
 
-        dist_str = 'd={:.4f}'.format(dist[i + 1])
+        dist_str = 'd={:.4f}'.format(distance[i + 1])
         state_str = map(lambda x: '{:.3f}'.format(x), states[neighbor_idx])
         neighbor_coord = true_states[neighbor_idx]
         total_error += np.linalg.norm(neighbor_coord - ref_coord)
@@ -123,5 +129,8 @@ pbar.close()
 # Mean MSE Error
 mean_error = total_error / n_images
 print("KNN MSE: {}".format(mean_error))
-with open("{}/knn_mse.txt".format(args.log_folder), 'w') as f:
-    f.write("{:.5f}".format(mean_error))
+
+result_dict = {'images': images_titles, 'knn_mse': round(mean_error, 5)}
+
+with open("{}/knn_mse.json".format(args.log_folder), 'wb') as f:
+    json.dump(result_dict, f)

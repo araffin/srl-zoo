@@ -47,8 +47,10 @@ MAX_BACTHSIZE_GPU = 512  # For plotting, max batch_size before having memory iss
 
 def observationsGenerator(observations, batch_size=64, cuda=False):
     """
+    Python generator to avoid out of memory issues
+    when predicting states for all the observations
     :param observations: (torch tensor)
-    :param  batch_size: (int)
+    :param batch_size: (int)
     :param cuda: (bool)
     """
     n_minibatches = len(observations) // batch_size + 1
@@ -143,7 +145,11 @@ class GaussianNoise(nn.Module):
 
 
 class RoboticPriorsLoss(nn.Module):
-    def __init__(self, model, l1_reg=0):
+    """
+    :param model: (PyTorch model)
+    :param l1_reg: (float) l1 regularization coeff
+    """
+    def __init__(self, model, l1_reg=0.0):
         super(RoboticPriorsLoss, self).__init__()
         # Retrieve only trainable and regularizable parameters (we should exclude biases)
         self.reg_params = [param for name, param in model.named_parameters() if
@@ -162,7 +168,6 @@ class RoboticPriorsLoss(nn.Module):
         state_diff = next_states - states
         state_diff_norm = state_diff.norm(2, dim=1)
         similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
-        # try:
         temp_coherence_loss = (state_diff_norm ** 2).mean()
         causality_loss = similarity(states[dissimilar_pairs[:, 0]],
                                     states[dissimilar_pairs[:, 1]]).mean()
@@ -175,7 +180,8 @@ class RoboticPriorsLoss(nn.Module):
 
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
-        loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss + 5 * repeatability_loss + self.l1_coeff * l1_loss
+        loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss \
+               + 5 * repeatability_loss + self.l1_coeff * l1_loss
         return loss
 
 
@@ -218,28 +224,66 @@ class SRL4robotics:
         self.log_folder = log_folder
 
     def _predFn(self, observations, restore_train=True):
-        # test mode
+        """
+        Predict states in test mode given observations
+        :param observations: (PyTorch Variable)
+        :param restore_train: (bool) whether to restore training mode after prediction
+        :return: (numpy tensor)
+        """
+        # Switch to test mode
         self.model.eval()
         states = self.model(observations)
         if restore_train:
+            # Restore training mode
             self.model.train()
         if self.cuda:
+            # Move the tensor back to the cpu
             return states.data.cpu().numpy()
         return states.data.numpy()
 
+    def predStates(self, observations):
+        """
+        Predict states for given observations
+        WARNING: you should use _batchPredStates
+        if observations tensor is large to avoid memory issues
+        :param observations: (numpy tensor)
+        :return: (numpy tensor)
+        """
+        observations = observations.astype(np.float32)
+        obs_var = Variable(th.from_numpy(observations), volatile=True)
+        if self.cuda:
+            obs_var = obs_var.cuda()
+        states = self._predFn(obs_var, restore_train=False)
+        return states
+
     def _batchPredStates(self, observations):
+        """
+        Predict states using minibatches to avoid memory issues
+        :param observations: (numpy tensor)
+        :return: (numpy tensor)
+        """
         predictions = []
         for obs_var in observationsGenerator(th.from_numpy(observations), MAX_BACTHSIZE_GPU, cuda=self.cuda):
             predictions.append(self._predFn(obs_var))
         return np.concatenate(predictions, axis=0)
 
     def learn(self, observations, actions, rewards, episode_starts):
+        """
+        Learn a state representation
+        :param observations: (numpy tensor)
+        :param actions: (numpy matrix)
+        :param rewards: (numpy 1D array)
+        :param episode_starts: (numpy 1D array) boolean array
+                                the ith index is True if one episode starts at this frame
+        :return: (numpy tensor) the learned states for the given observations
+        """
 
         # PREPARE DATA -------------------------------------------------------------------------------------------------
-        # here, we normalize the observations, organize the data into minibatches
+        # here, we organize the data into minibatches
         # and find pairs for the respective loss terms
 
         # We assume that observations are already preprocessed
+        # that is to say normalized and scaled
         observations = observations.astype(np.float32)
 
         num_samples = observations.shape[0] - 1  # number of samples
@@ -323,17 +367,10 @@ class SRL4robotics:
         # return predicted states for training observations
         return self._batchPredStates(observations)
 
-    def predStates(self, observations):
-        observations = observations.astype(np.float32)
-        obs_var = Variable(th.from_numpy(observations), volatile=True)
-        if self.cuda:
-            obs_var = obs_var.cuda()
-        states = self._predFn(obs_var, restore_train=False)
-        return states
-
 
 def saveStates(states, images_path, rewards, log_folder):
     """
+    Save learned states to json and npz files
     :param states: (numpy array)
     :param images_path: ([str])
     :param rewards: (rewards)
@@ -393,6 +430,7 @@ if __name__ == '__main__':
         del observations
         observations = preprocessInput(obs, mode="image_net")
 
+    # Move the channel dimension to match pretrained model input
     # (batch_size, width, height, n_channels) -> (batch_size, n_channels, height, width)
     observations = np.transpose(observations, (0, 3, 2, 1))
     print("Observations shape: {}".format(observations.shape))
