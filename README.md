@@ -9,13 +9,13 @@ Related papers:
 #### Base config
 Config common to all dataset can found in [configs/default.json](configs/default.json).
 
-### Dataset config
+#### Dataset config
 All dataset must be placed in the `data/` folder.
 Each dataset should can contain a `dataset_config.json` file, an example can be found [here](configs/example_dataset_config.json).
 This config file describes variables specifics to this dataset.
 
 
-### Experiment config
+#### Experiment config
 Experiment config file is generate by the `pipeline.py` script. An example can be found [here](configs/example_exp_config.json))
 
 
@@ -103,8 +103,25 @@ e.g. with Rico Jonschkowski's data
 python train.py --path slot_car_task_train.npz
 ```
 
+### Evaluation and Plotting
 
-## Dependencies
+After a report you can create a csv report file using:
+```
+python evaluation/create_report.py -d logs/nameOfTheDataset/
+```
+
+You can plot a learned representation with:
+```
+python plotting/representation_plot.py -i path/to/states_rewards.npz
+```
+
+You can also plot ground truth states with:
+```
+python plotting/representation_plot.py --data_folder path/to/datasetFolder/
+```
+
+
+### Dependencies
 
 Recommended configuration: Ubuntu 16.04 with python 2.7 or 3.6
 (should work with python3 though it was only thoroughly tested with python 2)
@@ -124,7 +141,7 @@ For display enhancement:
 - termcolor
 - tqdm
 
-## Example Data
+### Example Data
 You can reproduce Rico Jonschkowski's results by downloading npz files from the original [github repository](https://github.com/tu-rbo/learning-state-representations-with-robotic-priors).
 
 It was tested with the following commit: [https://github.com/araffin/srl-robotic-priors-pytorch/commit/5175b88a891c240f393b717dd1866435c73ebbda](https://github.com/araffin/srl-robotic-priors-pytorch/commit/5175b88a891c240f393b717dd1866435c73ebbda)
