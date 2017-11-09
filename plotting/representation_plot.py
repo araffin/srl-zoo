@@ -84,10 +84,13 @@ def plot_observations(observations, name='Observation Samples'):
         plt.yticks([])
     plt.pause(0.0001)
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Plotting script for representation')
-    parser.add_argument('-i', '--input_file', type=str, default="", help='Path to a npz file containing states and rewards')
-    parser.add_argument('--data_folder', type=str, default="", help='Path to a dataset folder, it will plot ground truth states')
+    parser.add_argument('-i', '--input_file', type=str, default="",
+                        help='Path to a npz file containing states and rewards')
+    parser.add_argument('--data_folder', type=str, default="",
+                        help='Path to a dataset folder, it will plot ground truth states')
     args = parser.parse_args()
 
     if args.input_file != "":

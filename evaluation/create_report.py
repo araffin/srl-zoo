@@ -4,7 +4,6 @@ import argparse
 import json
 import os
 
-import numpy as np
 import pandas as pd
 
 parser = argparse.ArgumentParser(description='Create a report file for a given dataset')
@@ -36,7 +35,7 @@ for experiment in experiments:
         knn_mse.append(-1)
         print("knn_mse.json not found for {}".format(experiment))
 
-exp_configs.update({'experiments':experiments, 'knn_mse': knn_mse})
+exp_configs.update({'experiments': experiments, 'knn_mse': knn_mse})
 result_df = pd.DataFrame(exp_configs)
 result_df.to_csv('{}/results.csv'.format(dataset_logfolder), sep=",", index=False)
 print("Saved results to {}/results.csv".format(dataset_logfolder))
