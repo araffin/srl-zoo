@@ -361,10 +361,10 @@ if __name__ == '__main__':
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
-    parser.add_argument('--path', type=str, default="", help='Path to npz file')
+    parser.add_argument('--path', type=str, default="", help='Path to npz file', required=True)
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder')
-    parser.add_argument('--log_folder', type=str, default='logs/default',
-                        help='Folder within logs/ where the experiment model and KNN images and plots will be saved')
+    parser.add_argument('--log_folder', type=str, default='logs/default_folder',
+                        help='Folder within logs/ where the experiment model and plots will be saved')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()

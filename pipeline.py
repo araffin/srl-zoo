@@ -5,6 +5,7 @@ import datetime
 import subprocess
 import json
 import os
+import sys
 from collections import OrderedDict
 from pprint import pprint
 
@@ -103,10 +104,13 @@ def knnCall(exp_config):
         raise RuntimeError("Error during knn plotting (config file above)")
     print("End of evluation.\n")
 
-def saveConfig(exp_config):
+def saveConfig(exp_config, print_config=False):
     """
     :param exp_config: (dict)
+    :param print_config: (bool)
     """
+    if print_config:
+        pprint(exp_config)
     # Sort by keys
     exp_config = OrderedDict(sorted(exp_config.items()))
 
@@ -118,7 +122,8 @@ def saveConfig(exp_config):
 parser = argparse.ArgumentParser(description='Pipeline script for state representation learning')
 parser.add_argument('-c', '--exp_config', type=str, default="", help='Path to an experiment config file')
 parser.add_argument('--data_folder', type=str, default="", help='Path to a dataset folder')
-parser.add_argument('--model_approach', type=str, default="priors", help='Model approach (default: priors)')
+parser.add_argument('--base_config', type=str, default="configs/default.json",
+                    help='Path to overall config file, it contains variables independent from datasets (default: /configs/default.json)')
 args = parser.parse_args()
 
 if args.exp_config != "":
@@ -144,6 +149,10 @@ if args.exp_config != "":
     knnCall(exp_config)
 
 elif args.data_folder != "":
+    if not os.path.isfile(args.base_config):
+        printRed("You must specify a valid --base_config json file")
+        sys.exit(-1)
+
     if "data/" in args.data_folder:
         args.data_folder = args.data_folder.split('data/')[1].strip("/")
     dataset_path = "data/{}".format(args.data_folder)
@@ -152,12 +161,9 @@ elif args.data_folder != "":
 
     printGreen("\n Grid search on a dataset folder: {} \n".format(args.data_folder))
 
-    # TODO: replace default argument by a json config file (see configs/ folder)
-    exp_config = {
-        'data_folder': args.data_folder,
-        'use_continuous': False,
-        'model_approach': args.model_approach,
-    }
+    with open(args.base_config, 'rb') as f:
+        exp_config = json.load(f)
+    exp_config['data_folder'] = args.data_folder
 
     try:
         os.makedirs("logs/{}".format(args.data_folder))
@@ -166,31 +172,20 @@ elif args.data_folder != "":
 
     # Preprocessing
     preprocessingCall(exp_config)
-    exp_config['priors'] = ['Proportionality', 'Temporal', 'Causality', 'Repetability']
-    exp_config['model_type'] = "cnn"
-
-    exp_config['learning_rate'] = 0.001
-    exp_config['l1_reg'] = 0.0
-    exp_config['batch_size'] = 256
-    exp_config['epochs'] = 1
-    exp_config['architecture_name'] = "resnet"
-    exp_config['knn_seed'] = 1
-    exp_config['n_neighbors'] = 5
-    exp_config['knn_samples'] = 5  # 5 test images for KNN
 
     # Grid search
     for seed in [1]:
         exp_config['seed'] = seed
-        for state_dim in [3]:
+        for state_dim in [2, 3, 4]:
             # Update config
             exp_config['state_dim'] = state_dim
             log_folder, experiment_name = getLogFolderName(exp_config)
             exp_config['log_folder'] = log_folder
             exp_config['experiment_name'] = experiment_name
             # Run the pipeline
-            saveConfig(exp_config)
+            saveConfig(exp_config, print_config=True)
             stateRepresentationLearningCall(exp_config)
             knnCall(exp_config)
 
 else:
-    print("Please specify one of --exp_config or --data_folder")
+    printYellow("Please specify one of --exp_config or --data_folder")
