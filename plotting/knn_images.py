@@ -15,31 +15,10 @@ from tqdm import tqdm
 
 N_NEIGHBORS_PER_LINE = 5
 
-
-def detectBasePath(filename, folder_name="srl-robotic-priors-pytorch", default_path=""):
-    """
-    Try to auto-detect the base path of the project
-    :param filename: (str) name of the python script (__file__ constant)
-    :param folder_name: (str) name of the root folder
-    :param default_path: (str) path used when the detection failed
-    :return: (str) detected base path
-    """
-    regex = r"(.*/" + folder_name + "/).*"
-    abs_path = os.path.abspath(filename)
-    matches = re.search(regex, abs_path)
-    base_path = default_path
-    if matches:
-        base_path = matches.group(1)
-    else:
-        print("[ERROR] Base path not found, fallback to default_path: {}".format(default_path))
-    return base_path
-
-
 # Init seaborn
 sns.set()
 
 parser = argparse.ArgumentParser(description='KNN plot and KNN MSE')
-parser.add_argument('--data_folder', type=str, default="", required=True, help='Path to a dataset folder')
 parser.add_argument('--log_folder', type=str, default="", required=True, help='Path to a log folder')
 parser.add_argument('--seed', type=int, default=1, help='random seed (default: 1)')
 parser.add_argument('-k', '--n_neighbors', type=int, default=5, help='Number of nearest neighbors (default: 5)')
@@ -51,15 +30,17 @@ n_samples = args.n_samples
 n_lines = (n_neighbors // N_NEIGHBORS_PER_LINE) + 1
 random.seed(args.seed)
 
+with open("{}/exp_config.json".format(args.log_folder), 'rb') as f:
+    data_folder = json.load(f)['data_folder']
+
 # Load ground truth and images path
-ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
+ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
 states = np.load('{}/states_rewards.npz'.format(args.log_folder))['states']
 # TODO: relative states for moving button
 true_states = ground_truth['arm_states']
 images_path = ground_truth['images_path']
 
-base_path = detectBasePath(__file__)
-knn_path = '{}/{}/NearestNeighbors'.format(base_path, args.log_folder)
+knn_path = '{}/NearestNeighbors'.format(args.log_folder)
 
 print("Computing KNN... with k={}".format(args.n_neighbors))
 # Do not consider the reference state as a neighbor
@@ -87,7 +68,7 @@ for image_path, neigbour_indices, distance, image_idx in data:
     # Add reference image
     # subplot: (i, j, k) ith plot, j rows, k columns
     ref_image = fig.add_subplot(n_lines + 1, 5, 3)
-    img = Image.open("{}data/{}".format(base_path, image_path))
+    img = Image.open("data/{}".format(image_path))
     plt.imshow(img)
     state_str = ", ".join(map(lambda x: '{:.3f}'.format(x), states[image_idx]))
     state_str = "[{}]".format(state_str)
@@ -104,7 +85,7 @@ for image_path, neigbour_indices, distance, image_idx in data:
         neighbor_record_folder = image_path.split("/")[1]
         neighbor_frame_name = image_path.split("/")[-1].split(".")[0]
 
-        img = Image.open("{}/data/{}".format(base_path, image_path))
+        img = Image.open("data/{}".format(image_path))
         plt.imshow(img)
 
         dist_str = 'd={:.4f}'.format(distance[i + 1])

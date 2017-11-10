@@ -116,7 +116,7 @@ def knnCall(exp_config):
 
     printGreen("\nEvaluating the state representation with KNN")
     args = ['--seed', str(exp_config['knn_seed']), '--n_samples', str(exp_config['knn_samples'])]
-    for arg in ['log_folder', 'data_folder', 'n_neighbors']:
+    for arg in ['log_folder', 'n_neighbors']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
     ok = subprocess.call(['python', '-m', 'plotting.knn_images'] + args)

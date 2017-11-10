@@ -69,6 +69,10 @@ if __name__ == '__main__':
     print("Resized shape: ({}, {})".format(IMAGE_WIDTH, IMAGE_HEIGHT))
     print("Max records: {}".format(MAX_RECORDS))
 
+    # Remove "data/" string from argument
+    if "data/" in args.data_folder:
+        args.data_folder = args.data_folder.split('data/')[1].strip("/")
+
     data_folder = args.data_folder
     data_folder = "{}/data/{}/".format(base_path, data_folder)
 
@@ -105,7 +109,8 @@ if __name__ == '__main__':
         # skip time file created by ROS and other unwanted non image files
         images = [item for item in os.listdir('{}/{}/'.format(record_folder, image_folders[0]))
                   if item.endswith(".jpg")]
-        images.sort(key=lambda item: int(item.split('.')[0].split('frame')[1]))
+        images.sort()
+
         observations = np.zeros((len(images), IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS))
         images_path = []
         for idx, image in enumerate(images):
