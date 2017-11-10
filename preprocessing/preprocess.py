@@ -17,9 +17,10 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from .utils import detectBasePath, getActions, findClosestAction, getDataFrame, preprocessInput
+from .utils import getActions, findClosestAction, getDataFrame, preprocessInput
+# Root folder utils file
+from utils import parseDataFolder
 
-base_path = detectBasePath(__file__)
 text_files = {
     'is_pressed': 'recorded_button1_is_pressed.txt',
     'button_position': 'recorded_button1_position.txt',
@@ -69,16 +70,12 @@ if __name__ == '__main__':
     print("Resized shape: ({}, {})".format(IMAGE_WIDTH, IMAGE_HEIGHT))
     print("Max records: {}".format(MAX_RECORDS))
 
-    # Remove "data/" string from argument
-    if "data/" in args.data_folder:
-        args.data_folder = args.data_folder.split('data/')[1].strip("/")
+    args.data_folder = parseDataFolder(args.data_folder)
+    data_folder = "data/{}".format(args.data_folder)
 
-    data_folder = args.data_folder
-    data_folder = "{}/data/{}/".format(base_path, data_folder)
-
-    if os.path.isfile('{}dataset_config.json'.format(data_folder)):
+    if os.path.isfile('{}/dataset_config.json'.format(data_folder)):
         print("Loading dataset config...")
-        with open('{}dataset_config.json'.format(data_folder), 'rb') as f:
+        with open('{}/dataset_config.json'.format(data_folder), 'rb') as f:
             dataset_config = json.load(f)
         BOUND_INF = dataset_config['bound_inf']
         BOUND_SUP = dataset_config['bound_sup']
@@ -186,7 +183,7 @@ if __name__ == '__main__':
         'episode_starts': episode_starts,
     }
 
-    assert len(all_rewards) == len(all_images_path),"n_rewards != n_images: {} != {}".format(len(all_rewards), len(all_images_path))
+    assert len(all_rewards) == len(all_images_path), "n_rewards != n_images: {} != {}".format(len(all_rewards), len(all_images_path))
 
     print("Saving preprocessed data...")
     np.savez('{}/preprocessed_data.npz'.format(data_folder), **data)

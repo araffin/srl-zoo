@@ -146,6 +146,16 @@ Example:
 python plotting/knn_images.py --log_folder path/to/an/experiment/log/folder
 ```
 
+### Baselines
+
+#### Supervised learning
+
+Baseline models are saved in `logs/nameOfTheDataset/baselines/` folder.
+
+Example:
+```
+python -m baselines.supervised --data_folder path/to/data/folder
+```
 
 ### Dependencies
 

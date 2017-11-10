@@ -13,7 +13,10 @@ args = parser.parse_args()
 assert os.path.isdir(args.data_log_folder), "--data_log_folder must be a path to a valid folder"
 
 dataset_logfolder = args.data_log_folder
-experiments = [item for item in os.listdir(dataset_logfolder) if os.path.isdir('{}/{}'.format(dataset_logfolder, item))]
+experiments = []
+for item in os.listdir(dataset_logfolder):
+    if 'baselines' not in item and os.path.isdir('{}/{}'.format(dataset_logfolder, item)):
+        experiments.append(item)
 experiments.sort()
 print("Found {} experiments".format(len(experiments)))
 

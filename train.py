@@ -347,10 +347,12 @@ class SRL4robotics:
                 self.optimizer.step()
                 epoch_loss += loss.data[0]
                 epoch_batches += 1
+            train_loss = epoch_loss / epoch_batches
 
             # Save best model
             # TODO: use a validation set
-            if epoch_loss / epoch_batches < best_error:
+            if train_loss < best_error:
+                best_error = train_loss
                 th.save(self.model.state_dict(), "{}/srl_model.pyth.pkl".format(self.log_folder))
 
             # Then we print the results for this epoch:
