@@ -365,7 +365,8 @@ class SRL4robotics:
                                         name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
-
+            
+        # TODO: load best model before predicting states
         # return predicted states for training observations
         return self._batchPredStates(observations)
 

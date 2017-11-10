@@ -27,58 +27,65 @@ BATCH_SIZE = 32
 MAX_BACTHSIZE_GPU = 512  # For plotting, max batch_size before having memory issues
 
 
-class DenseNetwork(nn.Module):
-    """
-    Feedforward Neural Net for State Representation Learning (SRL)
-    input shape : 3-channel RGB images of shape (3 x H x W) (to be consistent with CNN network)
-    :param input_dim: (int) 3 x H x H
-    :param state_dim: (int)
-    :param n_hidden: (int)
-    :param drop_p: (float) Dropout proba
-    """
+class LinearAutoEncoder(nn.Module):
+    def __init__(self, input_dim, state_dim=3):
+        super(LinearAutoEncoder, self).__init__()
 
-    def __init__(self, input_dim, state_dim=2, n_hidden=64, drop_p=0.5):
-        super(DenseNetwork, self).__init__()
-        self.fc1 = nn.Linear(input_dim, n_hidden)
-        self.fc2 = nn.Linear(n_hidden, state_dim)
-        self.drop_p = drop_p
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, state_dim),
+        )
+
+        self.decoder = nn.Sequential(
+            nn.Linear(state_dim, input_dim),
+        )
 
     def forward(self, x):
+        input_shape = x.size()
         # Flatten input
         x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        x = F.dropout(x, p=self.drop_p, training=self.training)
-        x = self.fc2(x)
-        return x
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        # Transform to a 4D tensor
+        decoded = decoded.view(input_shape)
+        return encoded, decoded
 
 
-class ConvolutionalNetwork(nn.Module):
-    """
-    Convolutional Neural Net for State Representation Learning (SRL)
-    input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
-    :param state_dim: (int)
-    :param cuda: (bool)
-    """
+class DenseAutoEncoder(nn.Module):
+    def __init__(self, input_dim, state_dim=3):
+        super(DenseAutoEncoder, self).__init__()
 
-    def __init__(self, state_dim=2, cuda=False):
-        super(ConvolutionalNetwork, self).__init__()
-        self.resnet = models.resnet18(pretrained=True)
-        # Freeze params
-        for param in self.resnet.parameters():
-            param.requires_grad = False
-        # Replace the last fully-connected layer
-        n_units = self.resnet.fc.in_features
-        print("{} units in the last layer".format(n_units))
-        self.resnet.fc = nn.Linear(n_units, state_dim)
-        if cuda:
-            self.resnet.cuda()
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, 128),
+            nn.Tanh(),
+            nn.Linear(128, 64),
+            nn.Tanh(),
+            nn.Linear(64, 12),
+            nn.Tanh(),
+            nn.Linear(12, state_dim),
+        )
+
+        self.decoder = nn.Sequential(
+            nn.Linear(state_dim, 12),
+            nn.Tanh(),
+            nn.Linear(12, 64),
+            nn.Tanh(),
+            nn.Linear(64, 128),
+            nn.Tanh(),
+            nn.Linear(128, input_dim),
+        )
 
     def forward(self, x):
-        x = self.resnet(x)
-        return x
+        input_shape = x.size()
+        # Flatten input
+        x = x.view(x.size(0), -1)
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        # Transform to a 4D tensor
+        decoded = decoded.view(input_shape)
+        return encoded, decoded
 
 
-class SupervisedLearning:
+class AutoEncoderLearning:
     """
     :param state_dim: (int)
     :param model_type: (str) one of "cnn" or "mlp"
@@ -101,10 +108,12 @@ class SupervisedLearning:
             th.cuda.manual_seed(seed)
 
         if model_type == "cnn":
-            self.model = ConvolutionalNetwork(self.state_dim, cuda)
+            raise ValueError("CNN Autoencoder not implemented")
+            # self.model = ConvolutionalNetwork(self.state_dim, cuda)
         elif model_type == "mlp":
             input_dim = 224 * 224 * 3
-            self.model = DenseNetwork(input_dim, self.state_dim)
+            # self.model = DenseAutoEncoder(input_dim, self.state_dim)
+            self.model = LinearAutoEncoder(input_dim, self.state_dim)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -124,7 +133,7 @@ class SupervisedLearning:
         """
         # Switch to test mode
         self.model.eval()
-        states = self.model(observations)
+        states, _ = self.model(observations)
         if restore_train:
             # Restore training mode
             self.model.train()
@@ -144,33 +153,29 @@ class SupervisedLearning:
             predictions.append(self._predFn(obs_var))
         return np.concatenate(predictions, axis=0)
 
-    def learn(self, observations, true_states, rewards):
+    def learn(self, observations, rewards):
         """
         Learn a state representation
         :param observations: (numpy tensor)
-        :param true_states: (numpy tensor)
         :param rewards: (numpy 1D array)
         :return: (numpy tensor) the learned states for the given observations
         """
         # We assume that observations are already preprocessed
         # that is to say normalized and scaled
         observations = observations.astype(np.float32)
-        true_states = true_states.astype(np.float32)
 
         # Split into train/validation set
-        X_train, X_val, y_train, y_val = train_test_split(observations, true_states, test_size=0.33,
-                                                          random_state=self.seed)
+        X_train, X_val = train_test_split(observations, test_size=0.33, random_state=self.seed)
 
         kwargs = {'num_workers': 1, 'pin_memory': False} if self.cuda else {}
 
         # Convert to torch tensor
-        X_train, y_train = th.from_numpy(X_train), th.from_numpy(y_train)
-        X_val, y_val = th.from_numpy(X_val), th.from_numpy(y_val)
+        X_train, X_val = th.from_numpy(X_train), th.from_numpy(X_val)
 
-        train_loader = th.utils.data.DataLoader(th.utils.data.TensorDataset(X_train, y_train),
+        train_loader = th.utils.data.DataLoader(th.utils.data.TensorDataset(X_train, X_train),
                                                 batch_size=self.batch_size, shuffle=True, **kwargs)
 
-        val_loader = th.utils.data.DataLoader(th.utils.data.TensorDataset(X_val, y_val),
+        val_loader = th.utils.data.DataLoader(th.utils.data.TensorDataset(X_val, X_val),
                                               batch_size=self.batch_size, shuffle=False, **kwargs)
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = nn.MSELoss()
@@ -183,14 +188,14 @@ class SupervisedLearning:
             # In each epoch, we do a full pass over the training data:
             train_loss, val_loss = 0, 0
 
-            for batch_idx, (obs, target_states) in enumerate(train_loader):
+            for batch_idx, (obs, _) in enumerate(train_loader):
                 if self.cuda:
-                    obs, target_states = obs.cuda(), target_states.cuda()
-                obs, target_states = Variable(obs), Variable(target_states)
+                    obs = obs.cuda()
+                obs = Variable(obs)
 
-                pred_states = self.model(obs)
+                _, decoded = self.model(obs)
                 self.optimizer.zero_grad()
-                loss = criterion(pred_states, target_states)
+                loss = criterion(decoded, obs)
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.data[0]
@@ -199,13 +204,13 @@ class SupervisedLearning:
 
             self.model.eval()
             # Pass on the validation set
-            for obs, target_states in val_loader:
+            for obs, _ in val_loader:
                 if self.cuda:
-                    obs, target_states = obs.cuda(), target_states.cuda()
-                obs, target_states = Variable(obs, volatile=True), Variable(target_states)
+                    obs = obs.cuda()
+                obs = Variable(obs, volatile=True)
 
-                pred_states = self.model(obs)
-                loss = criterion(pred_states, target_states)
+                _, decoded = self.model(obs)
+                loss = criterion(decoded, obs)
                 val_loss += loss.data[0]
 
             val_loss /= len(val_loader)
@@ -214,7 +219,7 @@ class SupervisedLearning:
             # Save best model
             if val_loss < best_error:
                 best_error = val_loss
-                th.save(self.model.state_dict(), "{}/srl_supervised_model.pyth.pkl".format(self.log_folder))
+                th.save(self.model.state_dict(), "{}/srl_ae_model.pyth.pkl".format(self.log_folder))
 
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:
@@ -240,12 +245,12 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     parser.add_argument('-bs', '--batch_size', type=int, default=32, help='batch_size (default: 32)')
-    parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
+    parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, help='learning rate (default: 0.001)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
-
+    parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -266,18 +271,17 @@ if __name__ == '__main__':
     # (batch_size, width, height, n_channels) -> (batch_size, n_channels, height, width)
     observations = np.transpose(observations, (0, 3, 2, 1))
     print("Observations shape: {}".format(observations.shape))
-    # TODO: normalize true states
     true_states = np.load("data/{}/ground_truth.npz".format(args.data_folder))['arm_states']
     state_dim = true_states.shape[1]
 
     print('Learning a state representation ... ')
-    srl = SupervisedLearning(state_dim, model_type=args.model_type, seed=args.seed,
+    srl = AutoEncoderLearning(args.state_dim, model_type=args.model_type, seed=args.seed,
                              log_folder=log_folder, learning_rate=args.learning_rate,
                              cuda=args.cuda)
-    learned_states = srl.learn(observations, true_states, rewards)
+    learned_states = srl.learn(observations, rewards)
 
-    name = "Learned State Representation - {} \n Supervised Learning".format(args.data_folder)
-    path = "{}/learned_states_supervised.png".format(log_folder)
+    name = "Learned State Representation - {} \n Autoencoder state_dim={}".format(args.data_folder, args.state_dim)
+    path = "{}/learned_states_ae.png".format(log_folder)
     plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     if DISPLAY_PLOTS:
