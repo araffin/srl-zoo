@@ -169,6 +169,7 @@ class RoboticPriorsLoss(nn.Module):
         state_diff_norm = state_diff.norm(2, dim=1)
         similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
         temp_coherence_loss = (state_diff_norm ** 2).mean()
+        fixed_ref_point_loss = temp_coherence_loss # assumes all sequences in the dataset share at least one same 3D pos of Baxter arm
         causality_loss = similarity(states[dissimilar_pairs[:, 0]],
                                     states[dissimilar_pairs[:, 1]]).mean()
         proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
@@ -181,7 +182,7 @@ class RoboticPriorsLoss(nn.Module):
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
         loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss \
-               + 5 * repeatability_loss + self.l1_coeff * l1_loss
+               + 5 * repeatability_loss + 1 * fixed_ref_point_loss + self.l1_coeff * l1_loss
         return loss
 
 

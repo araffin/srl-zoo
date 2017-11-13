@@ -16,7 +16,7 @@
     "Proportionality",
     "Temporal",
     "Causality",
-    "Repetability"
+    "Repeatability"
   ],
   "seed": 1,
   "state_dim": 4,
