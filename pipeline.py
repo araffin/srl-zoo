@@ -116,7 +116,7 @@ def knnCall(exp_config):
 
     printGreen("\nEvaluating the state representation with KNN")
     args = ['--seed', str(exp_config['knn_seed']), '--n_samples', str(exp_config['knn_samples'])]
-    for arg in ['log_folder', 'n_neighbors']:
+    for arg in ['log_folder', 'data_folder', 'n_neighbors']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
     ok = subprocess.call(['python', '-m', 'plotting.knn_images'] + args)
@@ -184,7 +184,7 @@ elif args.data_folder != "":
 
     assert os.path.isdir(dataset_path), "Path to dataset folder is not valid: {}".format(dataset_path)
 
-    printGreen("\n Grid search on a dataset folder: {} \n".format(args.data_folder))
+    printGreen("\n Grid search on several state_dim on dataset folder: {} \n".format(args.data_folder))
 
     with open(args.base_config, 'rb') as f:
         exp_config = json.load(f)
