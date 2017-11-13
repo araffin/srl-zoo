@@ -40,6 +40,7 @@ IMAGE_WIDTH = 224  # in px
 IMAGE_HEIGHT = 224  # in px
 N_CHANNELS = 3
 MAX_RECORDS = 50
+INPUT_DIM = IMAGE_WIDTH *IMAGE_HEIGHT * N_CHANNELS
 
 
 def isInBound(coordinate):
