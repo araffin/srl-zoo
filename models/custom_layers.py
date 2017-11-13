@@ -28,3 +28,28 @@ class GaussianNoise(nn.Module):
             self.noise.data.normal_(self.mean, std=self.std)
             return x + self.noise
         return x
+
+
+class GaussianNoiseVariant(nn.Module):
+    """
+    Variant of the Gaussian Noise layer that does not require fixed batch_size
+    It recreates a variable at each call
+    :param std: (float) standard deviation
+    :param mean: (float)
+    :param cuda: (bool)
+    """
+
+    def __init__(self, std, mean=0, cuda=False):
+        super(GaussianNoiseVariant, self).__init__()
+        self.std = std
+        self.mean = mean
+        self.cuda = cuda
+
+    def forward(self, x):
+        if self.training:
+            noise = Variable(th.zeros(x.size()))
+            if self.cuda:
+                noise = noise.cuda()
+            noise.data.normal_(self.mean, std=self.std)
+            return x + noise
+        return x

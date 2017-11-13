@@ -6,13 +6,13 @@ import argparse
 import numpy as np
 import torch as th
 import torch.nn as nn
-import torch.nn.functional as F
-import torchvision.models as models
 from torch.autograd import Variable
 from sklearn.model_selection import train_test_split
 
-from train import observationsGenerator
 from utils import parseDataFolder
+from preprocessing.preprocess import INPUT_DIM
+from models.base_learner import BaseLearner
+from models.models import LinearAutoEncoder, DenseAutoEncoder
 from plotting.representation_plot import plot_representation, plt
 
 # Python 2/3 compatibility
@@ -24,68 +24,10 @@ except NameError:
 DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 32
-MAX_BACTHSIZE_GPU = 512  # For plotting, max batch_size before having memory issues
+NOISE_STD = 1e-3  # Standard deviation of the gaussian noise for AE
 
 
-class LinearAutoEncoder(nn.Module):
-    def __init__(self, input_dim, state_dim=3):
-        super(LinearAutoEncoder, self).__init__()
-
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, state_dim),
-        )
-
-        self.decoder = nn.Sequential(
-            nn.Linear(state_dim, input_dim),
-        )
-
-    def forward(self, x):
-        input_shape = x.size()
-        # Flatten input
-        x = x.view(x.size(0), -1)
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        # Transform to a 4D tensor
-        decoded = decoded.view(input_shape)
-        return encoded, decoded
-
-
-class DenseAutoEncoder(nn.Module):
-    def __init__(self, input_dim, state_dim=3):
-        super(DenseAutoEncoder, self).__init__()
-
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 128),
-            nn.Tanh(),
-            nn.Linear(128, 64),
-            nn.Tanh(),
-            nn.Linear(64, 12),
-            nn.Tanh(),
-            nn.Linear(12, state_dim),
-        )
-
-        self.decoder = nn.Sequential(
-            nn.Linear(state_dim, 12),
-            nn.Tanh(),
-            nn.Linear(12, 64),
-            nn.Tanh(),
-            nn.Linear(64, 128),
-            nn.Tanh(),
-            nn.Linear(128, input_dim),
-        )
-
-    def forward(self, x):
-        input_shape = x.size()
-        # Flatten input
-        x = x.view(x.size(0), -1)
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        # Transform to a 4D tensor
-        decoded = decoded.view(input_shape)
-        return encoded, decoded
-
-
-class AutoEncoderLearning:
+class AutoEncoderLearning(BaseLearner):
     """
     :param state_dim: (int)
     :param model_type: (str) one of "cnn" or "mlp"
@@ -97,23 +39,14 @@ class AutoEncoderLearning:
     def __init__(self, state_dim, model_type="cnn", log_folder="logs/default",
                  seed=1, learning_rate=0.001, cuda=False):
 
-        self.state_dim = state_dim
-        self.batch_size = BATCH_SIZE
-        self.cuda = cuda
-        self.seed = seed
-
-        np.random.seed(seed)
-        th.manual_seed(seed)
-        if cuda:
-            th.cuda.manual_seed(seed)
+        super(AutoEncoderLearning, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
         if model_type == "cnn":
-            raise ValueError("CNN Autoencoder not implemented")
+            raise NotImplementedError("CNN Autoencoder not implemented")
             # self.model = ConvolutionalNetwork(self.state_dim, cuda)
         elif model_type == "mlp":
-            input_dim = 224 * 224 * 3
-            # self.model = DenseAutoEncoder(input_dim, self.state_dim)
-            self.model = LinearAutoEncoder(input_dim, self.state_dim)
+            # self.model = DenseAutoEncoder(INPUT_DIM, self.state_dim, NOISE_STD, cuda)
+            self.model = LinearAutoEncoder(INPUT_DIM, self.state_dim, NOISE_STD, cuda)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -142,17 +75,6 @@ class AutoEncoderLearning:
             return states.data.cpu().numpy()
         return states.data.numpy()
 
-    def _batchPredStates(self, observations):
-        """
-        Predict states using minibatches to avoid memory issues
-        :param observations: (numpy tensor)
-        :return: (numpy tensor)
-        """
-        predictions = []
-        for obs_var in observationsGenerator(th.from_numpy(observations), MAX_BACTHSIZE_GPU, cuda=self.cuda):
-            predictions.append(self._predFn(obs_var))
-        return np.concatenate(predictions, axis=0)
-
     def learn(self, observations, rewards):
         """
         Learn a state representation
@@ -160,6 +82,7 @@ class AutoEncoderLearning:
         :param rewards: (numpy 1D array)
         :return: (numpy tensor) the learned states for the given observations
         """
+        # TODO: do not duplicate the data to save memory
         # We assume that observations are already preprocessed
         # that is to say normalized and scaled
         observations = observations.astype(np.float32)
@@ -276,8 +199,8 @@ if __name__ == '__main__':
 
     print('Learning a state representation ... ')
     srl = AutoEncoderLearning(args.state_dim, model_type=args.model_type, seed=args.seed,
-                             log_folder=log_folder, learning_rate=args.learning_rate,
-                             cuda=args.cuda)
+                              log_folder=log_folder, learning_rate=args.learning_rate,
+                              cuda=args.cuda)
     learned_states = srl.learn(observations, rewards)
 
     name = "Learned State Representation - {} \n Autoencoder state_dim={}".format(args.data_folder, args.state_dim)
