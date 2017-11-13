@@ -203,7 +203,7 @@ class SRL4robotics(BaseLearner):
             # TODO: use a validation set
             if train_loss < best_error:
                 best_error = train_loss
-                th.save(self.model.state_dict(), "{}/srl_model.pyth.pkl".format(self.log_folder))
+                th.save(self.model.state_dict(), "{}/srl_model.pth".format(self.log_folder))
 
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:

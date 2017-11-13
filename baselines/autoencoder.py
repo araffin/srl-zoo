@@ -25,7 +25,7 @@ DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 32
 NOISE_STD = 1e-3  # Standard deviation of the gaussian noise for AE
-
+# TODO: plot reconstructed image
 
 class AutoEncoderLearning(BaseLearner):
     """
@@ -142,7 +142,7 @@ class AutoEncoderLearning(BaseLearner):
             # Save best model
             if val_loss < best_error:
                 best_error = val_loss
-                th.save(self.model.state_dict(), "{}/srl_ae_model.pyth.pkl".format(self.log_folder))
+                th.save(self.model.state_dict(), "{}/srl_ae_model.pth".format(self.log_folder))
 
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:

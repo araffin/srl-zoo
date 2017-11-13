@@ -124,7 +124,7 @@ class SupervisedLearning(BaseLearner):
             # Save best model
             if val_loss < best_error:
                 best_error = val_loss
-                th.save(self.model.state_dict(), "{}/srl_supervised_model.pyth.pkl".format(self.log_folder))
+                th.save(self.model.state_dict(), "{}/srl_supervised_model.pth".format(self.log_folder))
 
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:
