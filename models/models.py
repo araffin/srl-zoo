@@ -1,10 +1,11 @@
 from __future__ import print_function, division, absolute_import
 
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 
-from .custom_layers import GaussianNoise, GaussianNoiseVariant
+from .custom_layers import GaussianNoise
 
 
 class SRLConvolutionalNetwork(nn.Module):
@@ -119,11 +120,14 @@ class ConvolutionalNetwork(nn.Module):
 
 
 class LinearAutoEncoder(nn.Module):
-    def __init__(self, input_dim, state_dim=3, noise_std=0.0, cuda=False):
+    """
+    :param input_dim: (int)
+    :param state_dim: (int)
+    """
+    def __init__(self, input_dim, state_dim=3):
         super(LinearAutoEncoder, self).__init__()
 
         self.encoder = nn.Sequential(
-            GaussianNoiseVariant(noise_std, cuda=cuda),
             nn.Linear(input_dim, state_dim),
         )
 
@@ -143,28 +147,29 @@ class LinearAutoEncoder(nn.Module):
 
 
 class DenseAutoEncoder(nn.Module):
-    def __init__(self, input_dim, state_dim=3, noise_std=0.0, cuda=False):
+    """
+    Feedforward autoencoder network
+    Known issue: it reconstructs the image but omits the robot arm
+    :param input_dim: (int)
+    :param state_dim: (int)
+    """
+    def __init__(self, input_dim, state_dim=3):
         super(DenseAutoEncoder, self).__init__()
 
         self.encoder = nn.Sequential(
-            GaussianNoiseVariant(noise_std, cuda=cuda),
-            nn.Linear(input_dim, 128),
+            nn.Linear(input_dim, 50),
             nn.Tanh(),
-            nn.Linear(128, 64),
+            nn.Linear(50, 50),
             nn.Tanh(),
-            nn.Linear(64, 12),
-            nn.Tanh(),
-            nn.Linear(12, state_dim),
+            nn.Linear(50, state_dim),
         )
 
         self.decoder = nn.Sequential(
-            nn.Linear(state_dim, 12),
+            nn.Linear(state_dim, 50),
             nn.Tanh(),
-            nn.Linear(12, 64),
+            nn.Linear(50, 50),
             nn.Tanh(),
-            nn.Linear(64, 128),
-            nn.Tanh(),
-            nn.Linear(128, input_dim),
+            nn.Linear(50, input_dim),
         )
 
     def forward(self, x):
@@ -175,4 +180,83 @@ class DenseAutoEncoder(nn.Module):
         decoded = self.decoder(encoded)
         # Transform to a 4D tensor
         decoded = decoded.view(input_shape)
+        return encoded, decoded
+
+
+def conv3x3(in_planes, out_planes, stride=1):
+    """"
+    From PyTorch Resnet implementation
+    3x3 convolution with padding
+    :param in_planes: (int)
+    :param out_planes: (int)
+    :param stride: (int)
+    """
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
+                     padding=1, bias=False)
+
+
+class CNNAutoEncoder(nn.Module):
+    """
+    Custom convolutional autoencoder network
+    Input dim (same as ResNet): 3x224x224
+    :param state_dim: (int)
+    """
+
+    def __init__(self, state_dim=3):
+        super(CNNAutoEncoder, self).__init__()
+        # Inspired from ResNet:
+        # conv3x3 followed by BatchNorm2d
+        # TODO: implement residual connection
+        self.encoderConv = nn.Sequential(
+            # 224x224x3 -> 112x112x64
+            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),  # 56x56x64
+
+            conv3x3(in_planes=64, out_planes=64, stride=1),  # 56x56x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),  # 27x27x64
+
+            conv3x3(in_planes=64, out_planes=64, stride=2),  # 14x14x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
+        )
+
+        self.encoderFC = nn.Sequential(
+            nn.Linear(6 * 6 * 64, state_dim)
+        )
+
+        self.decoderFC = nn.Sequential(
+            nn.Linear(state_dim, 6 * 6 * 64)
+        )
+        self.decoderConv = nn.Sequential(
+            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2),  # 13x13x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+
+            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2),  # 27x27x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+
+            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2),  # 55x55x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+
+            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2),  # 111x111x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+
+            nn.ConvTranspose2d(64, 3, kernel_size=4, stride=2),  # 224x224x3
+        )
+
+    def forward(self, x):
+        encoded = self.encoderConv(x)
+        encoded = encoded.view(encoded.size(0), -1)
+        encoded = self.encoderFC(encoded)
+        decoded = self.decoderFC(encoded)
+        decoded = decoded.view(encoded.size(0), 64, 6, 6)
+        decoded = self.decoderConv(decoded)
         return encoded, decoded

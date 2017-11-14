@@ -11,9 +11,10 @@ from sklearn.model_selection import train_test_split
 
 from utils import parseDataFolder
 from preprocessing.preprocess import INPUT_DIM
+from preprocessing.utils import deNormalize
 from models.base_learner import BaseLearner
-from models.models import LinearAutoEncoder, DenseAutoEncoder
-from plotting.representation_plot import plot_representation, plt
+from models.models import LinearAutoEncoder, DenseAutoEncoder, CNNAutoEncoder
+from plotting.representation_plot import plot_representation, plt, plot_image
 
 # Python 2/3 compatibility
 try:
@@ -24,8 +25,8 @@ except NameError:
 DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 32
-NOISE_STD = 1e-3  # Standard deviation of the gaussian noise for AE
-# TODO: plot reconstructed image
+NOISE_FACTOR = 0.1
+
 
 class AutoEncoderLearning(BaseLearner):
     """
@@ -42,11 +43,10 @@ class AutoEncoderLearning(BaseLearner):
         super(AutoEncoderLearning, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
         if model_type == "cnn":
-            raise NotImplementedError("CNN Autoencoder not implemented")
-            # self.model = ConvolutionalNetwork(self.state_dim, cuda)
+            self.model = CNNAutoEncoder(self.state_dim)
         elif model_type == "mlp":
-            # self.model = DenseAutoEncoder(INPUT_DIM, self.state_dim, NOISE_STD, cuda)
-            self.model = LinearAutoEncoder(INPUT_DIM, self.state_dim, NOISE_STD, cuda)
+            self.model = DenseAutoEncoder(INPUT_DIM, self.state_dim)
+            # self.model = LinearAutoEncoder(INPUT_DIM, self.state_dim)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -55,6 +55,7 @@ class AutoEncoderLearning(BaseLearner):
             self.model.cuda()
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
+
         self.log_folder = log_folder
 
     def _predFn(self, observations, restore_train=True):
@@ -89,34 +90,39 @@ class AutoEncoderLearning(BaseLearner):
 
         # Split into train/validation set
         X_train, X_val = train_test_split(observations, test_size=0.33, random_state=self.seed)
+        # Compute noise
+        x_train_noise = NOISE_FACTOR * np.random.normal(loc=0.0, scale=1.0, size=X_train.shape).astype(np.float32)
+        x_val_noise = NOISE_FACTOR * np.random.normal(loc=0.0, scale=1.0, size=X_val.shape).astype(np.float32)
 
         kwargs = {'num_workers': 1, 'pin_memory': False} if self.cuda else {}
 
         # Convert to torch tensor
         X_train, X_val = th.from_numpy(X_train), th.from_numpy(X_val)
 
-        train_loader = th.utils.data.DataLoader(th.utils.data.TensorDataset(X_train, X_train),
-                                                batch_size=self.batch_size, shuffle=True, **kwargs)
+        train_loader = th.utils.data.DataLoader(
+            th.utils.data.TensorDataset(X_train + th.from_numpy(x_train_noise), X_train),
+            batch_size=self.batch_size, shuffle=True, **kwargs)
 
-        val_loader = th.utils.data.DataLoader(th.utils.data.TensorDataset(X_val, X_val),
+        val_loader = th.utils.data.DataLoader(th.utils.data.TensorDataset(X_val + th.from_numpy(x_val_noise), X_val),
                                               batch_size=self.batch_size, shuffle=False, **kwargs)
         # TRAINING -----------------------------------------------------------------------------------------------------
-        criterion = nn.MSELoss()
-        # criterion = F.smooth_l1_loss
+        criterion = nn.MSELoss(size_average=True)
         best_error = np.inf
-
+        print("Training...")
         self.model.train()
         start_time = time.time()
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             train_loss, val_loss = 0, 0
 
-            for batch_idx, (obs, _) in enumerate(train_loader):
+            for batch_idx, (noisy_obs, obs) in enumerate(train_loader):
                 if self.cuda:
-                    obs = obs.cuda()
+                    noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
+
+                noisy_obs = Variable(noisy_obs)
                 obs = Variable(obs)
 
-                _, decoded = self.model(obs)
+                _, decoded = self.model(noisy_obs)
                 self.optimizer.zero_grad()
                 loss = criterion(decoded, obs)
                 loss.backward()
@@ -127,16 +133,21 @@ class AutoEncoderLearning(BaseLearner):
 
             self.model.eval()
             # Pass on the validation set
-            for obs, _ in val_loader:
+            for noisy_obs, obs in val_loader:
                 if self.cuda:
-                    obs = obs.cuda()
+                    noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
+                noisy_obs = Variable(noisy_obs, volatile=True)
                 obs = Variable(obs, volatile=True)
 
-                _, decoded = self.model(obs)
+                _, decoded = self.model(noisy_obs)
                 loss = criterion(decoded, obs)
                 val_loss += loss.data[0]
 
             val_loss /= len(val_loader)
+            # Plot Reconstructed Image
+            plot_image(deNormalize(noisy_obs[0].data.cpu().numpy()), "Input Validation Image")
+            plot_image(deNormalize(decoded[0].data.cpu().numpy()), "Reconstructed Image")
+
             self.model.train()  # Restore train mode
 
             # Save best model

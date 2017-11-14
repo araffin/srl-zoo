@@ -80,7 +80,8 @@ def getDataFrame(text_file):
 
 def preprocessInput(x, mode="image_net"):
     """
-    :param x: (numpy tensor)
+    Normalize input
+    :param x: (numpy tensor) (RGB image with values between [0, 255])
     :param mode: (str) One of "image_net", "tf".
         - image_net: will zero-center each color channel with
             respect to the ImageNet dataset,
@@ -90,6 +91,7 @@ def preprocessInput(x, mode="image_net"):
             sample-wise.
     :return: (numpy tensor)
     """
+    assert x.shape[-1] == 3, "Color channel must be at the end of the tensor {}".format(x.shape)
     x /= 255.
     if mode == "tf":
         x -= 0.5
@@ -106,3 +108,34 @@ def preprocessInput(x, mode="image_net"):
     else:
         raise ValueError("Unknown mode for preprocessing")
     return x
+
+
+def deNormalize(x, mode="image_net"):
+    """
+    deNormalize data (transform input to [0, 1])
+    :param x: (numpy tensor)
+    :param mode: (str) One of "image_net", "tf".
+    :return: (numpy tensor)
+    """
+    # Reorder channels when we have only one image
+    if x.shape[0] == 3 and len(x.shape) == 3:
+        # (n_channels, height, width) -> (width, height, n_channels)
+        x = np.transpose(x, (2, 1, 0))
+    assert x.shape[-1] == 3, "Color channel must be at the end of the tensor {}".format(x.shape)
+
+    if mode == "tf":
+        x /= 2.
+        x += 0.5
+    elif mode == "image_net":
+        # Scaling
+        x[..., 0] *= 0.229
+        x[..., 1] *= 0.224
+        x[..., 2] *= 0.225
+        # Undo Zero-center
+        x[..., 0] += 0.485
+        x[..., 1] += 0.456
+        x[..., 2] += 0.406
+    else:
+        raise ValueError("Unknown mode for deNormalize")
+    # Clip to fix numeric imprecision (1e-09 = 0)
+    return np.clip(x, 0, 1)

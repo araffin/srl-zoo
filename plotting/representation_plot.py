@@ -16,11 +16,13 @@ except NameError:
 
 # Init seaborn
 sns.set()
+INTERACTIVE_PLOT = True
 
 
 def plot_3d_representation(states, rewards, name="Learned State Representation",
                            add_colorbar=True, path=None):
-    plt.ion()
+    if INTERACTIVE_PLOT:
+        plt.ion()
     fig = plt.figure(name)
     plt.clf()
     ax = fig.add_subplot(111, projection='3d')
@@ -58,7 +60,8 @@ def plot_representation(states, rewards, name="Learned State Representation",
 
 
 def plot_2d_representation(states, rewards, name="Learned State Representation", add_colorbar=True, path=None):
-    plt.ion()
+    if INTERACTIVE_PLOT:
+        plt.ion()
     plt.figure(name)
     plt.clf()
     plt.scatter(states[:, 0], states[:, 1], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
@@ -73,7 +76,8 @@ def plot_2d_representation(states, rewards, name="Learned State Representation",
 
 
 def plot_observations(observations, name='Observation Samples'):
-    plt.ion()
+    if INTERACTIVE_PLOT:
+        plt.ion()
     plt.figure(name)
     m, n = 8, 10
     for i in range(m * n):
@@ -82,6 +86,24 @@ def plot_observations(observations, name='Observation Samples'):
         plt.gca().invert_yaxis()
         plt.xticks([])
         plt.yticks([])
+    plt.pause(0.0001)
+
+def plot_image(image, name='Observation Sample'):
+    """
+    Display an image
+    :param image: (numpy tensor) (with values in [0, 1])
+    """
+    # Reorder channels
+    if image.shape[0] == 3 and len(x.shape) == 3:
+        # (n_channels, height, width) -> (width, height, n_channels)
+        image = np.transpose(image, (2, 1, 0))
+    if INTERACTIVE_PLOT:
+        plt.ion()
+    plt.figure(name)
+    plt.imshow(image, interpolation='nearest')
+    plt.gca().invert_yaxis()
+    plt.xticks([])
+    plt.yticks([])
     plt.pause(0.0001)
 
 
