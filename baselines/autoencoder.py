@@ -108,6 +108,7 @@ class AutoEncoderLearning(BaseLearner):
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = nn.MSELoss(size_average=True)
         best_error = np.inf
+        best_model_path = "{}/srl_ae_model.pth".format(self.log_folder)
         print("Training...")
         self.model.train()
         start_time = time.time()
@@ -153,7 +154,7 @@ class AutoEncoderLearning(BaseLearner):
             # Save best model
             if val_loss < best_error:
                 best_error = val_loss
-                th.save(self.model.state_dict(), "{}/srl_ae_model.pth".format(self.log_folder))
+                th.save(self.model.state_dict(), best_model_path)
 
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:
@@ -167,7 +168,8 @@ class AutoEncoderLearning(BaseLearner):
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
-        # TODO: load best model before predicting states
+        # load best model before predicting states
+        self.model.load_state_dict(th.load(best_model_path))
         # return predicted states for training observations
         return self._batchPredStates(observations)
 

@@ -171,7 +171,7 @@ class SRL4robotics(BaseLearner):
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = RoboticPriorsLoss(self.model, self.l1_reg)
         best_error = np.inf
-
+        best_model_path = "{}/srl_model.pth".format(self.log_folder)
         self.model.train()
         start_time = time.time()
         for epoch in range(N_EPOCHS):
@@ -203,7 +203,7 @@ class SRL4robotics(BaseLearner):
             # TODO: use a validation set
             if train_loss < best_error:
                 best_error = train_loss
-                th.save(self.model.state_dict(), "{}/srl_model.pth".format(self.log_folder))
+                th.save(self.model.state_dict(), best_model_path)
 
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:
@@ -216,7 +216,8 @@ class SRL4robotics(BaseLearner):
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
-        # TODO: load best model before predicting states
+        # Load best model before predicting states
+        self.model.load_state_dict(th.load(best_model_path))
         # return predicted states for training observations
         return self._batchPredStates(observations)
 
