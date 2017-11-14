@@ -66,7 +66,7 @@ for image_path, neigbour_indices, distance, image_idx in data:
     record_folder = images_path[image_idx].split("/")[1]
     frame_name = images_path[image_idx].split("/")[-1].split(".")[0]
     # Add reference image
-    # subplot: (i, j, k) ith plot, j rows, k columns
+    # subplot: (i, j, k) i rows, j columns, k^th plot | n_plots: i * j
     ref_image = fig.add_subplot(n_lines + 1, 5, 3)
     img = Image.open("data/{}".format(image_path))
     plt.imshow(img)
