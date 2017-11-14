@@ -148,13 +148,22 @@ python plotting/knn_images.py --log_folder path/to/an/experiment/log/folder
 
 ### Baselines
 
-#### Supervised learning
-
 Baseline models are saved in `logs/nameOfTheDataset/baselines/` folder.
+
+#### Supervised learning
 
 Example:
 ```
 python -m baselines.supervised --data_folder path/to/data/folder
+```
+
+#### Autoencoder
+
+Gaussian noise is added to the input with a factor `0.1`.
+
+Example:
+```
+python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3
 ```
 
 ### Dependencies
