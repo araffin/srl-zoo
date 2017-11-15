@@ -4,7 +4,7 @@ import numpy as np
 import torch as th
 from torch.autograd import Variable
 
-MAX_BACTHSIZE_GPU = 512  # For plotting, max batch_size before having memory issues
+MAX_BATCH_SIZE_GPU = 512  # For plotting, max batch_size before having memory issues
 
 
 def observationsGenerator(observations, batch_size=64, cuda=False):
@@ -87,7 +87,7 @@ class BaseLearner(object):
         :return: (numpy tensor)
         """
         predictions = []
-        for obs_var in observationsGenerator(th.from_numpy(observations), MAX_BACTHSIZE_GPU, cuda=self.cuda):
+        for obs_var in observationsGenerator(th.from_numpy(observations), MAX_BATCH_SIZE_GPU, cuda=self.cuda):
             predictions.append(self._predFn(obs_var))
         return np.concatenate(predictions, axis=0)
 
