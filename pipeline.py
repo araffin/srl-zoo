@@ -14,7 +14,8 @@ import sys
 from collections import OrderedDict
 from pprint import pprint
 
-from utils import printRed, printGreen, printBlue, printYellow, priorsToString
+from utils import printRed, printGreen, printBlue, parseDataFolder, \
+                  printYellow, priorsToString, createFolder
 
 # Fix for matplotlib non-zero return
 # Apparently due to seg fault
@@ -48,11 +49,7 @@ def getLogFolderName(exp_config):
 
     printBlue("\nExperiment: {}\n".format(experiment_name))
     log_folder = "logs/{}/{}".format(exp_config['data_folder'], experiment_name)
-
-    try:
-        os.makedirs(log_folder)
-    except OSError:
-        print("Experiment folder already exist")
+    createFolder(log_folder, "Experiment folder already exist")
 
     return log_folder, experiment_name
 
@@ -109,10 +106,8 @@ def knnCall(exp_config):
     and compute knn-mse on a set of images.
     :param exp_config: (dict)
     """
-    try:
-        os.makedirs('{}/NearestNeighbors/'.format(exp_config['log_folder']))
-    except OSError:
-        print("NearestNeighbors folder already exist")
+    folder_path = '{}/NearestNeighbors/'.format(exp_config['log_folder'])
+    createFolder(folder_path, "NearestNeighbors folder already exist")
 
     printGreen("\nEvaluating the state representation with KNN")
     args = ['--seed', str(exp_config['knn_seed']), '--n_samples', str(exp_config['knn_samples'])]
@@ -178,8 +173,7 @@ elif args.data_folder != "":
         printRed("You must specify a valid --base_config json file")
         sys.exit(-1)
 
-    if "data/" in args.data_folder:
-        args.data_folder = args.data_folder.split('data/')[1].strip("/")
+    args.data_folder = parseDataFolder(args.data_folder)
     dataset_path = "data/{}".format(args.data_folder)
 
     assert os.path.isdir(dataset_path), "Path to dataset folder is not valid: {}".format(dataset_path)
@@ -190,10 +184,8 @@ elif args.data_folder != "":
         exp_config = json.load(f)
     exp_config['data_folder'] = args.data_folder
 
-    try:
-        os.makedirs("logs/{}".format(args.data_folder))
-    except OSError:
-        printYellow("Dataset log folder already exist")
+    createFolder("logs/{}".format(args.data_folder), "Dataset log folder already exist")
+    createFolder("logs/{}/baselines".format(args.data_folder), "Baseline folder already exist")
 
     # Preprocessing
     preprocessingCall(exp_config)

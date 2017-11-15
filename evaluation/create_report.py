@@ -13,7 +13,10 @@ args = parser.parse_args()
 assert os.path.isdir(args.data_log_folder), "--data_log_folder must be a path to a valid folder"
 
 dataset_logfolder = args.data_log_folder
-experiments = [item for item in os.listdir(dataset_logfolder) if os.path.isdir('{}/{}'.format(dataset_logfolder, item))]
+experiments = []
+for item in os.listdir(dataset_logfolder):
+    if 'baselines' not in item and os.path.isdir('{}/{}'.format(dataset_logfolder, item)):
+        experiments.append(item)
 experiments.sort()
 print("Found {} experiments".format(len(experiments)))
 
@@ -39,3 +42,5 @@ exp_configs.update({'experiments': experiments, 'knn_mse': knn_mse})
 result_df = pd.DataFrame(exp_configs)
 result_df.to_csv('{}/results.csv'.format(dataset_logfolder), sep=",", index=False)
 print("Saved results to {}/results.csv".format(dataset_logfolder))
+print("Last 10 experiments:")
+print(result_df.tail(10))

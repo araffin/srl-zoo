@@ -12,7 +12,7 @@ Example to run this program:
 
 TODO: generator to load images on the fly
 """
-from __future__ import print_function, division
+from __future__ import print_function, division, absolute_import
 
 import argparse
 import time
@@ -21,10 +21,12 @@ import json
 import numpy as np
 import torch as th
 import torch.nn as nn
-import torch.nn.functional as F
-import torchvision.models as models
 from torch.autograd import Variable
 
+import plotting.representation_plot as plot_script
+from models.base_learner import BaseLearner
+from models.models import SRLConvolutionalNetwork, SRLDenseNetwork
+from preprocessing.preprocess import INPUT_DIM
 from plotting.representation_plot import plot_representation, plt
 
 # Python 2/3 compatibility
@@ -42,106 +44,6 @@ DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 256  #
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
-MAX_BACTHSIZE_GPU = 512  # For plotting, max batch_size before having memory issues
-
-
-def observationsGenerator(observations, batch_size=64, cuda=False):
-    """
-    Python generator to avoid out of memory issues
-    when predicting states for all the observations
-    :param observations: (torch tensor)
-    :param batch_size: (int)
-    :param cuda: (bool)
-    """
-    n_minibatches = len(observations) // batch_size + 1
-    for i in range(n_minibatches):
-        start_idx, end_idx = batch_size * i, batch_size * (i + 1)
-        obs_var = Variable(observations[start_idx:end_idx], volatile=True)
-        if cuda:
-            obs_var = obs_var.cuda()
-        yield obs_var
-
-
-class SRLConvolutionalNetwork(nn.Module):
-    """
-    Convolutional Neural Net for State Representation Learning (SRL)
-    input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
-    :param state_dim: (int)
-    :param batch_size: (int)
-    :param cuda: (bool)
-    """
-
-    def __init__(self, state_dim=2, batch_size=256, cuda=False):
-        super(SRLConvolutionalNetwork, self).__init__()
-        self.resnet = models.resnet18(pretrained=True)
-        self.squeezeNet = models.squeezenet1_0(pretrained=True)
-        # Freeze params
-        for param in self.resnet.parameters():
-            param.requires_grad = False
-        # Replace the last fully-connected layer
-        n_units = self.resnet.fc.in_features
-        print("{} units in the last layer".format(n_units))
-        self.resnet.fc = nn.Linear(n_units, state_dim)
-        if cuda:
-            self.resnet.cuda()
-        self.noise = GaussianNoise(batch_size, state_dim, NOISE_STD, cuda=cuda)
-
-    def forward(self, x):
-        x = self.resnet(x)
-        x = self.noise(x)
-        return x
-
-
-class SRLDenseNetwork(nn.Module):
-    """
-    Feedforward Neural Net for State Representation Learning (SRL)
-    input shape : 3-channel RGB images of shape (3 x H x W) (to be consistent with CNN network)
-    :param input_dim: (int) 3 x H x H
-    :param state_dim: (int)
-    :param batch_size: (int)
-    :param cuda: (bool)
-    :param n_hidden: (int)
-    """
-
-    def __init__(self, input_dim, state_dim=2,
-                 batch_size=256, cuda=False, n_hidden=32):
-        super(SRLDenseNetwork, self).__init__()
-        self.fc1 = nn.Linear(input_dim, n_hidden)
-        self.fc2 = nn.Linear(n_hidden, state_dim)
-        self.noise = GaussianNoise(batch_size, state_dim, NOISE_STD, cuda=cuda)
-
-    def forward(self, x):
-        # Flatten input
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        x = self.noise(x)
-        return x
-
-
-class GaussianNoise(nn.Module):
-    """
-    Gaussian Noise layer
-    :param batch_size: (int)
-    :param input_dim: (int)
-    :param std: (float) standard deviation
-    :param mean: (float)
-    :param cuda: (bool)
-    """
-
-    def __init__(self, batch_size, input_dim, std, mean=0, cuda=False):
-        super(GaussianNoise, self).__init__()
-        self.std = std
-        self.mean = mean
-        self.noise = Variable(th.zeros(batch_size, input_dim))
-        if cuda:
-            self.noise = self.noise.cuda()
-
-    def forward(self, x):
-        if self.training:
-            self.noise.data.normal_(self.mean, std=self.std)
-            return x + self.noise
-        return x
 
 
 class RoboticPriorsLoss(nn.Module):
@@ -186,7 +88,7 @@ class RoboticPriorsLoss(nn.Module):
         return loss
 
 
-class SRL4robotics:
+class SRL4robotics(BaseLearner):
     """
     :param state_dim: (int)
     :param model_type: (str) one of "cnn" or "mlp"
@@ -199,20 +101,13 @@ class SRL4robotics:
     def __init__(self, state_dim, model_type="cnn", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False):
 
-        self.state_dim = state_dim
-        self.batch_size = BATCH_SIZE
-        self.cuda = cuda
-
-        np.random.seed(seed)
-        th.manual_seed(seed)
-        if cuda:
-            th.cuda.manual_seed(seed)
+        super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
         if model_type == "cnn":
-            self.model = SRLConvolutionalNetwork(self.state_dim, self.batch_size, cuda)
+            self.model = SRLConvolutionalNetwork(self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         elif model_type == "mlp":
-            input_dim = 224 * 224 * 3
-            self.model = SRLDenseNetwork(input_dim, self.state_dim, self.batch_size, cuda)
+            # input_dim = 224 * 224 * 3
+            self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -223,50 +118,6 @@ class SRL4robotics:
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.l1_reg = l1_reg
         self.log_folder = log_folder
-
-    def _predFn(self, observations, restore_train=True):
-        """
-        Predict states in test mode given observations
-        :param observations: (PyTorch Variable)
-        :param restore_train: (bool) whether to restore training mode after prediction
-        :return: (numpy tensor)
-        """
-        # Switch to test mode
-        self.model.eval()
-        states = self.model(observations)
-        if restore_train:
-            # Restore training mode
-            self.model.train()
-        if self.cuda:
-            # Move the tensor back to the cpu
-            return states.data.cpu().numpy()
-        return states.data.numpy()
-
-    def predStates(self, observations):
-        """
-        Predict states for given observations
-        WARNING: you should use _batchPredStates
-        if observations tensor is large to avoid memory issues
-        :param observations: (numpy tensor)
-        :return: (numpy tensor)
-        """
-        observations = observations.astype(np.float32)
-        obs_var = Variable(th.from_numpy(observations), volatile=True)
-        if self.cuda:
-            obs_var = obs_var.cuda()
-        states = self._predFn(obs_var, restore_train=False)
-        return states
-
-    def _batchPredStates(self, observations):
-        """
-        Predict states using minibatches to avoid memory issues
-        :param observations: (numpy tensor)
-        :return: (numpy tensor)
-        """
-        predictions = []
-        for obs_var in observationsGenerator(th.from_numpy(observations), MAX_BACTHSIZE_GPU, cuda=self.cuda):
-            predictions.append(self._predFn(obs_var))
-        return np.concatenate(predictions, axis=0)
 
     def learn(self, observations, actions, rewards, episode_starts):
         """
@@ -322,7 +173,7 @@ class SRL4robotics:
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = RoboticPriorsLoss(self.model, self.l1_reg)
         best_error = np.inf
-
+        best_model_path = "{}/srl_model.pth".format(self.log_folder)
         self.model.train()
         start_time = time.time()
         for epoch in range(N_EPOCHS):
@@ -348,11 +199,13 @@ class SRL4robotics:
                 self.optimizer.step()
                 epoch_loss += loss.data[0]
                 epoch_batches += 1
+            train_loss = epoch_loss / epoch_batches
 
             # Save best model
             # TODO: use a validation set
-            if epoch_loss / epoch_batches < best_error:
-                th.save(self.model.state_dict(), "{}/srl_model.pyth.pkl".format(self.log_folder))
+            if train_loss < best_error:
+                best_error = train_loss
+                th.save(self.model.state_dict(), best_model_path)
 
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:
@@ -365,6 +218,8 @@ class SRL4robotics:
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
+        # Load best model before predicting states
+        self.model.load_state_dict(th.load(best_model_path))
         # return predicted states for training observations
         return self._batchPredStates(observations)
 
@@ -409,6 +264,7 @@ if __name__ == '__main__':
     DISPLAY_PLOTS = not args.no_plots
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
+    plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
 
     print('\nDataset npz file: {}\n'.format(args.path))
     print('Log folder: {}'.format(args.log_folder))
