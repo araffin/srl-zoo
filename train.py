@@ -23,6 +23,7 @@ import torch as th
 import torch.nn as nn
 from torch.autograd import Variable
 
+import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
 from models.models import SRLConvolutionalNetwork, SRLDenseNetwork
 from preprocessing.preprocess import INPUT_DIM
@@ -262,6 +263,7 @@ if __name__ == '__main__':
     DISPLAY_PLOTS = not args.no_plots
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
+    plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
 
     print('\nDataset npz file: {}\n'.format(args.path))
     print('Log folder: {}'.format(args.log_folder))

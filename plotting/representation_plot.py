@@ -18,11 +18,29 @@ except NameError:
 sns.set()
 INTERACTIVE_PLOT = True
 
+def updateDisplayMode():
+    """
+    Enable or disable interactive plot
+    see: http://matplotlib.org/faq/usage_faq.html#what-is-interactive-mode
+    """
+    if INTERACTIVE_PLOT:
+        plt.ion()
+    else:
+        plt.ioff()
+
+def pauseOrClose(fig):
+    """
+    :param fig: (matplotlib figure object)
+    """
+    if INTERACTIVE_PLOT:
+        plt.draw()
+        plt.pause(0.0001)  # Small pause to update the plot
+    else:
+        plt.close(fig)
 
 def plot_3d_representation(states, rewards, name="Learned State Representation",
                            add_colorbar=True, path=None):
-    if INTERACTIVE_PLOT:
-        plt.ion()
+    updateDisplayMode()
     fig = plt.figure(name)
     plt.clf()
     ax = fig.add_subplot(111, projection='3d')
@@ -34,10 +52,9 @@ def plot_3d_representation(states, rewards, name="Learned State Representation",
     ax.set_title(name)
     if add_colorbar:
         fig.colorbar(im, label='Reward')
-    plt.draw()
-    plt.pause(0.0001)
     if path is not None:
         plt.savefig(path)
+    pauseOrClose(fig)
 
 
 def plot_representation(states, rewards, name="Learned State Representation",
@@ -60,9 +77,8 @@ def plot_representation(states, rewards, name="Learned State Representation",
 
 
 def plot_2d_representation(states, rewards, name="Learned State Representation", add_colorbar=True, path=None):
-    if INTERACTIVE_PLOT:
-        plt.ion()
-    plt.figure(name)
+    updateDisplayMode()
+    fig = plt.figure(name)
     plt.clf()
     plt.scatter(states[:, 0], states[:, 1], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
     plt.xlabel('State dimension 1')
@@ -70,15 +86,13 @@ def plot_2d_representation(states, rewards, name="Learned State Representation",
     plt.title(name)
     if add_colorbar:
         plt.colorbar(label='Reward')
-    plt.pause(0.0001)
     if path is not None:
         plt.savefig(path)
-
+    pauseOrClose(fig)
 
 def plot_observations(observations, name='Observation Samples'):
-    if INTERACTIVE_PLOT:
-        plt.ion()
-    plt.figure(name)
+    updateDisplayMode()
+    fig = plt.figure(name)
     m, n = 8, 10
     for i in range(m * n):
         plt.subplot(m, n, i + 1)
@@ -86,7 +100,7 @@ def plot_observations(observations, name='Observation Samples'):
         plt.gca().invert_yaxis()
         plt.xticks([])
         plt.yticks([])
-    plt.pause(0.0001)
+    pauseOrClose(fig)
 
 def plot_image(image, name='Observation Sample'):
     """
@@ -97,14 +111,13 @@ def plot_image(image, name='Observation Sample'):
     if image.shape[0] == 3 and len(x.shape) == 3:
         # (n_channels, height, width) -> (width, height, n_channels)
         image = np.transpose(image, (2, 1, 0))
-    if INTERACTIVE_PLOT:
-        plt.ion()
-    plt.figure(name)
+    updateDisplayMode()
+    fig = plt.figure(name)
     plt.imshow(image, interpolation='nearest')
     plt.gca().invert_yaxis()
     plt.xticks([])
     plt.yticks([])
-    plt.pause(0.0001)
+    pauseOrClose(fig)
 
 
 if __name__ == '__main__':
