@@ -9,9 +9,12 @@ https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
 Example to run this program:
  python main.py --path slot_car_task_train.npz
 
-
+# Some details:
+-Weight initialization: Xavier method (by )default for Conv layers https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L40)
 TODO: generator to load images on the fly
 """
+# preventing incompatibility errors:
+#  https://docs.python.org/3/howto/pyporting.html#prevent-compatibility-regressions
 from __future__ import print_function, division
 
 import argparse
@@ -127,6 +130,7 @@ class GaussianNoise(nn.Module):
     :param std: (float) standard deviation
     :param mean: (float)
     :param cuda: (bool)
+    Noise is not part of data augmentation, it just prevents NaN when using robotic priors
     """
 
     def __init__(self, batch_size, input_dim, std, mean=0, cuda=False):
@@ -157,19 +161,19 @@ class RoboticPriorsLoss(nn.Module):
         n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
         self.l1_coeff = (l1_reg / n_params)
 
-    def forward(self, states, next_states, dissimilar_pairs, same_actions_pairs):
+    def forward(self, states, next_states, states_from_same_pos_as_states, dissimilar_pairs, same_actions_pairs):
         """
         :param states: (th Variable)
         :param next_states: (th Variable)
         :param dissimilar_pairs: (th tensor)
         :param same_actions_pairs: (th tensor)
+        :param same_states_diff_norm: (th tensor)
         :return: (th Variable)
         """
         state_diff = next_states - states
         state_diff_norm = state_diff.norm(2, dim=1)
         similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
         temp_coherence_loss = (state_diff_norm ** 2).mean()
-        fixed_ref_point_loss = 0 # TODO WIP temp_coherence_loss # assumes all sequences in the dataset share at least one same 3D pos of Baxter arm
         causality_loss = similarity(states[dissimilar_pairs[:, 0]],
                                     states[dissimilar_pairs[:, 1]]).mean()
         proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
@@ -178,6 +182,11 @@ class RoboticPriorsLoss(nn.Module):
         repeatability_loss = (
             similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
             (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
+
+        # 5th prior assumes all sequences in the dataset share at least one same 3D pos input image of Baxter arm
+        same_pos_states_diff = states - states_from_same_pos_as_states
+        same_pos_states_diff_norm = same_pos_states_diff.norm(2, dim=1)
+        fixed_ref_point_loss = (same_pos_states_diff_norm ** 2).mean()
 
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
@@ -268,11 +277,12 @@ class SRL4robotics:
             predictions.append(self._predFn(obs_var))
         return np.concatenate(predictions, axis=0)
 
-    def learn(self, observations, actions, rewards, episode_starts):
+    def learn(self, observations, actions, rewards, episode_starts, data_folder):
         """
         Learn a state representation
         :param observations: (numpy tensor)
-        :param actions: (numpy matrix)
+        :param actions: (np matrix) of each action id performed. To support
+            Jonschkowski's race_car baseline, each action id is within an array: e.g. [[4], [8], [2]]
         :param rewards: (numpy 1D array)
         :param episode_starts: (numpy 1D array) boolean array
                                 the ith index is True if one episode starts at this frame
@@ -293,7 +303,8 @@ class SRL4robotics:
         indices = np.array([i for i in range(num_samples) if not episode_starts[i + 1]], dtype='int64')
         np.random.shuffle(indices)
 
-        # split indices into minibatches
+        # split indices into minibatches. minibatchlist is a list of lists; each
+        # list is the id of the observation preserved thorough the training
         minibatchlist = [np.array(sorted(indices[start_idx:start_idx + self.batch_size]))
                          for start_idx in range(0, num_samples - self.batch_size + 1, self.batch_size)]
         if len(minibatchlist[-1]) < self.batch_size:
@@ -302,22 +313,47 @@ class SRL4robotics:
 
         find_same_actions = lambda index, minibatch: \
             np.where(np.prod(actions[minibatch] == actions[minibatch[index]], axis=1))[0]
-        same_actions = [
+
+        same_actions = [   #TODO: DOCUMENT THE DATA TYPE HERE, IT IS NOT TRIVIAL, e.g.: list of arrays, each containing one pair of observation ids
             np.array([[i, j] for i in range(self.batch_size) for j in find_same_actions(i, minibatch) if j > i],
                      dtype='int64') for minibatch in minibatchlist]
 
-        # check with samples should be dissimilar because they lead to different rewards aften the same actions
+        # Here we save which (observation index) samples should be dissimilar because they lead
+        # to different rewards after the same actions. The * represents the mask
+        # of 0s and 1s indicating the fulfilment of the two conditions (= AND gate)
+        # Final [0] gives the array of row indexes where condition is true ([1] gives columns)
+        # np.prod transforms the Jonschkowski required format of action ids
+        # actions = [[1],[6],[4]] -> {1, 6, 4]}
         find_dissimilar = lambda index, minibatch: \
             np.where(np.prod(actions[minibatch] == actions[minibatch[index]], axis=1) *
                      (rewards[minibatch + 1] != rewards[minibatch[index] + 1]))[0]
+
         dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in find_dissimilar(i, minibatch) if j > i],
                                dtype='int64') for minibatch in minibatchlist]
+        #print('actions {}, same actions {} and np.prod {}', actions[minibatch], actions[minibatch[index]], actions[minibatch] == actions[minibatch[index]])
+
+
+        if fixed_ref_point in arm_states:
+            print('Exact fixed ref point found in arm_states, no need to add threshold for finding equivalent grount truth arm_states (arm_position)')
+        find_same_ref_point_position = lambda index, minibatch: \
+            np.where(np.prod(arm_states[minibatch] == arm_states[minibatch[index]], axis=1))[0]
+            # 0 returns the row indexes ([1] for column indexes) of the cases where the (prod) resulting matrix satisfied the where condition
+
+        same_ref_points = [
+            np.array([[i, j] for i in range(self.batch_size) for j in find_same_ref_points(i, minibatch) if j > i],
+                     dtype='int64') for minibatch in minibatchlist]
 
         for item in same_actions + dissimilar:
             if len(item) == 0:
-                msg = "No similar or dissimilar pair found for at least one minibatch\n"
+                msg = "No similar or dissimilar pairs found for at least one minibatch (currently is {})\n".format(BATCH_SIZE)
                 msg += "=> Consider increasing the batch_size or changing the seed"
                 raise ValueError(msg)
+        for item in same_ref_points:
+            if len(item) == 0:
+                msg = "No same ref point position observation of the arm was found for at least one minibatch (currently is {})\n".format(BATCH_SIZE)
+                msg += "=> Consider increasing the batch_size or changing the seed\n same_ref_point_positions: {}, arm_states:{}, fixed_ref_point:{}".format(same_ref_points, arm_states, fixed_ref_point)
+                raise ValueError(msg)
+
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = RoboticPriorsLoss(self.model, self.l1_reg)
@@ -325,25 +361,33 @@ class SRL4robotics:
 
         self.model.train()
         start_time = time.time()
+        n_batches = len(minibatchlist)
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             epoch_loss, epoch_batches = 0, 0
-            enumerated_minibatches = list(enumerate(minibatchlist))
+            enumerated_minibatches = list(enumerate(minibatchlist))  # print('minibatchlist and enum_mini {}   {}'.format(minibatchlist, enumerated_minibatches))
+            # shuffle the order of the minibatchlist while preserving the indexes for each minibatch
             np.random.shuffle(enumerated_minibatches)
-            for i, batch in enumerated_minibatches:
+            for i, batch in enumerated_minibatches: #                print('i, batch from enum_mini {}  {}  {}'.format(i, batch, enumerated_minibatches))
                 diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])]
                 same = same_actions[i][
                     np.random.permutation(same_actions[i].shape[0])]  # [:MAX_PAIR_PER_SAMPLE * self.batch_size]
-                diss, same = th.from_numpy(diss), th.from_numpy(same)
+                same_point = same_ref_points[i][
+                    np.random.permutation(same_ref_points[i].shape[0])]
+                diss, same, same_point = th.from_numpy(diss), th.from_numpy(same), th.from_numpy(same_point)
                 obs = Variable(th.from_numpy(observations[batch]))
                 next_obs = Variable(th.from_numpy(observations[batch + 1]))
+                # select a random but different batch index (non necessarily consecutive either)
+                batch_random_index = np.random.permutation(np.delete(np.arange(i), i))[0] # Equiv to something like np.random.choice(n_batches- the index of current batch i, 1, replace=False)
+                obs_from_same_pos_as_obs = Variable(th.from_numpy(observations[same_point[batch_random_index]]))
+
                 if self.cuda:
-                    obs, next_obs = obs.cuda(), next_obs.cuda()
+                    obs, next_obs, obs_from_same_pos_as_obs = obs.cuda(), next_obs.cuda(), obs_from_same_pos_as_obs.cuda()
                     same, diss = same.cuda(), diss.cuda()
 
-                states, next_states = self.model(obs), self.model(next_obs)
+                states, next_states, states_from_same_pos_as_states = self.model(obs), self.model(next_obs), self.model(obs_from_same_pos_as_obs)
                 self.optimizer.zero_grad()
-                loss = criterion(states, next_states, diss, same)
+                loss = criterion(states, next_states, states_from_same_pos_as_states, diss, same)
                 loss.backward()
                 self.optimizer.step()
                 epoch_loss += loss.data[0]
@@ -367,7 +411,6 @@ class SRL4robotics:
 
         # return predicted states for training observations
         return self._batchPredStates(observations)
-
 
 def saveStates(states, images_path, rewards, log_folder):
     """
@@ -403,6 +446,9 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder')
     parser.add_argument('--log_folder', type=str, default='logs/default_folder',
                         help='Folder within logs/ where the experiment model and plots will be saved')
+    parser.add_argument('--ref_prior', action='store_true', default=False,
+                        help='Applies 5th Fixed Reference Point Prior')
+
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -418,7 +464,9 @@ if __name__ == '__main__':
     observations, actions = training_data['observations'], training_data['actions']
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
 
-    # Demo with rico's original data
+    if args.data_folder == "":
+        raise ValueError("Fifth prior cannot be applied if --data_folder parameter for ground truth states are not provided")
+    # Demo with Rico's original data
     if len(observations.shape) == 2:
         import cv2
         from preprocessing.preprocess import IMAGE_WIDTH, IMAGE_HEIGHT
@@ -440,8 +488,12 @@ if __name__ == '__main__':
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda)
-    learned_states = srl.learn(observations, actions, rewards, episode_starts)
+    if srl.ref_prior and 'slot_car_task_train' in args.data_folder:
+        raise ValueError("Jonschkowski's racing slot_car_car baseline is not supported \
+                         to apply the 5th prior on as it does not contain ground truth")
+    learned_states = srl.learn(observations, actions, rewards, episode_starts, args.data_folder)
 
+    # We should always save the states learned, why only if dataset is given?
     if args.data_folder != "":
         ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
         saveStates(learned_states, ground_truth['images_path'], rewards, args.log_folder)
@@ -450,5 +502,5 @@ if __name__ == '__main__':
     path = "{}/learned_states.png".format(args.log_folder)
     plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
 
-    if DISPLAY_PLOTS:
+    if DISPLAY_PLOTS: # needed to keep the plots showing while training
         input('\nPress any key to exit.')

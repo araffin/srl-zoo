@@ -101,6 +101,7 @@ python train.py [--epochs N] [--seed S] [--state_dim STATE_DIM]
 e.g. with Rico Jonschkowski's data
 ```
 python train.py --path slot_car_task_train.npz
+py train.py --path 'data/staticButtonSimplest/preprocessed_data.npz'
 ```
 
 ### Evaluation and Plotting
@@ -151,6 +152,10 @@ python plotting/knn_images.py --log_folder path/to/an/experiment/log/folder
 
 Recommended configuration: Ubuntu 16.04 with python 2.7 or 3.6
 (should work with python3 though it was only thoroughly tested with python 2)
+Summary:
+```
+conda install matplotlib seaborn pandas scipy numpy scikit-learn tqdm
+```
 
 - OpenCV (version >= 2.4)
 - PyTorch
