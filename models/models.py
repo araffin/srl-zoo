@@ -42,7 +42,7 @@ class SRLConvolutionalNetwork(nn.Module):
 
 class SRLDenseNetwork(nn.Module):
     """
-    Feedforward Neural Net for State Representation Learning (SRL)
+    Dense Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W) (to be consistent with CNN network)
     :param input_dim: (int) 3 x H x H
     :param state_dim: (int)
@@ -70,7 +70,7 @@ class SRLDenseNetwork(nn.Module):
 
 class DenseNetwork(nn.Module):
     """
-    Feedforward Neural Net for State Representation Learning (SRL)
+    Dense Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W) (to be consistent with CNN network)
     :param input_dim: (int) 3 x H x H
     :param state_dim: (int)
@@ -148,7 +148,7 @@ class LinearAutoEncoder(nn.Module):
 
 class DenseAutoEncoder(nn.Module):
     """
-    Feedforward autoencoder network
+    Dense autoencoder network
     Known issue: it reconstructs the image but omits the robot arm
     :param input_dim: (int)
     :param state_dim: (int)
