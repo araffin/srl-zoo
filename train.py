@@ -8,6 +8,8 @@ https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
 
 Example to run this program:
  python main.py --path slot_car_task_train.npz
+ py train.py --path 'data/staticButtonSimplest/preprocessed_data.npz' --data_folder staticButtonSimplest
+
 
 # Some details:
 -Weight initialization: Xavier method (by )default for Conv layers https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L40)
@@ -277,7 +279,7 @@ class SRL4robotics:
             predictions.append(self._predFn(obs_var))
         return np.concatenate(predictions, axis=0)
 
-    def learn(self, observations, actions, rewards, episode_starts, data_folder):
+    def learn(self, observations, actions, rewards, episode_starts, same_ref_points):
         """
         Learn a state representation
         :param observations: (numpy tensor)
@@ -330,28 +332,28 @@ class SRL4robotics:
 
         dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in find_dissimilar(i, minibatch) if j > i],
                                dtype='int64') for minibatch in minibatchlist]
-        #print('actions {}, same actions {} and np.prod {}', actions[minibatch], actions[minibatch[index]], actions[minibatch] == actions[minibatch[index]])
 
-
-        if fixed_ref_point in arm_states:
-            print('Exact fixed ref point found in arm_states, no need to add threshold for finding equivalent grount truth arm_states (arm_position)')
-        find_same_ref_point_position = lambda index, minibatch: \
-            np.where(np.prod(arm_states[minibatch] == arm_states[minibatch[index]], axis=1))[0]
+        find_same_ref_point_observations = lambda index, minibatch: \
+            np.where(same_ref_points[minibatch] * same_ref_points[minibatch[index]])[0]
             # 0 returns the row indexes ([1] for column indexes) of the cases where the (prod) resulting matrix satisfied the where condition
 
-        same_ref_points = [
-            np.array([[i, j] for i in range(self.batch_size) for j in find_same_ref_points(i, minibatch) if j > i],
+        same_ref_point_pos_observations = [np.array([[i, j] for i in range(self.batch_size) for j in find_same_ref_point_observations(i, minibatch) if j > i],
                      dtype='int64') for minibatch in minibatchlist]
+
+        #print('dissimilar {}, minib actions {} shape {}, type {}'.format(actions[minibatch], actions[minibatch[0]], 1, type(actions)))
+        # print('same_ref_point_pos_observations {}, minib same ref {} shape {}, type {} \
+        #       '.format(1, same_ref_point_pos_observations[minibatch[0]],1,  type(same_ref_point_pos_observations)))
+        #print (dissimilar); #print(same_ref_point_pos_observations); print (len(dissimilar));  print(len(same_ref_point_pos_observations))
 
         for item in same_actions + dissimilar:
             if len(item) == 0:
                 msg = "No similar or dissimilar pairs found for at least one minibatch (currently is {})\n".format(BATCH_SIZE)
                 msg += "=> Consider increasing the batch_size or changing the seed"
                 raise ValueError(msg)
-        for item in same_ref_points:
+        for item in same_ref_point_pos_observations:
             if len(item) == 0:
                 msg = "No same ref point position observation of the arm was found for at least one minibatch (currently is {})\n".format(BATCH_SIZE)
-                msg += "=> Consider increasing the batch_size or changing the seed\n same_ref_point_positions: {}, arm_states:{}, fixed_ref_point:{}".format(same_ref_points, arm_states, fixed_ref_point)
+                msg += "=> Consider increasing the batch_size or changing the seed\n same_ref_point_positions: {}".format(same_ref_point_pos_observations)
                 raise ValueError(msg)
 
 
@@ -372,26 +374,32 @@ class SRL4robotics:
                 diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])]
                 same = same_actions[i][
                     np.random.permutation(same_actions[i].shape[0])]  # [:MAX_PAIR_PER_SAMPLE * self.batch_size]
-                same_point = same_ref_points[i][
-                    np.random.permutation(same_ref_points[i].shape[0])]
+                #print(same[i]);print(same.shape);print('random index {}'.format(len(np.random.permutation(same_ref_point_pos_observations[i].shape[0]))))
+                same_point = same_ref_point_pos_observations[i][
+                    np.random.permutation(same_ref_point_pos_observations[i].shape[0])]
                 diss, same, same_point = th.from_numpy(diss), th.from_numpy(same), th.from_numpy(same_point)
                 obs = Variable(th.from_numpy(observations[batch]))
                 next_obs = Variable(th.from_numpy(observations[batch + 1]))
-                # select a random but different batch index (non necessarily consecutive either)
-                batch_random_index = np.random.permutation(np.delete(np.arange(i), i))[0] # Equiv to something like np.random.choice(n_batches- the index of current batch i, 1, replace=False)
-                obs_from_same_pos_as_obs = Variable(th.from_numpy(observations[same_point[batch_random_index]]))
-
+                different_batch_id = np.random.permutation(np.delete(np.arange(n_batches), i))[0]
+                # Equiv to something like np.random.choice(n_batches- the index of current batch i, 1, replace=False)
+                obs_from_same_point_as_obs = Variable(th.from_numpy(observations[different_batch_id]))
                 if self.cuda:
-                    obs, next_obs, obs_from_same_pos_as_obs = obs.cuda(), next_obs.cuda(), obs_from_same_pos_as_obs.cuda()
-                    same, diss = same.cuda(), diss.cuda()
+                    obs, next_obs = obs.cuda(), next_obs.cuda()
+                    #obs_from_same_point_as_obs = obs_from_same_point_as_obs.cuda()
+                    same, diss = same.cuda(), diss.cuda()#
+                    #same_point = same_point.cuda()
 
-                states, next_states, states_from_same_pos_as_states = self.model(obs), self.model(next_obs), self.model(obs_from_same_pos_as_obs)
+                states, next_states = self.model(obs), self.model(next_obs)
+                states_from_same_pos_as_states = self.model(obs_from_same_point_as_obs)
                 self.optimizer.zero_grad()
                 loss = criterion(states, next_states, states_from_same_pos_as_states, diss, same)
                 loss.backward()
                 self.optimizer.step()
                 epoch_loss += loss.data[0]
                 epoch_batches += 1
+
+
+
 
             # Save best model
             # TODO: use a validation set
@@ -455,14 +463,17 @@ if __name__ == '__main__':
     DISPLAY_PLOTS = not args.no_plots
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
-
+    if args.ref_prior and 'slot_car_task_train' in args.data_folder:
+        raise ValueError("Jonschkowski's racing slot_car_car baseline is not supported \
+                         to apply the 5th prior on as it does not contain ground truth")
     print('\nDataset npz file: {}\n'.format(args.path))
     print('Log folder: {}'.format(args.log_folder))
 
     print('Loading data ... ')
     training_data = np.load(args.path)
     observations, actions = training_data['observations'], training_data['actions']
-    rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
+    print(training_data)
+    rewards, episode_starts, same_ref_points = training_data['rewards'], training_data['episode_starts'], training_data['same_ref_point_pos_observations']
 
     if args.data_folder == "":
         raise ValueError("Fifth prior cannot be applied if --data_folder parameter for ground truth states are not provided")
@@ -488,10 +499,8 @@ if __name__ == '__main__':
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda)
-    if srl.ref_prior and 'slot_car_task_train' in args.data_folder:
-        raise ValueError("Jonschkowski's racing slot_car_car baseline is not supported \
-                         to apply the 5th prior on as it does not contain ground truth")
-    learned_states = srl.learn(observations, actions, rewards, episode_starts, args.data_folder)
+
+    learned_states = srl.learn(observations, actions, rewards, episode_starts, same_ref_points)
 
     # We should always save the states learned, why only if dataset is given?
     if args.data_folder != "":

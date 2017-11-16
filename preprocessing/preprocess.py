@@ -1,5 +1,6 @@
 """
 Preprocessing script to extract actions, rewards, ground truth from text files
+Run example: python -m preprocessing.preprocess --data_folder staticButtonSimplest
 
 TODO: improve image preprocessing speed, reduce memory usage
 TODO: normalize with data loaders from pytorch
@@ -181,8 +182,7 @@ if __name__ == '__main__':
         'observations': all_observations,
         'rewards': all_rewards,
         'actions': all_actions.reshape(-1, 1), # Only to support Rico's baseline data
-        'episode_starts': episode_starts,
-        'same_fix_ref_point'; same_fix_ref_point
+        'episode_starts': episode_starts
     }
 
     ground_truth = {
@@ -191,47 +191,43 @@ if __name__ == '__main__':
         'actions_deltas': action_to_idx.keys(),
         'images_path': all_images_path,
     }
-    for key in ['bound_inf','bound_sup','fixed_ref_point_threshold',\
+
+    for key in ['bound_inf','bound_sup',\
                 'fixed_ref_point_threshold','fixed_ref_point']:
         if key in dataset_config.keys():
             ground_truth[key] = dataset_config[key]
+        else:
+            print('Warning: 5th prior will not be able to be executed with this\
+                  dataset because key parameter in .json config is missing: {}'.format(key))
 
-    ##### 5th Prior Functionality
+    ##### 5th Prior Functionality ###########################################
     # Saving a mask (0s and 1s) to indicate which datapoints contain the same ref_point (used in 5th prior)
     # same position observations for 5th prior
+    if not ground_truth['fixed_ref_point'] in all_arm_states:
+        print('Warning: Exact fixed ref point NOT FOUND in arm_states, Using \
+              fixed_ref_point_threshold to find equivalent ref points in arm_states in \
+              each data sequence: {}'.format(ground_truth['fixed_ref_point_threshold']))
 
-    if not fixed_ref_point in arm_states:
-        print('Exact fixed ref point NOT FOUND in arm_states, Need to use ground\
-              truth amplitude delta to find equivalent ref points in arm_states in each data sequence: {}'.format(fixed_ref_point_threshold))
+    close_enough =  lambda pos, ref_pos, t: ref_pos-t <= pos <= ref_pos+t
+    def same_point (pos, ref_pos, threshold):
+        same_point = True
+        for coord in range(len(pos)):
+            if not close_enough(pos[coord], ref_pos[coord], threshold):
+                return False
+        return same_point
 
-    find_same_ref_point_position = lambda index, minibatch: \
-        np.where(np.prod(arm_states[minibatch] == arm_states[minibatch[index]], axis=1))[0]
+    same_ref_point_pos_observations = np.array([1 if same_point(all_arm_states[i], \
+        ground_truth['fixed_ref_point'], ground_truth['fixed_ref_point_threshold']) else 0 for i in range(len(all_arm_states))])
+    data['same_ref_point_pos_observations'] = same_ref_point_pos_observations
+    # find_same_ref_points = lambda index, minibatch: \
+    #     np.where(np.prod(arm_states[minibatch] == arm_states[minibatch[index]], axis=1))[0]
         # 0 returns the row indexes ([1] for column indexes) of the cases where the (prod) resulting matrix satisfied the where condition
 
-    same_ref_points = [
-        np.array([[i, j] for i in range(self.batch_size) for j in find_same_ref_points(i, minibatch) if j > i],
-                 dtype='int64') for minibatch in minibatchlist]
+    # same_fix_ref_points = [
+    #     np.array([[i, j] for i in range(self.batch_size) for j in find_same_ref_points(i, minibatch) if j > i],
+    #              dtype='int64') for minibatch in minibatchlist]
 
-    for item in same_actions + dissimilar:
-        if len(item) == 0:
-            msg = "No similar or dissimilar pairs found for at least one minibatch \
-            (currently is {})\n".format(BATCH_SIZE)
-            msg += "=> Consider increasing the batch_size or changing the seed"
-            raise ValueError(msg)
-    for item in same_ref_points:
-        if len(item) == 0:
-            msg = "No same ref point position observation of the arm was found \
-            for at least one minibatch (currently is {})\n".format(BATCH_SIZE)
-            msg += "=> Consider increasing the batch_size or changing the seed\n \
-            same_ref_point_positions: {}, arm_states:{}, fixed_ref_point:{}".format(same_ref_points, arm_states, fixed_ref_point)
-            raise ValueError(msg)
-    delta = ground_truth['fixed_ref_point_threshold']
-    print('same actions: {}'.format(same_actions))
-    print('{}  \n*  {} *{}'.format(type(same_actions), type(same_actions[0]), type(same_actions[0][0])))
-    same_ref_points = self.find_same_ref_point_but_different_pairs_of_observations(minibatch, fixed_ref_point_threshold)
-
-
-    assert len(all_rewards) == len(all_images_path),"n_rewards != n_images: {} != {}".format(len(all_rewards), len(all_images_path))
+    assert len(same_ref_point_pos_observations) == len(all_rewards) and len(all_rewards) == len(all_images_path),"n_rewards != n_images or n_rewards != same_ref_point_pos_observations: {}, {}, {}".format(len(all_rewards), len(all_images_path), len(same_ref_point_pos_observations))
 
     print("Saving preprocessed data...")
     np.savez('{}/preprocessed_data.npz'.format(data_folder), **data)
