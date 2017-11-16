@@ -383,14 +383,16 @@ class SRL4robotics:
                 different_batch_id = np.random.permutation(np.delete(np.arange(n_batches), i))[0]
                 # Equiv to something like np.random.choice(n_batches- the index of current batch i, 1, replace=False)
                 obs_from_same_point_as_obs = Variable(th.from_numpy(observations[different_batch_id]))
+
                 if self.cuda:
                     obs, next_obs = obs.cuda(), next_obs.cuda()
-                    #obs_from_same_point_as_obs = obs_from_same_point_as_obs.cuda()
+                    obs_from_same_point_as_obs = obs_from_same_point_as_obs.cuda()
                     same, diss = same.cuda(), diss.cuda()#
                     #same_point = same_point.cuda()
 
                 states, next_states = self.model(obs), self.model(next_obs)
                 states_from_same_pos_as_states = self.model(obs_from_same_point_as_obs)
+
                 self.optimizer.zero_grad()
                 loss = criterion(states, next_states, states_from_same_pos_as_states, diss, same)
                 loss.backward()
