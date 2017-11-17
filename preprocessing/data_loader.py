@@ -1,12 +1,13 @@
 from __future__ import print_function, division, absolute_import
 
 import time
+import threading
+import multiprocessing as mp
 from collections import OrderedDict
 
 import cv2
 import numpy as np
 import torch as th
-import multiprocessing as mp
 from torch.autograd import Variable
 
 from .utils import preprocessInput
@@ -27,7 +28,6 @@ def imageWorker(image_queue, output_queue, exit_event):
         output_queue.put((idx, im))
         del im  # Free memory
 
-# TODO: prefetch data + cache using dict
 class BaxterImageLoader(object):
     """
     :param minibatches: [[int]] list of list of int (observations ids)
@@ -36,7 +36,7 @@ class BaxterImageLoader(object):
 
     def __init__(self, minibatches, images_path, same_actions,
                  dissimilar, test_batch_size=512, cache_capacity=5000,
-                 n_workers=12, is_training=True, mode="image_net"):
+                 n_workers=5, is_training=True, mode="image_net"):
         super(BaxterImageLoader, self).__init__()
         self.minibatches = minibatches[:]
         self.n_minibatches = len(minibatches)
@@ -50,16 +50,23 @@ class BaxterImageLoader(object):
         self.same_actions = same_actions[:]
 
         self.current_idx = 0
+        self.current_preprocessed_idx = 0
         self.is_training = is_training
         self.test_batch_size = test_batch_size
-        self.idx_ready = -1
+        # Cache
         self.cache = OrderedDict()
         self.cached_indices = None
         self.cache_capacity = cache_capacity
+        self.result = None
+        self.ready_event = threading.Event()
+        self.result_given_event = threading.Event()
+        self.reset_event = threading.Event()
+        self.thread_exit = threading.Event()
+        self.thread = None
 
         # Multiprocessing
         self.n_workers = n_workers
-        self.image_queue = mp.Queue()
+        self.image_queues = [mp.Queue() for _ in range(self.n_workers)]
         self.output_queue = mp.Queue()
         self.exit_event = mp.Event()
         self.n_sent, self.n_received = 0, 0
@@ -71,10 +78,12 @@ class BaxterImageLoader(object):
 
         self.workers = []
         for i in range(self.n_workers):
-            w = mp.Process(target=imageWorker, args=(self.image_queue, self.output_queue, self.exit_event))
+            w = mp.Process(target=imageWorker, args=(self.image_queues[i], self.output_queue, self.exit_event))
             w.daemon = True  # ensure that the worker exits on process exit
             w.start()
             self.workers.append(w)
+
+        self.launchPreprocessing()
 
     def trainMode(self):
         self.is_training = True
@@ -96,16 +105,21 @@ class BaxterImageLoader(object):
             for key in self.cache.keys()[:n_to_delete]:
                 del self.cache[key]
 
+    def cleanUp(self):
+        self.thread_exit.set()
+        self.reset()
+
     def reset(self):
         self.current_idx = 0
+        self.resetPreprocessingThread()
 
     def resetCache(self):
         del self.cache
         self.cache = OrderedDict()
 
     def resetAndShuffle(self):
-        self.current_idx = 0
         self.shuffleMinitbatchesOrder()
+        self.reset()
 
     def shuffleMinitbatchesOrder(self):
         np.random.shuffle(self.minibatches)
@@ -117,11 +131,107 @@ class BaxterImageLoader(object):
         """
         self.n_sent, self.n_received = 0, 0
         # Clear queues
-        for q in [self.image_queue, self.output_queue]:
+        for q in self.image_queues + [self.output_queue]:
             while not q.empty():
                 idx, _ = q.get()
                 if idx is not None:
                     print("Warning, queue not empty")
+
+    def resetPreprocessingThread(self):
+        self.result = None
+        self.current_preprocessed_idx = 0
+        self.ready_event.clear()
+        self.result_given_event.clear()
+        self.reset_event.set()
+
+    def launchPreprocessing(self):
+        t = threading.Thread(target=self.prePreprocessingThread)
+        self.thread = t
+        t.deamon = True
+        t.start()
+
+    def prePreprocessingThread(self):
+        while not self.thread_exit.is_set():
+            if self.current_preprocessed_idx >= len(self.minibatches):
+                self.reset_event.clear()
+                self.reset_event.wait()
+                if self.thread_exit.is_set():
+                    continue
+            self._processNextBatch()
+
+    def _processNextBatch(self):
+
+        if self.current_preprocessed_idx == 0:
+            self.total_time = 0
+
+        start_time = time.time()
+        print('{}/{}'.format(self.current_preprocessed_idx, len(self.minibatches)))
+        # Alias to improve readability
+        i = self.current_preprocessed_idx
+        obs_indices = self.minibatches[i]
+
+        batch_size = len(obs_indices)
+
+        if self.is_training:
+            diss = self.dissimilar[i][np.random.permutation(self.dissimilar[i].shape[0])]
+            same = self.same_actions[i][np.random.permutation(self.same_actions[i].shape[0])]
+            # Convert to torch tensor
+            diss, same = th.from_numpy(diss), th.from_numpy(same)
+
+            # Retrieve observations
+            # Define a dict to modify it in the for loop
+            obs_dict = {'obs': None, 'next_obs': None}
+            indices_list = [obs_indices, obs_indices + 1]
+        else:
+            obs_dict = {'obs': None}
+            indices_list = [obs_indices]
+
+        for indices, key in zip(indices_list, obs_dict.keys()):
+            obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS), dtype=np.float32)
+            # Reset queues and received count
+            self.resetQueues()
+
+            # Retrieve known images from cache:
+            self.cached_indices = np.zeros(len(indices)).astype(bool)
+            known_images = set(self.cache.keys())
+            minibatch_idx_to_idx = {}  # Minibatch index to Image index
+            for j, idx in enumerate(indices):
+                minibatch_idx_to_idx[j] = idx
+                if idx in known_images:
+                    self.cached_indices[j] = True
+                    obs[j, :, :, :] = self.cache[idx]
+
+            self._putImages(indices)
+
+            while self.n_received < self.n_sent:
+                j, im = self.output_queue.get(timeout=3)  # 3s timeout
+                obs[j, :, :, :] = im
+                self.cache[minibatch_idx_to_idx[j]] = im
+                self.n_received += 1
+
+            obs = np.transpose(obs, (0, 3, 2, 1))
+            obs_dict[key] = Variable(th.from_numpy(obs))
+            # Free memory
+            del obs
+
+        self.deleteOldCache()
+
+        delta = time.time() - start_time
+        self.total_time += delta
+        if self.result is not None:
+            # Wait before overriding result
+            self.result_given_event.wait()
+            self.result_given_event.clear()
+            # Prevent from changing self.result before the return
+            time.sleep(0.01)
+
+        if self.is_training:
+            self.result = obs_dict['obs'], obs_dict['next_obs'], diss, same
+        else:
+            self.result = obs_dict['obs']
+
+        self.ready_event.set()
+        self.current_preprocessed_idx += 1
 
     def __iter__(self):
         return self
@@ -131,73 +241,14 @@ class BaxterImageLoader(object):
 
     def __next__(self):
         if self.current_idx < len(self.minibatches):
-            if self.current_idx == 0:
-                self.total_time = 0
-                self.total_time_2 = 0
-            start_time = time.time()
-            print('{}/{}'.format(self.current_idx, len(self.minibatches)))
-            # Alias to improve readability
-            i = self.current_idx
-            obs_indices = self.minibatches[i]
-
-            batch_size = len(obs_indices)
-
-            if self.is_training:
-                diss = self.dissimilar[i][np.random.permutation(self.dissimilar[i].shape[0])]
-                same = self.same_actions[i][np.random.permutation(self.same_actions[i].shape[0])]
-                # Convert to torch tensor
-                diss, same = th.from_numpy(diss), th.from_numpy(same)
-
-                # Retrieve observations
-                # Define a dict to modify it in the for loop
-                obs_dict = {'obs': None, 'next_obs': None}
-                indices_list = [obs_indices, obs_indices + 1]
-            else:
-                obs_dict = {'obs': None}
-                indices_list = [obs_indices]
-
-            for indices, key in zip(indices_list, obs_dict.keys()):
-                obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS), dtype=np.float32)
-                # Reset queues and received count
-                self.resetQueues()
-
-                # Retrieve known images from cache:
-                self.cached_indices = np.zeros(len(indices)).astype(bool)
-                known_images = set(self.cache.keys())
-                minibatch_idx_to_idx = {}  # Minibatch index to Image index
-                for j, idx in enumerate(indices):
-                    minibatch_idx_to_idx[j] = idx
-                    if idx in known_images:
-                        self.cached_indices[j] = True
-                        obs[j, :, :, :] = self.cache[idx]
-
-                self._putImages(indices)
-
-                while self.n_received < self.n_sent:
-                    t1 = time.time()
-                    j, im = self.output_queue.get(timeout=3)  # 3s timeout
-                    self.total_time_2 += time.time() - t1
-                    obs[j, :, :, :] = im
-                    self.cache[minibatch_idx_to_idx[j]] = im
-                    self.n_received += 1
-
-                obs = np.transpose(obs, (0, 3, 2, 1))
-                obs_dict[key] = Variable(th.from_numpy(obs))
-                # Free memory
-                del obs
-
-            self.deleteOldCache()
-
-            delta = time.time() - start_time
-            self.total_time += delta
+            self.ready_event.wait()
+            self.ready_event.clear()
+            self.result_given_event.set()
             self.current_idx += 1
-            if self.is_training:
-                return obs_dict['obs'], obs_dict['next_obs'], diss, same
-            else:
-                return obs_dict['obs']
-
+            return self.result
         else:
-            print("Block took {:.2f}s".format(self.total_time_2))
+            # del self.result
+            self.result = None
             print("Preprocessing took {:.2f}s".format(self.total_time))
             self.resetCache()
             raise StopIteration
@@ -212,7 +263,7 @@ class BaxterImageLoader(object):
         for j, idx in enumerate(indices):
             if not self.cached_indices[j]:
                 image_path = 'data/{}'.format(self.images_path[idx])
-                self.image_queue.put((j, image_path))
+                self.image_queues[j % self.n_workers].put((j, image_path))
                 self.n_sent += 1
 
     def _shutdown_workers(self):
@@ -224,14 +275,14 @@ class BaxterImageLoader(object):
         if not self.shutdown:
             self.shutdown = True
             self.exit_event.set()
-            for _ in self.workers:
-                self.image_queue.put((None, None))
-            for w in self.workers:
+            for i, w in enumerate(self.workers):
+                self.image_queues[i].put((None, None))
                 w.join()
 
     def __del__(self):
         """
         Shutdown processes when the object is deleted
         """
+        # self.cleanUp()
         if self.n_workers > 0:
             self._shutdown_workers()

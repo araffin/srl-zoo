@@ -236,8 +236,11 @@ class SRL4robotics(BaseLearner):
 
         # Load best model before predicting states
         self.model.load_state_dict(th.load(best_model_path))
+        states = self._batchPredStates(baxter_data_loader)
+        # Important: release the preprocessing thread
+        baxter_data_loader.cleanUp()
         # return predicted states for training observations
-        return self._batchPredStates(baxter_data_loader)
+        return states
 
 
 def saveStates(states, images_path, rewards, log_folder):
