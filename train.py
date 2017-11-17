@@ -8,7 +8,7 @@ https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
 
 Example to run this program:
  python main.py --path slot_car_task_train.npz
- py train.py --path 'data/staticButtonSimplest/preprocessed_data.npz' --data_folder staticButtonSimplest
+ py train.py --path 'data/staticButtonSimplest/preprocessed_data.npz' --data_folder staticButtonSimplest --model mlp
 
 
 # Some details:
@@ -380,16 +380,22 @@ class SRL4robotics:
                 diss, same, same_point = th.from_numpy(diss), th.from_numpy(same), th.from_numpy(same_point)
                 obs = Variable(th.from_numpy(observations[batch]))
                 next_obs = Variable(th.from_numpy(observations[batch + 1]))
+                # Picking a batch id different to the current one
                 different_batch_id = np.random.permutation(np.delete(np.arange(n_batches), i))[0]
-                # Equiv to something like np.random.choice(n_batches- the index of current batch i, 1, replace=False)
+                print('Selecting different_batch_id: {} to get image from other batch for 5th prior'.format(different_batch_id))
                 obs_from_same_point_as_obs = Variable(th.from_numpy(observations[different_batch_id]))
-
+                print(obs)
+                print('obs_from_same_point_as_obs: {}'.format(obs_from_same_point_as_obs))
+                
                 if self.cuda:
                     obs, next_obs = obs.cuda(), next_obs.cuda()
                     obs_from_same_point_as_obs = obs_from_same_point_as_obs.cuda()
                     same, diss = same.cuda(), diss.cuda()#
-                    #same_point = same_point.cuda()
+                    same_point = same_point.cuda()
 
+                print(len(obs))
+                print(len(obs_from_same_point_as_obs))
+                # learning representation for each observation
                 states, next_states = self.model(obs), self.model(next_obs)
                 states_from_same_pos_as_states = self.model(obs_from_same_point_as_obs)
 
