@@ -9,7 +9,6 @@ import torch as th
 import multiprocessing
 from torch.autograd import Variable
 
-
 from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
 
@@ -17,6 +16,7 @@ if sys.version_info[0] == 2:
     import Queue as queue
 else:
     import queue
+
 
 def imageWorker(image_queue, output_queue, exit_event):
     while not exit_event.is_set():
@@ -34,6 +34,7 @@ def imageWorker(image_queue, output_queue, exit_event):
     print("Worker exiting...")
 
 
+# TODO: prefetch data + cache using dict
 class BaxterImageLoader(object):
     """
     :param minibatches: [[int]] list of list of int (observations ids)
@@ -41,7 +42,9 @@ class BaxterImageLoader(object):
     """
 
     def __init__(self, minibatches, images_path, same_actions,
-                 dissimilar, test_batch_size=512, is_training=True, mode="image_net"):
+                 dissimilar, test_batch_size=512, n_workers=8,
+                 n_queues=4,
+                 is_training=True, mode="image_net"):
         super(BaxterImageLoader, self).__init__()
         self.minibatches = minibatches[:]
         self.n_minibatches = len(minibatches)
@@ -58,25 +61,29 @@ class BaxterImageLoader(object):
         self.test_batch_size = test_batch_size
 
         # Multiprocessing
-        self.num_workers = 5
-        self.image_queue = multiprocessing.Queue()
-        self.output_queue = multiprocessing.Queue()
+        self.n_workers = n_workers
+        n_queues = n_queues if n_queues > 0 else n_workers // 2
+        self.n_queues = min(n_queues, n_workers)
+        self.image_queues = [multiprocessing.Queue() for _ in range(n_queues)]
+        self.output_queues = [multiprocessing.Queue() for _ in range(n_queues)]
         self.exit_event = multiprocessing.Event()
         self.n_sent, self.n_received = 0, 0
         self.shutdown = False
 
-        if self.num_workers <= 0:
-            raise ValueError("num_workers <= 0")
+        if self.n_workers <= 0:
+            raise ValueError("n_workers <= 0")
+        print("{} workers {} queues".format(self.n_workers, self.n_queues))
 
-        self.workers = [
-            multiprocessing.Process(
-                target=imageWorker,
-                args=(self.image_queue, self.output_queue, self.exit_event))
-            for _ in range(self.num_workers)]
-        # Start workers
-        for w in self.workers:
+        self.workers = []
+        for i in range(self.n_workers):
+            w = multiprocessing.Process(target=imageWorker,
+                                        args=(self.image_queues[i % self.n_queues],
+                                              self.output_queues[i % self.n_queues],
+                                              self.exit_event)
+                                        )
             w.daemon = True  # ensure that the worker exits on process exit
             w.start()
+            self.workers.append(w)
 
     def trainMode(self):
         self.is_training = True
@@ -84,7 +91,6 @@ class BaxterImageLoader(object):
 
     def testMode(self):
         self.is_training = False
-        indices = np.arange(self.n_samples).astype(np.int64)
         self.minibatches = []
         for i in range(self.n_samples // self.test_batch_size + 1):
             start_idx = i * self.test_batch_size
@@ -102,9 +108,13 @@ class BaxterImageLoader(object):
         np.random.shuffle(self.minibatches)
 
     def resetQueues(self):
+        """
+        Reset sent and received count
+        and empty queues
+        """
         self.n_sent, self.n_received = 0, 0
         # Clear queues
-        for q in [self.image_queue, self.output_queue]:
+        for q in self.image_queues + self.output_queues:
             while not q.empty():
                 idx, _ = q.get()
                 if idx is not None:
@@ -149,9 +159,13 @@ class BaxterImageLoader(object):
                 self._putImages(indices)
 
                 while self.n_received < self.n_sent:
-                    j, im = self.output_queue.get()
-                    obs[j, :, :, :] = im
-                    self.n_received += 1
+                    for q in self.output_queues:
+                        try:
+                            j, im = q.get_nowait()
+                        except queue.Empty:
+                            continue
+                        obs[j, :, :, :] = im
+                        self.n_received += 1
 
                 obs = np.transpose(obs, (0, 3, 2, 1))
                 obs_dict[key] = Variable(th.from_numpy(obs))
@@ -173,19 +187,32 @@ class BaxterImageLoader(object):
     next = __next__  # Python 2 compatibility
 
     def _putImages(self, indices):
+        """
+        Put images to be processed in the queues
+        :param indices: (int)
+        """
         for j, idx in enumerate(indices):
             image_path = 'data/{}'.format(self.images_path[idx])
-            self.image_queue.put((j, image_path))
+            self.image_queues[j % self.n_queues].put((j, image_path))
             self.n_sent += 1
 
     def _shutdown_workers(self):
+        """
+        Method used to shutdown processes
+        It set the exit_event and release the queues
+        by sending `None`
+        """
         if not self.shutdown:
             self.shutdown = True
             self.exit_event.set()
+            for i in range(len(self.workers)):
+                self.image_queues[i % self.n_queues].put((None, None))
             for w in self.workers:
-                self.image_queue.put((None, None))
                 w.join()
 
     def __del__(self):
-        if self.num_workers > 0:
+        """
+        Shutdown processes when the object is deleted
+        """
+        if self.n_workers > 0:
             self._shutdown_workers()
