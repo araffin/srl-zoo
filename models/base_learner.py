@@ -1,5 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
+import json
+
 import numpy as np
 import torch as th
 from torch.autograd import Variable
@@ -91,9 +93,44 @@ class BaseLearner(object):
             predictions.append(self._predFn(obs_var))
         return np.concatenate(predictions, axis=0)
 
+    def _dataLoaderPredStates(self, data_loader):
+        """
+        Predict states using minibatches to avoid memory issues
+        :param data_loader: (Baxter Data Loader object)
+        :return: (numpy tensor)
+        """
+        # Switch to test mode and reset the iterator
+        data_loader.testMode()
+        predictions = []
+        for obs_var in data_loader:
+            if self.cuda:
+                obs_var = obs_var.cuda()
+            predictions.append(self._predFn(obs_var))
+        # Switch back to train mode
+        data_loader.trainMode()
+        return np.concatenate(predictions, axis=0)
+
     def learn(self, *args, **kwargs):
         """
         Function called to learn a state representation
         it returns the learned states for the given observations
         """
         raise NotImplementedError("Learn method not implemented")
+
+    @staticmethod
+    def saveStates(states, images_path, rewards, log_folder, name=""):
+        """
+        Save learned states to json and npz files
+        :param states: (numpy array)
+        :param images_path: ([str])
+        :param rewards: (rewards)
+        :param log_folder: (str)
+        :param name: (str)
+        """
+        print("Saving image path to state representation")
+        image_to_state = {path: list(map(str, state)) for path, state in zip(images_path, states)}
+        with open("{}/image_to_state{}.json".format(log_folder, name), 'wb') as f:
+            json.dump(image_to_state, f, sort_keys=True)
+        print("Saving states and rewards")
+        states_rewards = {'states': states, 'rewards': rewards}
+        np.savez('{}/states_rewards{}.npz'.format(log_folder, name), **states_rewards)

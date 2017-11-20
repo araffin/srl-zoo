@@ -7,11 +7,12 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
-from torch.autograd import Variable
 
 from models.base_learner import BaseLearner
 from models.models import ConvolutionalNetwork, DenseNetwork
 from plotting.representation_plot import plot_representation, plt
+from preprocessing.data_loader import SupervisedDataLoader
+from preprocessing.preprocess import INPUT_DIM
 from utils import parseDataFolder
 
 # Python 2/3 compatibility
@@ -42,8 +43,7 @@ class SupervisedLearning(BaseLearner):
         if model_type == "cnn":
             self.model = ConvolutionalNetwork(self.state_dim, cuda)
         elif model_type == "mlp":
-            input_dim = 224 * 224 * 3
-            self.model = DenseNetwork(input_dim, self.state_dim)
+            self.model = DenseNetwork(INPUT_DIM, self.state_dim)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -54,34 +54,30 @@ class SupervisedLearning(BaseLearner):
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.log_folder = log_folder
 
-    def learn(self, observations, true_states, rewards):
+
+    def learn(self, true_states, images_path, rewards):
         """
         Learn a state representation
-        :param observations: (numpy tensor)
+        :param images_path: (numpy 1D array)
         :param true_states: (numpy tensor)
         :param rewards: (numpy 1D array)
         :return: (numpy tensor) the learned states for the given observations
         """
-        # We assume that observations are already preprocessed
-        # that is to say normalized and scaled
-        observations = observations.astype(np.float32)
         true_states = true_states.astype(np.float32)
+        x_indices = np.arange(len(true_states)).astype(np.int64)
 
         # Split into train/validation set
-        X_train, X_val, y_train, y_val = train_test_split(observations, true_states, test_size=0.33,
-                                                          random_state=self.seed)
+        x_train, x_val, y_train, y_val = train_test_split(x_indices, true_states,
+                                                          test_size=0.33, random_state=self.seed)
 
-        kwargs = {'num_workers': 1, 'pin_memory': False} if self.cuda else {}
+        train_loader = SupervisedDataLoader(x_train, y_train, images_path, batch_size=self.batch_size,
+                                            cache_capacity=5000, auto_cleanup=False)
+        val_loader = SupervisedDataLoader(x_val, y_val, images_path, batch_size=self.batch_size,
+                                          cache_capacity=2500, auto_cleanup=False, is_training=False)
+        # For plotting
+        data_loader = SupervisedDataLoader(x_indices, true_states, images_path, batch_size=512, no_targets=True,
+                                           cache_capacity=0, auto_cleanup=True, is_training=False)
 
-        # Convert to torch tensor
-        X_train, y_train = th.from_numpy(X_train), th.from_numpy(y_train)
-        X_val, y_val = th.from_numpy(X_val), th.from_numpy(y_val)
-
-        train_loader = th.utils.data.DataLoader(th.utils.data.TensorDataset(X_train, y_train),
-                                                batch_size=self.batch_size, shuffle=True, **kwargs)
-
-        val_loader = th.utils.data.DataLoader(th.utils.data.TensorDataset(X_val, y_val),
-                                              batch_size=self.batch_size, shuffle=False, **kwargs)
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = nn.MSELoss()
         # criterion = F.smooth_l1_loss
@@ -93,11 +89,10 @@ class SupervisedLearning(BaseLearner):
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             train_loss, val_loss = 0, 0
-
+            train_loader.resetAndShuffle()
             for batch_idx, (obs, target_states) in enumerate(train_loader):
                 if self.cuda:
                     obs, target_states = obs.cuda(), target_states.cuda()
-                obs, target_states = Variable(obs), Variable(target_states)
 
                 pred_states = self.model(obs)
                 self.optimizer.zero_grad()
@@ -109,11 +104,11 @@ class SupervisedLearning(BaseLearner):
             train_loss /= len(train_loader)
 
             self.model.eval()
+            val_loader.resetIterator()
             # Pass on the validation set
             for obs, target_states in val_loader:
                 if self.cuda:
                     obs, target_states = obs.cuda(), target_states.cuda()
-                obs, target_states = Variable(obs, volatile=True), Variable(target_states)
 
                 pred_states = self.model(obs)
                 loss = criterion(pred_states, target_states)
@@ -134,15 +129,18 @@ class SupervisedLearning(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
-                    plot_representation(self._batchPredStates(observations), rewards, add_colorbar=epoch == 0,
+                    plot_representation(self._dataLoaderPredStates(data_loader), rewards, add_colorbar=epoch == 0,
                                         name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
+        # Explicit cleanup in order to delete the objects
+        train_loader.cleanUp()
+        val_loader.cleanUp()
 
         # Load best model before predicting states
         self.model.load_state_dict(th.load(best_model_path))
         # return predicted states for training observations
-        return self._batchPredStates(observations)
+        return self._dataLoaderPredStates(data_loader)
 
 
 if __name__ == '__main__':
@@ -169,23 +167,19 @@ if __name__ == '__main__':
     print('Log folder: {}'.format(log_folder))
 
     print('Loading data ... ')
-    training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
-    observations = training_data['observations']
-    rewards = training_data['rewards']
+    rewards = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))['rewards']
 
-    # Move the channel dimension to match pretrained model input
-    # (batch_size, width, height, n_channels) -> (batch_size, n_channels, height, width)
-    observations = np.transpose(observations, (0, 3, 2, 1))
-    print("Observations shape: {}".format(observations.shape))
     # TODO: normalize true states
-    true_states = np.load("data/{}/ground_truth.npz".format(args.data_folder))['arm_states']
-    state_dim = true_states.shape[1]
+    ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
+    state_dim = ground_truth['arm_states'].shape[1]
 
     print('Learning a state representation ... ')
     srl = SupervisedLearning(state_dim, model_type=args.model_type, seed=args.seed,
                              log_folder=log_folder, learning_rate=args.learning_rate,
                              cuda=args.cuda)
-    learned_states = srl.learn(observations, true_states, rewards)
+    learned_states = srl.learn(ground_truth['arm_states'], ground_truth['images_path'], rewards)
+    srl.saveStates(learned_states, ground_truth['images_path'], rewards, log_folder,
+                   name="_supervised")
 
     name = "Learned State Representation - {} \n Supervised Learning".format(args.data_folder)
     path = "{}/learned_states_supervised.png".format(log_folder)

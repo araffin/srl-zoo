@@ -73,7 +73,7 @@ Usage:
 python train.py [--epochs N] [--seed S] [--state_dim STATE_DIM]
                 [-bs BATCH_SIZE] [-lr LEARNING_RATE] [--l1_reg L1_REG]
                 [--no-cuda] [--no-plots] [--model_type MODEL_TYPE]
-                [--path PATH] [--data_folder DATA_FOLDER]
+                [--data_folder DATA_FOLDER]
                 [--log_folder LOG_FOLDER]
 
 --epochs N            number of epochs to train (default: 50)
@@ -89,7 +89,6 @@ python train.py [--epochs N] [--seed S] [--state_dim STATE_DIM]
 --no-plots            disables plots
 --model_type MODEL_TYPE
                       Model architecture (default: "cnn")
---path PATH           Path to npz file
 --data_folder DATA_FOLDER
                       Dataset folder
 --log_folder LOG_FOLDER
@@ -98,9 +97,9 @@ python train.py [--epochs N] [--seed S] [--state_dim STATE_DIM]
 ```
 
 
-e.g. with Rico Jonschkowski's data
+Example:
 ```
-python train.py --path slot_car_task_train.npz
+python train.py --data_folder data/path/to/dataset
 ```
 
 ### Evaluation and Plotting

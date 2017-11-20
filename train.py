@@ -10,7 +10,6 @@ https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
 from __future__ import print_function, division, absolute_import
 
 import argparse
-import json
 import time
 
 import numpy as np
@@ -120,23 +119,6 @@ class SRL4robotics(BaseLearner):
         self.l1_reg = l1_reg
         self.log_folder = log_folder
 
-    def _batchPredStates(self, data_loader):
-        """
-        Predict states using minibatches to avoid memory issues
-        :param data_loader: (Baxter Data Loader object)
-        :return: (numpy tensor)
-        """
-        # Switch to test mode and reset the iterator
-        data_loader.testMode()
-        predictions = []
-        for obs_var in data_loader:
-            if self.cuda:
-                obs_var = obs_var.cuda()
-            predictions.append(self._predFn(obs_var))
-        # Switch back to train mode
-        data_loader.trainMode()
-        return np.concatenate(predictions, axis=0)
-
     def learn(self, images_path, actions, rewards, episode_starts):
         """
         Learn a state representation
@@ -184,8 +166,8 @@ class SRL4robotics(BaseLearner):
                 msg += "=> Consider increasing the batch_size or changing the seed"
                 raise ValueError(msg)
 
-        baxter_data_loader = BaxterImageLoader(minibatchlist, images_path, same_actions,
-                                               dissimilar, auto_cleanup=False)
+        baxter_data_loader = BaxterImageLoader(minibatchlist, images_path, same_actions, dissimilar,
+                                               cache_capacity=5000, auto_cleanup=False)
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = RoboticPriorsLoss(self.model, self.l1_reg)
@@ -227,7 +209,7 @@ class SRL4robotics(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
-                    plot_representation(self._batchPredStates(baxter_data_loader), rewards, add_colorbar=epoch == 0,
+                    plot_representation(self._dataLoaderPredStates(baxter_data_loader), rewards, add_colorbar=epoch == 0,
                                         name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
@@ -236,24 +218,7 @@ class SRL4robotics(BaseLearner):
         self.model.load_state_dict(th.load(best_model_path))
         baxter_data_loader.auto_cleanup = True
         # return predicted states for training observations
-        return self._batchPredStates(baxter_data_loader)
-
-
-def saveStates(states, images_path, rewards, log_folder):
-    """
-    Save learned states to json and npz files
-    :param states: (numpy array)
-    :param images_path: ([str])
-    :param rewards: (rewards)
-    :param log_folder: (str)
-    """
-    print("Saving image path to state representation")
-    image_to_state = {path: list(map(str, state)) for path, state in zip(images_path, states)}
-    with open("{}/image_to_state.json".format(log_folder), 'wb') as f:
-        json.dump(image_to_state, f, sort_keys=True)
-    print("Saving states and rewards")
-    states_rewards = {'states': states, 'rewards': rewards}
-    np.savez('{}/states_rewards.npz'.format(log_folder), **states_rewards)
+        return self._dataLoaderPredStates(baxter_data_loader)
 
 
 if __name__ == '__main__':
@@ -296,7 +261,7 @@ if __name__ == '__main__':
                        l1_reg=args.l1_reg, cuda=args.cuda)
     learned_states = srl.learn(ground_truth['images_path'], actions, rewards, episode_starts)
 
-    saveStates(learned_states, ground_truth['images_path'], rewards, args.log_folder)
+    srl.saveStates(learned_states, ground_truth['images_path'], rewards, args.log_folder)
 
     name = "Learned State Representation\n {}".format(args.log_folder.split('/')[-1])
     path = "{}/learned_states.png".format(args.log_folder)
