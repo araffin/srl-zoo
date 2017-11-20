@@ -15,20 +15,20 @@ TODO: generator to load images on the fly
 from __future__ import print_function, division, absolute_import
 
 import argparse
-import time
 import json
+import time
 
 import numpy as np
 import torch as th
 import torch.nn as nn
-from torch.autograd import Variable
+from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
 from models.models import SRLConvolutionalNetwork, SRLDenseNetwork
-from preprocessing.preprocess import INPUT_DIM
-from preprocessing.data_loader import BaxterImageLoader
 from plotting.representation_plot import plot_representation, plt
+from preprocessing.data_loader import BaxterImageLoader
+from preprocessing.preprocess import INPUT_DIM
 from utils import parseDataFolder
 
 # Python 2/3 compatibility
@@ -128,16 +128,17 @@ class SRL4robotics(BaseLearner):
     def _batchPredStates(self, data_loader):
         """
         Predict states using minibatches to avoid memory issues
-        :param observations: (numpy tensor)
+        :param data_loader: (Baxter Data Loader object)
         :return: (numpy tensor)
         """
+        # Switch to test mode and reset the iterator
         data_loader.testMode()
-        data_loader.reset()
         predictions = []
         for obs_var in data_loader:
             if self.cuda:
                 obs_var = obs_var.cuda()
             predictions.append(self._predFn(obs_var))
+        # Switch back to train mode
         data_loader.trainMode()
         return np.concatenate(predictions, axis=0)
 
@@ -189,7 +190,7 @@ class SRL4robotics(BaseLearner):
                 raise ValueError(msg)
 
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path, same_actions,
-                                               dissimilar, mode="image_net")
+                                               dissimilar, auto_cleanup=False)
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = RoboticPriorsLoss(self.model, self.l1_reg)
@@ -200,7 +201,7 @@ class SRL4robotics(BaseLearner):
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             epoch_loss, epoch_batches = 0, 0
-
+            pbar = tqdm(total=len(minibatchlist))
             baxter_data_loader.resetAndShuffle()
             for obs, next_obs, same, diss in baxter_data_loader:
                 if self.cuda:
@@ -214,6 +215,8 @@ class SRL4robotics(BaseLearner):
                 self.optimizer.step()
                 epoch_loss += loss.data[0]
                 epoch_batches += 1
+                pbar.update(1)
+            pbar.close()
 
             train_loss = epoch_loss / epoch_batches
 
@@ -236,11 +239,9 @@ class SRL4robotics(BaseLearner):
 
         # Load best model before predicting states
         self.model.load_state_dict(th.load(best_model_path))
-        states = self._batchPredStates(baxter_data_loader)
-        # Important: release the preprocessing thread
-        baxter_data_loader.cleanUp()
+        baxter_data_loader.auto_cleanup = True
         # return predicted states for training observations
-        return states
+        return self._batchPredStates(baxter_data_loader)
 
 
 def saveStates(states, images_path, rewards, log_folder):
