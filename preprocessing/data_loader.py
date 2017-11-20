@@ -134,7 +134,7 @@ class BaxterImageLoader(object):
         self.is_training = True
         self.minibatches = self.original_minibatches[:]
         # Reset the iterator
-        self.reset()
+        self.resetIterator()
 
     def testMode(self):
         """
@@ -148,7 +148,7 @@ class BaxterImageLoader(object):
             end_idx = min(self.n_samples, (i + 1) * self.test_batch_size)
             self.minibatches.append(np.arange(start_idx, end_idx))
         # Reset the iterator
-        self.reset()
+        self.resetIterator()
 
     def deleteOldCache(self):
         """
@@ -166,11 +166,11 @@ class BaxterImageLoader(object):
         Exit preprocessing thread
         """
         self.thread_exit.set()
-        self.reset()
+        self.resetIterator()
         self.thread.join()
         self.thread = None
 
-    def reset(self):
+    def resetIterator(self):
         """
         Reset the iterator so we can do
         a full pass on the minibatches
@@ -190,7 +190,7 @@ class BaxterImageLoader(object):
         Reset the iterator and shuffle the minibatches
         """
         self.shuffleMinitbatchesOrder()
-        self.reset()
+        self.resetIterator()
 
     def shuffleMinitbatchesOrder(self):
         """
