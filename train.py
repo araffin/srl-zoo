@@ -6,11 +6,6 @@ Representations with Robotic Priors" (Jonschkowski & Brock, 2015).
 This program is based on the original implementation by Rico Jonschkowski (rico.jonschkowski@tu-berlin.de):
 https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
 
-Example to run this program:
- python main.py --path slot_car_task_train.npz
-
-
-TODO: generator to load images on the fly
 """
 from __future__ import print_function, division, absolute_import
 
