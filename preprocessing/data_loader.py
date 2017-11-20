@@ -38,7 +38,6 @@ def imageWorker(image_queue, output_queue, exit_event):
         del im  # Free memory
 
 
-# TODO: check that the output is the same for the different mode (prefetch=True|False)
 class BaxterImageLoader(object):
     """
     Data loader for baxter images.
