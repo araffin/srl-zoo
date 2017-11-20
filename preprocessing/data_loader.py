@@ -119,6 +119,8 @@ class BaxterImageLoader(object):
         if self.n_workers <= 0:
             raise ValueError("n_workers <= 0 in the data loader")
 
+        # Start the workers, there is one input queue (image queue) per worker
+        # and a common output_queue
         self.workers = []
         for i in range(self.n_workers):
             w = mp.Process(target=imageWorker, args=(self.image_queues[i], self.output_queue, self.exit_event))
@@ -230,12 +232,12 @@ class BaxterImageLoader(object):
         the workers with data
         """
         self.thread_exit.clear()
-        t = threading.Thread(target=self.prePreprocessingThread)
+        t = threading.Thread(target=self.preprocessingThread)
         self.thread = t
         t.deamon = True
         t.start()
 
-    def prePreprocessingThread(self):
+    def preprocessingThread(self):
         """
         Preprocess minibatches
         It waits for a reset event at the end of an iteration
