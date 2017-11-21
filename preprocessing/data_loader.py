@@ -38,6 +38,7 @@ def imageWorker(image_queue, output_queue, exit_event):
         del im  # Free memory
 
 
+# TODO: autoreset ?
 class BaxterImageLoader(object):
     """
     Data loader for baxter images.
@@ -151,6 +152,28 @@ class BaxterImageLoader(object):
             self.minibatchlist.append(np.arange(start_idx, end_idx))
         # Reset the iterator
         self.resetIterator()
+
+    @staticmethod
+    def createMinibatchList(x_indices, y_values, batch_size):
+        """
+        Create list of minibatches (contains the observations indices)
+        along with the corresponding list of targets
+        Warning: this may create minibatches of different length
+        :param x_indices: (numpy 1D array)
+        :param y_values: (numpy tensor)
+        :param batch_size: (int)
+        :return: [numpy array], [numpy tensor]
+        """
+        targets = []
+        minibatchlist = []
+        n_minibatches = len(x_indices) // batch_size + 1
+        for i in range(0, n_minibatches):
+            start_idx = i * batch_size
+            end_idx = min(start_idx + batch_size, len(x_indices))
+            excerpt = slice(start_idx, end_idx)
+            minibatchlist.append(x_indices[excerpt])
+            targets.append(y_values[excerpt])
+        return minibatchlist, targets
 
     def deleteOldCache(self):
         """
@@ -410,27 +433,34 @@ class BaxterImageLoader(object):
 
 
 class SupervisedDataLoader(BaxterImageLoader):
+    """
+    Data loader for baxter images for supervised learning.
+    It uses workers, a prefetch thread.
+    :param x_indices: (numpy 1D array)
+    :param y_values: (numpy tensor)
+    :param images_path: (numpy 1D array of str)
+    :param batch_size: (int)
+    :param is_training: (bool) Whether to create volatile variables or not
+    :param no_targets: (bool) Set to true, only inputs are generated
+    :param n_workers: (int) number of processes used for preprocessing
+    :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
+    [WARNING] Set to False, you MUST clean up the loader manually (by calling cleanUp() method)
+    """
+
     def __init__(self, x_indices, y_values, images_path, batch_size, is_training=True,
-                 no_targets=False, n_workers=5, cache_capacity=5000, auto_cleanup=True):
+                 no_targets=False, n_workers=5, auto_cleanup=True):
         # Create minibatch list
-        # Warning: this may create minibatches of different length
-        targets = []
-        minibatchlist = []
-        n_minibatches = len(x_indices) // batch_size + 1
-        for i in range(0, n_minibatches):
-            start_idx = i * batch_size
-            end_idx = min(start_idx + batch_size, len(x_indices))
-            excerpt = slice(start_idx, end_idx)
-            minibatchlist.append(x_indices[excerpt])
-            targets.append(y_values[excerpt])
+        minibatchlist, targets = self.createMinibatchList(x_indices, y_values, batch_size)
 
         # Whether to yield targets together with output
         # (not needed when plotting or predicting states)
         self.no_targets = no_targets
         self.targets = np.array(targets)
 
+        # Here the cache is not useful: we do not have observations
+        # that are present in different minibatches
         super(SupervisedDataLoader, self).__init__(minibatchlist, images_path, [], [],
-                                                   cache_capacity=cache_capacity,
+                                                   cache_capacity=0,
                                                    n_workers=n_workers, auto_cleanup=auto_cleanup)
         # Training mode is the default one
         if not is_training:
@@ -446,12 +476,12 @@ class SupervisedDataLoader(BaxterImageLoader):
 
     def _processNextMinibatch(self):
         """
-        Send images to workers and compute
+        Send images to workers and compute inputs/targets
         """
         # Alias to improve readability
         i = self.current_preprocessed_idx
         obs_indices = self.minibatchlist[i]
-        targets = Variable(th.from_numpy(self.targets[i]))
+        targets = Variable(th.from_numpy(self.targets[i]), volatile=not self.is_training)
 
         batch_size = len(obs_indices)
         obs_dict = {'obs': None}
@@ -469,7 +499,94 @@ class SupervisedDataLoader(BaxterImageLoader):
         self.current_preprocessed_idx += 1
 
     def trainMode(self):
+        """
+        Switch to train mode
+        """
         self.is_training = True
 
     def testMode(self):
+        """
+        Switch to test mode
+        Variables will be created with the volatile keyword
+        """
+        self.is_training = False
+
+
+class AutoEncoderDataLoader(BaxterImageLoader):
+    """
+    Data loader for baxter images for autoencoder.
+    It uses workers, a prefetch thread.
+    :param x_indices: (numpy 1D array)
+    :param images_path: (numpy 1D array of str)
+    :param batch_size: (int)
+    :param noise_factor: (float)
+    :param is_training: (bool) Whether to create volatile variables or not
+    :param no_targets: (bool) Set to true, only inputs are generated
+    :param n_workers: (int) number of processes used for preprocessing
+    :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
+    [WARNING] Set to False, you MUST clean up the loader manually (by calling cleanUp() method)
+    """
+
+    def __init__(self, x_indices, images_path, batch_size, noise_factor=0.0, is_training=True,
+                 no_targets=False, n_workers=5, auto_cleanup=True):
+        # Create minibatch list
+        minibatchlist, _ = self.createMinibatchList(x_indices, x_indices, batch_size)
+
+        # Whether to yield targets together with output
+        # (not needed when plotting or predicting states)
+        self.no_targets = no_targets
+        self.noise_factor = noise_factor
+
+        # Here the cache is not useful: we do not have observations
+        # that are present in different minibatches
+        super(AutoEncoderDataLoader, self).__init__(minibatchlist, images_path, [], [],
+                                                    cache_capacity=0,
+                                                    n_workers=n_workers, auto_cleanup=auto_cleanup)
+        # Training mode is the default one
+        if not is_training:
+            self.testMode()
+
+    def _processNextMinibatch(self):
+        """
+        Send images to workers and compute inputs/targets
+        """
+        # Alias to improve readability
+        i = self.current_preprocessed_idx
+        obs_indices = self.minibatchlist[i]
+        # Warning: the noise is not consistent
+        # for validation set (different at each iteration)
+        if self.noise_factor > 0:
+            noise_shape = (len(obs_indices), N_CHANNELS, IMAGE_HEIGHT, IMAGE_WIDTH)
+            noise = self.noise_factor * np.random.normal(loc=0.0, scale=1.0, size=noise_shape).astype(np.float32)
+            noise = Variable(th.from_numpy(noise), volatile=not self.is_training)
+
+        batch_size = len(obs_indices)
+        obs_dict = {'obs': None}
+        indices_list = [obs_indices]
+
+        self._sendToWorkers(batch_size, indices_list, obs_dict)
+
+        if self.no_targets:
+            self.preprocess_result = obs_dict['obs']
+        else:
+            if self.noise_factor > 0:
+                self.preprocess_result = obs_dict['obs'] + noise, obs_dict['obs'].clone()
+            else:
+                self.preprocess_result = obs_dict['obs'], obs_dict['obs'].clone()
+
+        # Notify iterator that the minibatch is ready
+        self.ready_event.set()
+        self.current_preprocessed_idx += 1
+
+    def trainMode(self):
+        """
+        Switch to train mode
+        """
+        self.is_training = True
+
+    def testMode(self):
+        """
+        Switch to test mode
+        Variables will be created with the volatile keyword
+        """
         self.is_training = False
