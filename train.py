@@ -186,12 +186,12 @@ class RoboticPriorsLoss(nn.Module):
             (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
 
         # 5th prior assumes all sequences in the dataset share at least one same 3D pos input image of Baxter arm
-        print(same_ref_point_states)
-        print(states.shape)
-        print (same_ref_point_states.shape)
-        print(dissimilar_pairs.shape)
+        # print(same_ref_point_states)
+        # print(states)#.shape)
+        # print (same_ref_point_states)#.shape)
+        # print(dissimilar_pairs)#.shape)
 
-        tates_from_same_ref_pos_sA = states[same_ref_point_states[:,0]]
+        states_from_same_ref_pos_sA = states[same_ref_point_states[:,0]]
         states_from_same_ref_pos_sB = states[same_ref_point_states[:,1]]
 
         same_pos_states_diff = states_from_same_ref_pos_sA - states_from_same_ref_pos_sB
