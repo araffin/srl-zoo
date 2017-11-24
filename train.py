@@ -163,7 +163,7 @@ class RoboticPriorsLoss(nn.Module):
         n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
         self.l1_coeff = (l1_reg / n_params)
 
-    def forward(self, states, next_states, states_from_same_pos_as_states, dissimilar_pairs, same_actions_pairs):
+    def forward(self, states, next_states, dissimilar_pairs, same_actions_pairs, same_ref_point_states):
         """
         :param states: (th Variable)
         :param next_states: (th Variable)
@@ -186,7 +186,15 @@ class RoboticPriorsLoss(nn.Module):
             (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
 
         # 5th prior assumes all sequences in the dataset share at least one same 3D pos input image of Baxter arm
-        same_pos_states_diff = states - states_from_same_pos_as_states
+        print(same_ref_point_states)
+        print(states.shape)
+        print (same_ref_point_states.shape)
+        print(dissimilar_pairs.shape)
+
+        tates_from_same_ref_pos_sA = states[same_ref_point_states[:,0]]
+        states_from_same_ref_pos_sB = states[same_ref_point_states[:,1]]
+
+        same_pos_states_diff = states_from_same_ref_pos_sA - states_from_same_ref_pos_sB
         same_pos_states_diff_norm = same_pos_states_diff.norm(2, dim=1)
         fixed_ref_point_loss = (same_pos_states_diff_norm ** 2).mean()
 
@@ -375,32 +383,28 @@ class SRL4robotics:
                 same = same_actions[i][
                     np.random.permutation(same_actions[i].shape[0])]  # [:MAX_PAIR_PER_SAMPLE * self.batch_size]
                 #print(same[i]);print(same.shape);print('random index {}'.format(len(np.random.permutation(same_ref_point_pos_observations[i].shape[0]))))
-                same_point = same_ref_point_pos_observations[i][
+                same_ref_points = same_ref_point_pos_observations[i][
                     np.random.permutation(same_ref_point_pos_observations[i].shape[0])]
-                diss, same, same_point = th.from_numpy(diss), th.from_numpy(same), th.from_numpy(same_point)
+                diss, same, same_ref_points = th.from_numpy(diss), th.from_numpy(same), th.from_numpy(same_ref_points)
                 obs = Variable(th.from_numpy(observations[batch]))
                 next_obs = Variable(th.from_numpy(observations[batch + 1]))
                 # Picking a batch id different to the current one
-                different_batch_id = np.random.permutation(np.delete(np.arange(n_batches), i))[0]
-                print('Selecting different_batch_id: {} to get image from other batch for 5th prior'.format(different_batch_id))
-                obs_from_same_point_as_obs = Variable(th.from_numpy(observations[different_batch_id]))
-                print(obs)
-                print('obs_from_same_point_as_obs: {}'.format(obs_from_same_point_as_obs))
-                
-                if self.cuda:
-                    obs, next_obs = obs.cuda(), next_obs.cuda()
-                    obs_from_same_point_as_obs = obs_from_same_point_as_obs.cuda()
-                    same, diss = same.cuda(), diss.cuda()#
-                    same_point = same_point.cuda()
+                #different_batch_id = np.random.permutation(np.delete(np.arange(n_batches), i))[0]
+                #print('Selecting different_batch_id: {} to get image from other batch for 5th prior'.format(different_batch_id))
+                # obs_from_same_point_as_obs = Variable(th.from_numpy(observations[different_batch_id]))
+                # print(obs) print('obs_from_same_point_as_obs: {}'.format(obs_from_same_point_as_obs))
 
-                print(len(obs))
-                print(len(obs_from_same_point_as_obs))
+                if self.cuda:
+                    obs, next_obs = obs.cuda(), next_obs.cuda() #obs_from_same_point_as_obs = obs_from_same_point_as_obs.cuda()
+                    same, diss = same.cuda(), diss.cuda()#
+                    same_ref_points = same_ref_points.cuda()
+
                 # learning representation for each observation
                 states, next_states = self.model(obs), self.model(next_obs)
-                states_from_same_pos_as_states = self.model(obs_from_same_point_as_obs)
+                #states_from_same_pos_as_states = self.model(obs_from_same_point_as_obs)
 
                 self.optimizer.zero_grad()
-                loss = criterion(states, next_states, states_from_same_pos_as_states, diss, same)
+                loss = criterion(states, next_states, diss, same, same_ref_points)
                 loss.backward()
                 self.optimizer.step()
                 epoch_loss += loss.data[0]
