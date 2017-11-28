@@ -209,7 +209,7 @@ class SRL4robotics(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
-                    plot_representation(self._dataLoaderPredStates(baxter_data_loader), rewards, add_colorbar=epoch == 0,
+                    plot_representation(self.predStatesWithDataLoader(baxter_data_loader), rewards, add_colorbar=epoch == 0,
                                         name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
@@ -218,7 +218,7 @@ class SRL4robotics(BaseLearner):
         self.model.load_state_dict(th.load(best_model_path))
         baxter_data_loader.auto_cleanup = True
         # return predicted states for training observations
-        return self._dataLoaderPredStates(baxter_data_loader)
+        return self.predStatesWithDataLoader(baxter_data_loader)
 
 
 if __name__ == '__main__':

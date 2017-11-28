@@ -93,7 +93,7 @@ class BaseLearner(object):
             predictions.append(self._predFn(obs_var))
         return np.concatenate(predictions, axis=0)
 
-    def _dataLoaderPredStates(self, data_loader):
+    def predStatesWithDataLoader(self, data_loader):
         """
         Predict states using minibatches to avoid memory issues
         :param data_loader: (Baxter Data Loader object)
