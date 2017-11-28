@@ -83,8 +83,7 @@ def stateRepresentationLearningCall(exp_config):
     """
     printGreen("\nLearning a state representation...")
 
-    npz_file = "data/{}/preprocessed_data.npz".format(exp_config['data_folder'])
-    args = ['--path', npz_file, '--no-plots']
+    args = ['--no-plots']
     for arg in ['learning_rate', 'l1_reg', 'batch_size',
                 'state_dim', 'epochs', 'seed', 'model_type',
                 'log_folder', 'data_folder']:
@@ -111,7 +110,7 @@ def knnCall(exp_config):
 
     printGreen("\nEvaluating the state representation with KNN")
     args = ['--seed', str(exp_config['knn_seed']), '--n_samples', str(exp_config['knn_samples'])]
-    for arg in ['log_folder', 'data_folder', 'n_neighbors']:
+    for arg in ['log_folder', 'n_neighbors']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
     ok = subprocess.call(['python', '-m', 'plotting.knn_images'] + args)

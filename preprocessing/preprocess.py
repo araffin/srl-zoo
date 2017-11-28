@@ -1,11 +1,5 @@
 """
 Preprocessing script to extract actions, rewards, ground truth from text files
-
-TODO: improve image preprocessing speed, reduce memory usage
-TODO: normalize with data loaders from pytorch
-https://github.com/pytorch/examples/blob/42e5b996718797e45c46a25c55b031e6768f8440/imagenet/main.py#L89-L101
-as in normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])
 """
 from __future__ import print_function, division, absolute_import
 
@@ -39,8 +33,8 @@ BOUND_SUP = [0.75, 0.60, 0.35]
 IMAGE_WIDTH = 224  # in px
 IMAGE_HEIGHT = 224  # in px
 N_CHANNELS = 3
-MAX_RECORDS = 50
-INPUT_DIM = IMAGE_WIDTH *IMAGE_HEIGHT * N_CHANNELS
+MAX_RECORDS = 5000 # No limit
+INPUT_DIM = IMAGE_WIDTH * IMAGE_HEIGHT * N_CHANNELS
 
 
 def isInBound(coordinate):
@@ -109,17 +103,13 @@ if __name__ == '__main__':
                   if item.endswith(".jpg")]
         images.sort()
 
-        observations = np.zeros((len(images), IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS))
         images_path = []
         for idx, image in enumerate(images):
             # Save only the path starting from the data folder
-            images_path.append(
-                '{}/{}/{}/{}'.format(args.data_folder, record_folder.split("/")[-1], image_folders[0], image))
-            im = cv2.imread('{}/{}/{}'.format(record_folder, image_folders[0], image))
-            im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
-            obs = preprocessInput(im.astype(np.float32), mode=args.mode)
-            obs = np.expand_dims(obs, axis=0)
-            observations[idx] = obs
+            image_path = '{}/{}/{}/{}'.format(args.data_folder,
+                                              record_folder.split("/")[-1],
+                                              image_folders[0], image)
+            images_path.append(image_path)
 
         # Retrieve frame indices where the button was pressed
         df = getDataFrame('{}/{}'.format(record_folder, text_files['is_pressed']))
@@ -161,24 +151,20 @@ if __name__ == '__main__':
             all_rewards = rewards
             episode_starts = episode_start[:]
             all_arm_states = arm_states
-            all_observations = [observations]
             all_images_path = [images_path]
         else:
             all_actions = np.concatenate((all_actions, actions), axis=0)
             all_rewards = np.concatenate((all_rewards, rewards), axis=0)
             episode_starts = np.concatenate((episode_starts, episode_start), axis=0)
             all_arm_states = np.concatenate((all_arm_states, arm_states), axis=0)
-            all_observations.append(observations)
             all_images_path.append(images_path)
         # Update progressbar
         pbar.update(1)
 
-    all_observations = np.concatenate(all_observations)
     all_images_path = np.concatenate(all_images_path)
     pbar.close()
     # Save Everything
     data = {
-        'observations': all_observations,
         'rewards': all_rewards,
         'actions': all_actions.reshape(-1, 1),
         'episode_starts': episode_starts,

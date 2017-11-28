@@ -6,28 +6,24 @@ Representations with Robotic Priors" (Jonschkowski & Brock, 2015).
 This program is based on the original implementation by Rico Jonschkowski (rico.jonschkowski@tu-berlin.de):
 https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
 
-Example to run this program:
- python main.py --path slot_car_task_train.npz
-
-
-TODO: generator to load images on the fly
 """
 from __future__ import print_function, division, absolute_import
 
 import argparse
 import time
-import json
 
 import numpy as np
 import torch as th
 import torch.nn as nn
-from torch.autograd import Variable
+from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
 from models.models import SRLConvolutionalNetwork, SRLDenseNetwork
-from preprocessing.preprocess import INPUT_DIM
 from plotting.representation_plot import plot_representation, plt
+from preprocessing.data_loader import BaxterImageLoader
+from preprocessing.preprocess import INPUT_DIM
+from utils import parseDataFolder
 
 # Python 2/3 compatibility
 try:
@@ -51,6 +47,7 @@ class RoboticPriorsLoss(nn.Module):
     :param model: (PyTorch model)
     :param l1_reg: (float) l1 regularization coeff
     """
+
     def __init__(self, model, l1_reg=0.0):
         super(RoboticPriorsLoss, self).__init__()
         # Retrieve only trainable and regularizable parameters (we should exclude biases)
@@ -71,7 +68,10 @@ class RoboticPriorsLoss(nn.Module):
         state_diff_norm = state_diff.norm(2, dim=1)
         similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
         temp_coherence_loss = (state_diff_norm ** 2).mean()
-        fixed_ref_point_loss = 0 # TODO WIP temp_coherence_loss # assumes all sequences in the dataset share at least one same 3D pos of Baxter arm
+        # TODO WIP temp_coherence_loss
+        # assumes all sequences in the dataset share at least one same 3D pos of Baxter arm
+        fixed_ref_point_loss = 0
+
         causality_loss = similarity(states[dissimilar_pairs[:, 0]],
                                     states[dissimilar_pairs[:, 1]]).mean()
         proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
@@ -119,10 +119,10 @@ class SRL4robotics(BaseLearner):
         self.l1_reg = l1_reg
         self.log_folder = log_folder
 
-    def learn(self, observations, actions, rewards, episode_starts):
+    def learn(self, images_path, actions, rewards, episode_starts):
         """
         Learn a state representation
-        :param observations: (numpy tensor)
+        :param images_path: (numpy 1D array)
         :param actions: (numpy matrix)
         :param rewards: (numpy 1D array)
         :param episode_starts: (numpy 1D array) boolean array
@@ -134,11 +134,7 @@ class SRL4robotics(BaseLearner):
         # here, we organize the data into minibatches
         # and find pairs for the respective loss terms
 
-        # We assume that observations are already preprocessed
-        # that is to say normalized and scaled
-        observations = observations.astype(np.float32)
-
-        num_samples = observations.shape[0] - 1  # number of samples
+        num_samples = images_path.shape[0] - 1  # number of samples
 
         # indices for all time steps where the episode continues
         indices = np.array([i for i in range(num_samples) if not episode_starts[i + 1]], dtype='int64')
@@ -170,6 +166,9 @@ class SRL4robotics(BaseLearner):
                 msg += "=> Consider increasing the batch_size or changing the seed"
                 raise ValueError(msg)
 
+        baxter_data_loader = BaxterImageLoader(minibatchlist, images_path, same_actions, dissimilar,
+                                               cache_capacity=5000, auto_cleanup=False)
+
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = RoboticPriorsLoss(self.model, self.l1_reg)
         best_error = np.inf
@@ -179,15 +178,9 @@ class SRL4robotics(BaseLearner):
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             epoch_loss, epoch_batches = 0, 0
-            enumerated_minibatches = list(enumerate(minibatchlist))
-            np.random.shuffle(enumerated_minibatches)
-            for i, batch in enumerated_minibatches:
-                diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])]
-                same = same_actions[i][
-                    np.random.permutation(same_actions[i].shape[0])]  # [:MAX_PAIR_PER_SAMPLE * self.batch_size]
-                diss, same = th.from_numpy(diss), th.from_numpy(same)
-                obs = Variable(th.from_numpy(observations[batch]))
-                next_obs = Variable(th.from_numpy(observations[batch + 1]))
+            pbar = tqdm(total=len(minibatchlist))
+            baxter_data_loader.resetAndShuffle()
+            for obs, next_obs, same, diss in baxter_data_loader:
                 if self.cuda:
                     obs, next_obs = obs.cuda(), next_obs.cuda()
                     same, diss = same.cuda(), diss.cuda()
@@ -199,6 +192,9 @@ class SRL4robotics(BaseLearner):
                 self.optimizer.step()
                 epoch_loss += loss.data[0]
                 epoch_batches += 1
+                pbar.update(1)
+            pbar.close()
+
             train_loss = epoch_loss / epoch_batches
 
             # Save best model
@@ -213,32 +209,16 @@ class SRL4robotics(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
-                    plot_representation(self._batchPredStates(observations), rewards, add_colorbar=epoch == 0,
+                    plot_representation(self.predStatesWithDataLoader(baxter_data_loader), rewards, add_colorbar=epoch == 0,
                                         name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
         # Load best model before predicting states
         self.model.load_state_dict(th.load(best_model_path))
+        baxter_data_loader.auto_cleanup = True
         # return predicted states for training observations
-        return self._batchPredStates(observations)
-
-
-def saveStates(states, images_path, rewards, log_folder):
-    """
-    Save learned states to json and npz files
-    :param states: (numpy array)
-    :param images_path: ([str])
-    :param rewards: (rewards)
-    :param log_folder: (str)
-    """
-    print("Saving image path to state representation")
-    image_to_state = {path: list(map(str, state)) for path, state in zip(images_path, states)}
-    with open("{}/image_to_state.json".format(log_folder), 'wb') as f:
-        json.dump(image_to_state, f, sort_keys=True)
-    print("Saving states and rewards")
-    states_rewards = {'states': states, 'rewards': rewards}
-    np.savez('{}/states_rewards.npz'.format(log_folder), **states_rewards)
+        return self.predStatesWithDataLoader(baxter_data_loader)
 
 
 if __name__ == '__main__':
@@ -254,53 +234,34 @@ if __name__ == '__main__':
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
-    parser.add_argument('--path', type=str, default="", help='Path to npz file', required=True)
-    parser.add_argument('--data_folder', type=str, default="", help='Dataset folder')
+    parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log_folder', type=str, default='logs/default_folder',
                         help='Folder within logs/ where the experiment model and plots will be saved')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
+    args.data_folder = parseDataFolder(args.data_folder)
     DISPLAY_PLOTS = not args.no_plots
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
 
-    print('\nDataset npz file: {}\n'.format(args.path))
     print('Log folder: {}'.format(args.log_folder))
 
     print('Loading data ... ')
-    training_data = np.load(args.path)
-    observations, actions = training_data['observations'], training_data['actions']
+    training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
+    actions = training_data['actions']
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
 
-    # Demo with rico's original data
-    if len(observations.shape) == 2:
-        import cv2
-        from preprocessing.preprocess import IMAGE_WIDTH, IMAGE_HEIGHT
-        from preprocessing.utils import preprocessInput
-
-        observations = observations.reshape(-1, 16, 16, 3) * 255.
-        obs = np.zeros((observations.shape[0], IMAGE_WIDTH, IMAGE_HEIGHT, 3))
-        for i in range(len(observations)):
-            obs[i] = cv2.resize(observations[i], (IMAGE_WIDTH, IMAGE_HEIGHT))
-        del observations
-        observations = preprocessInput(obs, mode="image_net")
-
-    # Move the channel dimension to match pretrained model input
-    # (batch_size, width, height, n_channels) -> (batch_size, n_channels, height, width)
-    observations = np.transpose(observations, (0, 3, 2, 1))
-    print("Observations shape: {}".format(observations.shape))
+    ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda)
-    learned_states = srl.learn(observations, actions, rewards, episode_starts)
+    learned_states = srl.learn(ground_truth['images_path'], actions, rewards, episode_starts)
 
-    if args.data_folder != "":
-        ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
-        saveStates(learned_states, ground_truth['images_path'], rewards, args.log_folder)
+    srl.saveStates(learned_states, ground_truth['images_path'], rewards, args.log_folder)
 
     name = "Learned State Representation\n {}".format(args.log_folder.split('/')[-1])
     path = "{}/learned_states.png".format(args.log_folder)

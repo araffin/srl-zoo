@@ -6,10 +6,11 @@ import argparse
 import numpy as np
 import torch as th
 import torch.nn as nn
-from torch.autograd import Variable
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 from utils import parseDataFolder
+from preprocessing.data_loader import AutoEncoderDataLoader
 from preprocessing.preprocess import INPUT_DIM
 from preprocessing.utils import deNormalize
 from models.base_learner import BaseLearner
@@ -26,6 +27,7 @@ DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 32
 NOISE_FACTOR = 0.1
+TEST_BATCH_SIZE = 512
 
 
 class AutoEncoderLearning(BaseLearner):
@@ -76,35 +78,28 @@ class AutoEncoderLearning(BaseLearner):
             return states.data.cpu().numpy()
         return states.data.numpy()
 
-    def learn(self, observations, rewards):
+    def learn(self, images_path, rewards):
         """
         Learn a state representation
-        :param observations: (numpy tensor)
+        :param images_path: (numpy 1D array)
         :param rewards: (numpy 1D array)
         :return: (numpy tensor) the learned states for the given observations
         """
-        # TODO: do not duplicate the data to save memory
-        # We assume that observations are already preprocessed
-        # that is to say normalized and scaled
-        observations = observations.astype(np.float32)
+        x_indices = np.arange(len(images_path)).astype(np.int64)
 
         # Split into train/validation set
-        X_train, X_val = train_test_split(observations, test_size=0.33, random_state=self.seed)
-        # Compute noise
-        x_train_noise = NOISE_FACTOR * np.random.normal(loc=0.0, scale=1.0, size=X_train.shape).astype(np.float32)
-        x_val_noise = NOISE_FACTOR * np.random.normal(loc=0.0, scale=1.0, size=X_val.shape).astype(np.float32)
+        x_train, x_val = train_test_split(x_indices, test_size=0.33, random_state=self.seed)
 
-        kwargs = {'num_workers': 1, 'pin_memory': False} if self.cuda else {}
+        train_loader = AutoEncoderDataLoader(x_train, images_path,
+                                             batch_size=self.batch_size,
+                                             noise_factor=NOISE_FACTOR)
+        val_loader = AutoEncoderDataLoader(x_val, images_path,
+                                           batch_size=TEST_BATCH_SIZE,
+                                           noise_factor=NOISE_FACTOR, is_training=False)
+        # For plotting
+        data_loader = AutoEncoderDataLoader(x_indices, images_path, batch_size=TEST_BATCH_SIZE,
+                                            no_targets=True, is_training=False)
 
-        # Convert to torch tensor
-        X_train, X_val = th.from_numpy(X_train), th.from_numpy(X_val)
-
-        train_loader = th.utils.data.DataLoader(
-            th.utils.data.TensorDataset(X_train + th.from_numpy(x_train_noise), X_train),
-            batch_size=self.batch_size, shuffle=True, **kwargs)
-
-        val_loader = th.utils.data.DataLoader(th.utils.data.TensorDataset(X_val + th.from_numpy(x_val_noise), X_val),
-                                              batch_size=self.batch_size, shuffle=False, **kwargs)
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = nn.MSELoss(size_average=True)
         best_error = np.inf
@@ -115,13 +110,11 @@ class AutoEncoderLearning(BaseLearner):
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             train_loss, val_loss = 0, 0
-
+            train_loader.resetAndShuffle()
+            pbar = tqdm(total=len(train_loader))
             for batch_idx, (noisy_obs, obs) in enumerate(train_loader):
                 if self.cuda:
                     noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
-
-                noisy_obs = Variable(noisy_obs)
-                obs = Variable(obs)
 
                 _, decoded = self.model(noisy_obs)
                 self.optimizer.zero_grad()
@@ -129,16 +122,17 @@ class AutoEncoderLearning(BaseLearner):
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.data[0]
+                pbar.update(1)
+            pbar.close()
 
             train_loss /= len(train_loader)
 
             self.model.eval()
+            val_loader.resetIterator()
             # Pass on the validation set
             for noisy_obs, obs in val_loader:
                 if self.cuda:
                     noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
-                noisy_obs = Variable(noisy_obs, volatile=True)
-                obs = Variable(obs, volatile=True)
 
                 _, decoded = self.model(noisy_obs)
                 loss = criterion(decoded, obs)
@@ -163,7 +157,7 @@ class AutoEncoderLearning(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
-                    plot_representation(self._batchPredStates(observations), rewards, add_colorbar=epoch == 0,
+                    plot_representation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
                                         name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
@@ -171,7 +165,7 @@ class AutoEncoderLearning(BaseLearner):
         # load best model before predicting states
         self.model.load_state_dict(th.load(best_model_path))
         # return predicted states for training observations
-        return self._batchPredStates(observations)
+        return self.predStatesWithDataLoader(data_loader)
 
 
 if __name__ == '__main__':
@@ -199,22 +193,17 @@ if __name__ == '__main__':
     print('Log folder: {}'.format(log_folder))
 
     print('Loading data ... ')
-    training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
-    observations = training_data['observations']
-    rewards = training_data['rewards']
+    rewards = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))['rewards']
 
-    # Move the channel dimension to match pretrained model input
-    # (batch_size, width, height, n_channels) -> (batch_size, n_channels, height, width)
-    observations = np.transpose(observations, (0, 3, 2, 1))
-    print("Observations shape: {}".format(observations.shape))
-    true_states = np.load("data/{}/ground_truth.npz".format(args.data_folder))['arm_states']
-    state_dim = true_states.shape[1]
+    ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
 
     print('Learning a state representation ... ')
     srl = AutoEncoderLearning(args.state_dim, model_type=args.model_type, seed=args.seed,
                               log_folder=log_folder, learning_rate=args.learning_rate,
                               cuda=args.cuda)
-    learned_states = srl.learn(observations, rewards)
+    learned_states = srl.learn(ground_truth['images_path'], rewards)
+    srl.saveStates(learned_states, ground_truth['images_path'], rewards, log_folder,
+                   name="_autoencoder")
 
     name = "Learned State Representation - {} \n Autoencoder state_dim={}".format(args.data_folder, args.state_dim)
     path = "{}/learned_states_ae.png".format(log_folder)

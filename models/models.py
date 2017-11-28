@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 
-from .custom_layers import GaussianNoise
+from .custom_layers import GaussianNoise, GaussianNoiseVariant
 
 
 class SRLConvolutionalNetwork(nn.Module):
@@ -32,7 +32,9 @@ class SRLConvolutionalNetwork(nn.Module):
         self.resnet.fc = nn.Linear(n_units, state_dim)
         if cuda:
             self.resnet.cuda()
-        self.noise = GaussianNoise(batch_size, state_dim, noise_std, cuda=cuda)
+        # This variant does not require the batch_size
+        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
+        # self.noise = GaussianNoise(batch_size, state_dim, noise_std, cuda=cuda)
 
     def forward(self, x):
         x = self.resnet(x)
@@ -57,7 +59,8 @@ class SRLDenseNetwork(nn.Module):
         super(SRLDenseNetwork, self).__init__()
         self.fc1 = nn.Linear(input_dim, n_hidden)
         self.fc2 = nn.Linear(n_hidden, state_dim)
-        self.noise = GaussianNoise(batch_size, state_dim, noise_std, cuda=cuda)
+        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
+        # self.noise = GaussianNoise(batch_size, state_dim, noise_std, cuda=cuda)
 
     def forward(self, x):
         # Flatten input
