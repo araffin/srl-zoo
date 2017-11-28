@@ -219,13 +219,6 @@ if __name__ == '__main__':
     same_ref_point_pos_observations = np.array([1 if same_point(all_arm_states[i], \
         ground_truth['fixed_ref_point'], ground_truth['fixed_ref_point_threshold']) else 0 for i in range(len(all_arm_states))])
     data['same_ref_point_pos_observations'] = same_ref_point_pos_observations
-    # find_same_ref_points = lambda index, minibatch: \
-    #     np.where(np.prod(arm_states[minibatch] == arm_states[minibatch[index]], axis=1))[0]
-        # 0 returns the row indexes ([1] for column indexes) of the cases where the (prod) resulting matrix satisfied the where condition
-
-    # same_fix_ref_points = [
-    #     np.array([[i, j] for i in range(self.batch_size) for j in find_same_ref_points(i, minibatch) if j > i],
-    #              dtype='int64') for minibatch in minibatchlist]
 
     assert len(same_ref_point_pos_observations) == len(all_rewards) and len(all_rewards) == len(all_images_path),"n_rewards != n_images or n_rewards != same_ref_point_pos_observations: {}, {}, {}".format(len(all_rewards), len(all_images_path), len(same_ref_point_pos_observations))
 
