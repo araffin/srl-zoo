@@ -163,7 +163,7 @@ class RoboticPriorsLoss(nn.Module):
         n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
         self.l1_coeff = (l1_reg / n_params)
 
-    def forward(self, states, next_states, dissimilar_pairs, same_actions_pairs, same_ref_point_states=[]):
+    def forward(self, states, next_states, dissimilar_pairs, same_actions_pairs, same_ref_point_states=None):
         """
         :param states: (th Variable)
         :param next_states: (th Variable)
@@ -185,7 +185,7 @@ class RoboticPriorsLoss(nn.Module):
             similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
             (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
 
-        if len(same_ref_point_states)>0:
+        if len(same_ref_point_states) > 0:
             # We apply 5th ref point prior
             # 5th prior assumes all sequences in the dataset share at least one same 3D pos input image of Baxter arm
             states_from_same_ref_pos_sA = states[same_ref_point_states[:,0]]
@@ -285,12 +285,11 @@ class SRL4robotics:
             predictions.append(self._predFn(obs_var))
         return np.concatenate(predictions, axis=0)
 
-    def learn(self, observations, actions, rewards, episode_starts, same_ref_points=[]):
+    def learn(self, observations, actions, rewards, episode_starts, same_ref_points=None):
         """
         Learn a state representation
         :param observations: (numpy tensor)
-        :param actions: (np matrix) of each action id performed. To support
-            Jonschkowski's race_car baseline, each action id is within an array: e.g. [[4], [8], [2]]
+        :param actions: (np matrix) of each action id performed.
         :param rewards: (numpy 1D array)
         :param episode_starts: (numpy 1D array) boolean array
                                 the ith index is True if one episode starts at this frame
@@ -346,10 +345,7 @@ class SRL4robotics:
                 msg += "=> Consider increasing the batch_size or changing the seed"
                 raise ValueError(msg)
 
-        # If we are applying the 5th prior, we need a third set of equivalent points, all
-        # being different observations where Baxter arm position is placed in the same
-        # 3D cartesioan point
-        if len(same_ref_points)>0:
+        if len(same_ref_points) > 0:
             find_same_ref_point_observations = lambda index, minibatch: \
             np.where(same_ref_points[minibatch] * same_ref_points[minibatch[index]])[0]
             # 0 returns the row indexes ([1] for column indexes) of the cases where the (prod) resulting matrix satisfied the where condition
@@ -386,7 +382,7 @@ class SRL4robotics:
                 diss, same = th.from_numpy(diss), th.from_numpy(same)
 
                 # 5th prior points
-                if len(same_ref_points)> 0:
+                if len(same_ref_points) > 0:
                     same_ref_points = same_ref_point_pos_observations[i][
                         np.random.permutation(same_ref_point_pos_observations[i].shape[0])]
                     same_ref_points = th.from_numpy(same_ref_points)
@@ -397,7 +393,7 @@ class SRL4robotics:
                 if self.cuda:
                     obs, next_obs = obs.cuda(), next_obs.cuda() #obs_from_same_point_as_obs = obs_from_same_point_as_obs.cuda()
                     same, diss = same.cuda(), diss.cuda()#
-                    if len(same_ref_points)>0:
+                    if  if len(same_ref_points) > 0:
                         same_ref_points = same_ref_points.cuda()
 
                 # learning representation for each observation
@@ -410,7 +406,6 @@ class SRL4robotics:
                 self.optimizer.step()
                 epoch_loss += loss.data[0]
                 epoch_batches += 1
-
 
             # Save best model
             # TODO: use a validation set
@@ -474,7 +469,7 @@ if __name__ == '__main__':
     DISPLAY_PLOTS = not args.no_plots
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
-    APPLY_5TH_PRIOR = args.no_ref_prior
+    APPLY_5TH_PRIOR = not args.no_ref_prior
 
     if APPLY_5TH_PRIOR and 'slot_car_task_train' in args.data_folder:
         raise ValueError("Jonschkowski's racing slot_car_car baseline is not supported \
@@ -526,5 +521,5 @@ if __name__ == '__main__':
     path = "{}/learned_states.png".format(args.log_folder)
     plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
 
-    if DISPLAY_PLOTS: # needed to keep the plots showing while training
+    if DISPLAY_PLOTS: # do not close plot at the end of training
         input('\nPress any key to exit.')

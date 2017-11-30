@@ -81,6 +81,8 @@ if __name__ == '__main__':
         print("Loading dataset config...")
         with open('{}dataset_config.json'.format(data_folder), 'rb') as f:
             dataset_config = json.load(f)
+            BOUND_INF = dataset_config['bound_inf']
+            BOUND_SUP = dataset_config['bound_sup']
     else:
         print("No dataset config file found, using default values")
 
@@ -208,26 +210,21 @@ if __name__ == '__main__':
               fixed_ref_point_threshold to find equivalent ref points in arm_states in \
               each data sequence: {}'.format(ground_truth['fixed_ref_point_threshold']))
 
-    close_enough =  lambda pos, ref_pos, t: ref_pos-t <= pos <= ref_pos+t
-    def same_point (pos, ref_pos, threshold):
+    close_enough =  lambda pos, ref_pos, t: np.linalg.norm(ref_pos - pos) <= t
+    def samePoint (pos, ref_pos, threshold):
         same_point = True
         for coord in range(len(pos)):
             if not close_enough(pos[coord], ref_pos[coord], threshold):
                 return False
         return same_point
 
-    same_ref_point_pos_observations = np.array([1 if same_point(all_arm_states[i], \
+    same_ref_point_pos_observations = np.array([1 if samePoint(all_arm_states[i], \
         ground_truth['fixed_ref_point'], ground_truth['fixed_ref_point_threshold']) else 0 for i in range(len(all_arm_states))])
     data['same_ref_point_pos_observations'] = same_ref_point_pos_observations
-    # find_same_ref_points = lambda index, minibatch: \
-    #     np.where(np.prod(arm_states[minibatch] == arm_states[minibatch[index]], axis=1))[0]
-        # 0 returns the row indexes ([1] for column indexes) of the cases where the (prod) resulting matrix satisfied the where condition
+    print (same_ref_point_pos_observations)
 
-    # same_fix_ref_points = [
-    #     np.array([[i, j] for i in range(self.batch_size) for j in find_same_ref_points(i, minibatch) if j > i],
-    #              dtype='int64') for minibatch in minibatchlist]
-
-    assert len(same_ref_point_pos_observations) == len(all_rewards) and len(all_rewards) == len(all_images_path),"n_rewards != n_images or n_rewards != same_ref_point_pos_observations: {}, {}, {}".format(len(all_rewards), len(all_images_path), len(same_ref_point_pos_observations))
+    assert len(same_ref_point_pos_observations) == len(all_rewards) , " same_ref_point_pos_observations does not coincide with the length of all_rewards: {}, {}".format(len(same_ref_point_pos_observations), len(all_rewards))
+    assert len(all_rewards) == len(all_images_path),"n_rewards != n_images: {}, {}".format(len(all_rewards), len(all_images_path))
 
     print("Saving preprocessed data...")
     np.savez('{}/preprocessed_data.npz'.format(data_folder), **data)

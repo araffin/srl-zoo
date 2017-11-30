@@ -156,8 +156,12 @@ Summary:
 ```
 conda install matplotlib seaborn pandas scipy numpy scikit-learn tqdm
 ```
+or what should you avoid the previous line, installing the Jupyter plugin nb_conda as a jupyter notebook extension (see [2])
 
 - OpenCV (version >= 2.4)
+```
+conda install -c menpo opencv3
+```
 - PyTorch
 - PyTorchVision
 - Numpy
@@ -202,3 +206,11 @@ SOLUTION 2: Decrease the batch size, e.g. 32-64 in GPUs with little memory. Warn
 
 SOLUTION 3: Use simple 2-layers neural network model
 python train.py --path path_to_npz.npz --model_type mlp
+
+
+
+
+
+### Links
+[1] [https://docs.anaconda.com/anaconda/user-guide/tasks/use-jupyter-notebook-extensions] nb_conda plugin
+[https://stackoverflow.com/questions/37085665/in-which-conda-environment-is-jupyter-executing] nb_conda plugin check
