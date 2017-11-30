@@ -155,6 +155,7 @@ class RoboticPriorsLoss(nn.Module):
     :param model: (PyTorch model)
     :param l1_reg: (float) l1 regularization coeff
     """
+
     def __init__(self, model, l1_reg=0.0):
         super(RoboticPriorsLoss, self).__init__()
         # Retrieve only trainable and regularizable parameters (we should exclude biases)
@@ -169,7 +170,7 @@ class RoboticPriorsLoss(nn.Module):
         :param next_states: (th Variable)
         :param dissimilar_pairs: (th tensor)
         :param same_actions_pairs: (th tensor)
-        :param same_states_diff_norm: (th tensor)
+        :param same_ref_point_states: (th tensor)
         :return: (th Variable)
         """
         state_diff = next_states - states
@@ -187,11 +188,12 @@ class RoboticPriorsLoss(nn.Module):
 
         if len(same_ref_point_states) > 0:
             # We apply 5th ref point prior
-            # 5th prior assumes all sequences in the dataset share at least one same 3D pos input image of Baxter arm
-            states_from_same_ref_pos_sA = states[same_ref_point_states[:,0]]
-            states_from_same_ref_pos_sB = states[same_ref_point_states[:,1]]
+            # 5th prior assumes all sequences in the dataset share
+            # at least one same 3D pos input image of Baxter arm
+            states_same_ref_pos_t1 = states[same_ref_point_states[:, 0]]
+            states_same_ref_pos_t2 = states[same_ref_point_states[:, 1]]
 
-            same_pos_states_diff = states_from_same_ref_pos_sA - states_from_same_ref_pos_sB
+            same_pos_states_diff = states_same_ref_pos_t1 - states_same_ref_pos_t2
             same_pos_states_diff_norm = same_pos_states_diff.norm(2, dim=1)
             fixed_ref_point_loss = (same_pos_states_diff_norm ** 2).mean()
         else:
@@ -293,6 +295,9 @@ class SRL4robotics:
         :param rewards: (numpy 1D array)
         :param episode_starts: (numpy 1D array) boolean array
                                 the ith index is True if one episode starts at this frame
+        :param same_ref_points: (numpy 1D array) Boolean array containing states
+                                that corresponds to the reference position
+                                (when using the reference prior)
         :return: (numpy tensor) the learned states for the given observations
         """
 
@@ -321,7 +326,7 @@ class SRL4robotics:
         find_same_actions = lambda index, minibatch: \
             np.where(np.prod(actions[minibatch] == actions[minibatch[index]], axis=1))[0]
 
-        #same_actions: list of arrays, each containing one pair of observation ids
+        # same_actions: list of arrays, each containing one pair of observation ids
         same_actions = [
             np.array([[i, j] for i in range(self.batch_size) for j in find_same_actions(i, minibatch) if j > i],
                      dtype='int64') for minibatch in minibatchlist]
@@ -341,25 +346,27 @@ class SRL4robotics:
 
         for item in same_actions + dissimilar:
             if len(item) == 0:
-                msg = "No similar or dissimilar pairs found for at least one minibatch (currently is {})\n".format(BATCH_SIZE)
+                msg = "No similar or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
+                    BATCH_SIZE)
                 msg += "=> Consider increasing the batch_size or changing the seed"
                 raise ValueError(msg)
 
         if len(same_ref_points) > 0:
             find_same_ref_point_observations = lambda index, minibatch: \
-            np.where(same_ref_points[minibatch] * same_ref_points[minibatch[index]])[0]
-            # 0 returns the row indexes ([1] for column indexes) of the cases where the (prod) resulting matrix satisfied the where condition
+                np.where(same_ref_points[minibatch] * same_ref_points[minibatch[index]])[0]
 
             same_ref_point_pos_observations = [np.array([[i, j] for i in range(self.batch_size)
-                    for j in find_same_ref_point_observations(i, minibatch) if j > i],
-                     dtype='int64') for minibatch in minibatchlist]
+                                                         for j in find_same_ref_point_observations(i, minibatch) if
+                                                         j > i],
+                                                        dtype='int64') for minibatch in minibatchlist]
 
             for item in same_ref_point_pos_observations:
                 if len(item) == 0:
-                    msg = "No same ref point position observation of the arm was found for at least one minibatch (currently is {})\n".format(BATCH_SIZE)
-                    msg += "=> Consider increasing the batch_size or changing the seed\n same_ref_point_positions: {}".format(same_ref_point_pos_observations)
+                    msg = "No same ref point position observation of the arm was found \
+                            for at least one minibatch (current batch size is {})\n".format(BATCH_SIZE)
+                    msg += "=> Consider increasing the batch_size or changing the seed\n same_ref_point_positions: {}".format(
+                        same_ref_point_pos_observations)
                     raise ValueError(msg)
-
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = RoboticPriorsLoss(self.model, self.l1_reg)
@@ -374,7 +381,7 @@ class SRL4robotics:
             enumerated_minibatches = list(enumerate(minibatchlist))
             # shuffle the order of the minibatchlist while preserving the indexes for each minibatch
             np.random.shuffle(enumerated_minibatches)
-            for i, batch in enumerated_minibatches: #
+            for i, batch in enumerated_minibatches:  #
                 diss = dissimilar[i][np.random.permutation(dissimilar[i].shape[0])]
                 same = same_actions[i][
                     np.random.permutation(same_actions[i].shape[0])]  # [:MAX_PAIR_PER_SAMPLE * self.batch_size]
@@ -391,14 +398,13 @@ class SRL4robotics:
                 next_obs = Variable(th.from_numpy(observations[batch + 1]))
 
                 if self.cuda:
-                    obs, next_obs = obs.cuda(), next_obs.cuda() #obs_from_same_point_as_obs = obs_from_same_point_as_obs.cuda()
-                    same, diss = same.cuda(), diss.cuda()#
-                    if  if len(same_ref_points) > 0:
+                    obs, next_obs = obs.cuda(), next_obs.cuda()
+                    same, diss = same.cuda(), diss.cuda()  #
+                    if len(same_ref_points) > 0:
                         same_ref_points = same_ref_points.cuda()
 
                 # learning representation for each observation
                 states, next_states = self.model(obs), self.model(next_obs)
-                #states_from_same_pos_as_states = self.model(obs_from_same_point_as_obs)
 
                 self.optimizer.zero_grad()
                 loss = criterion(states, next_states, diss, same, same_ref_points)
@@ -425,6 +431,7 @@ class SRL4robotics:
 
         # return predicted states for training observations
         return self._batchPredStates(observations)
+
 
 def saveStates(states, images_path, rewards, log_folder):
     """
@@ -463,7 +470,6 @@ if __name__ == '__main__':
     parser.add_argument('--no_ref_prior', action='store_false', default=False,
                         help='Applies 5th Fixed Reference Point Prior')
 
-
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     DISPLAY_PLOTS = not args.no_plots
@@ -483,7 +489,8 @@ if __name__ == '__main__':
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
 
     if args.data_folder == "":
-        raise ValueError("Fifth prior cannot be applied if --data_folder parameter for ground truth states is not provided")
+        raise ValueError(
+            "Fifth prior cannot be applied if --data_folder parameter for ground truth states is not provided")
     # Demo with Rico's original data
     if len(observations.shape) == 2:
         import cv2
@@ -521,5 +528,5 @@ if __name__ == '__main__':
     path = "{}/learned_states.png".format(args.log_folder)
     plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
 
-    if DISPLAY_PLOTS: # do not close plot at the end of training
+    if DISPLAY_PLOTS:  # do not close plot at the end of training
         input('\nPress any key to exit.')

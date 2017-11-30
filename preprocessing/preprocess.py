@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from .utils import detectBasePath, getActions, findClosestAction, getDataFrame, preprocessInput
+from .utils import detectBasePath, getActions, findClosestAction, getDataFrame, preprocessInput, samePoint
 
 base_path = detectBasePath(__file__)
 text_files = {
@@ -29,7 +29,7 @@ text_files = {
     'arm_state': 'recorded_robot_limb_left_endpoint_state.txt'
 }
 
-DELTA_POS = 0.05
+DELTA_POS = 0.05  # delta between each action
 N_ACTIONS = 26
 # Bound for negative rewards (3D limits of the table)
 BOUND_INF = [0.42, -0.1, -0.11]  # default for nonStaticButton dataset?
@@ -183,7 +183,7 @@ if __name__ == '__main__':
     data = {
         'observations': all_observations,
         'rewards': all_rewards,
-        'actions': all_actions.reshape(-1, 1), # Only to support Rico's baseline data
+        'actions': all_actions.reshape(-1, 1),  # Only to support Rico's baseline data
         'episode_starts': episode_starts
     }
 
@@ -194,36 +194,34 @@ if __name__ == '__main__':
         'images_path': all_images_path,
     }
 
-    for key in ['bound_inf','bound_sup',\
-                'fixed_ref_point_threshold','fixed_ref_point']:
+    for key in ['bound_inf', 'bound_sup',
+                'fixed_ref_point_threshold', 'fixed_ref_point']:
         if key in dataset_config.keys():
             ground_truth[key] = dataset_config[key]
         else:
             print('Warning: 5th prior will not be able to be executed with this\
                   dataset because key parameter in .json config is missing: {}'.format(key))
 
-    ##### 5th Prior Functionality ###########################################
-    # Saving a mask (0s and 1s) to indicate which datapoints contain the same ref_point (used in 5th prior)
+    # Same Reference Prior (5th prior)
+    # Saving a mask to indicate which datapoints contain the same ref_point (used in 5th prior)
     # same position observations for 5th prior
     if not ground_truth['fixed_ref_point'] in all_arm_states:
-        print('Warning: Exact fixed ref point NOT FOUND in arm_states, Using \
-              fixed_ref_point_threshold to find equivalent ref points in arm_states in \
-              each data sequence: {}'.format(ground_truth['fixed_ref_point_threshold']))
+        print("""Warning: Exact fixed ref point NOT FOUND in arm_states, Using
+              fixed_ref_point_threshold to find equivalent ref points in arm_states in
+              each data sequence: {}""".format(ground_truth['fixed_ref_point_threshold']]))
 
-    close_enough =  lambda pos, ref_pos, t: np.linalg.norm(ref_pos - pos) <= t
-    def samePoint (pos, ref_pos, threshold):
-        same_point = True
-        for coord in range(len(pos)):
-            if not close_enough(pos[coord], ref_pos[coord], threshold):
-                return False
-        return same_point
+    same_ref_point_pos_observations = np.array([samePoint(all_arm_states[i],
+                                                          ground_truth['fixed_ref_point'],
+                                                          ground_truth['fixed_ref_point_threshold'])
+                                                for i in range(len(all_arm_states))])
 
-    same_ref_point_pos_observations = np.array([1 if samePoint(all_arm_states[i], \
-        ground_truth['fixed_ref_point'], ground_truth['fixed_ref_point_threshold']) else 0 for i in range(len(all_arm_states))])
     data['same_ref_point_pos_observations'] = same_ref_point_pos_observations
 
-    assert len(same_ref_point_pos_observations) == len(all_rewards) , " length of same_ref_point_pos_observations and all_rewards does not coincide: {}, {}".format(len(same_ref_point_pos_observations), len(all_rewards))
-    assert len(all_rewards) == len(all_images_path),"n_rewards != n_images: {}, {}".format(len(all_rewards), len(all_images_path))
+    assert len(same_ref_point_pos_observations) == len(all_rewards), \
+        "Length of same_ref_point_pos_observations \
+              and all_rewards does not coincide: {}, {}".format(len(same_ref_point_pos_observations), len(all_rewards))
+    assert len(all_rewards) == len(all_images_path), \
+        "n_rewards != n_images: {}, {}".format(len(all_rewards), len(all_images_path))
 
     print("Saving preprocessed data...")
     np.savez('{}/preprocessed_data.npz'.format(data_folder), **data)

@@ -67,6 +67,17 @@ def findClosestAction(action, action_to_idx, show_warning=True):
     return action_idx
 
 
+def samePoint(pos, ref_pos, threshold):
+    """
+    Return true if the position `pos` is close enough
+    to the reference
+    :param pos: (numpy array)
+    :param ref_pos: (numpy array)
+    :return: (bool)
+    """
+    return np.linalg.norm(ref_pos - pos, 2) <= threshold
+
+
 def getDataFrame(text_file):
     """
     :param text_file: (str) path to a text file extracted from a ROS bag
