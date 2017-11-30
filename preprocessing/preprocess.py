@@ -221,9 +221,8 @@ if __name__ == '__main__':
     same_ref_point_pos_observations = np.array([1 if samePoint(all_arm_states[i], \
         ground_truth['fixed_ref_point'], ground_truth['fixed_ref_point_threshold']) else 0 for i in range(len(all_arm_states))])
     data['same_ref_point_pos_observations'] = same_ref_point_pos_observations
-    print (same_ref_point_pos_observations)
 
-    assert len(same_ref_point_pos_observations) == len(all_rewards) , " same_ref_point_pos_observations does not coincide with the length of all_rewards: {}, {}".format(len(same_ref_point_pos_observations), len(all_rewards))
+    assert len(same_ref_point_pos_observations) == len(all_rewards) , " length of same_ref_point_pos_observations and all_rewards does not coincide: {}, {}".format(len(same_ref_point_pos_observations), len(all_rewards))
     assert len(all_rewards) == len(all_images_path),"n_rewards != n_images: {}, {}".format(len(all_rewards), len(all_images_path))
 
     print("Saving preprocessed data...")
