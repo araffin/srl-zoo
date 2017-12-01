@@ -73,7 +73,7 @@ class BaxterImageLoader(object):
         self.images_path = images_path[:]
         self.dissimilar = dissimilar[:]
         self.same_actions = same_actions[:]
-        self.ref_point_pairs = ref_point_pairs[:]
+        self.ref_point_pairs = ref_point_pairs[:] if ref_point_pairs is not None else []
 
         # Index of the minibatch in the iterator
         self.current_idx = 0

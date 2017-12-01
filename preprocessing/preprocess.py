@@ -56,7 +56,6 @@ if __name__ == '__main__':
                         help='disables warnings')
     args = parser.parse_args()
 
-    assert args.data_folder != "", "You must specify a data_folder parameter "
     assert args.mode in ['tf', 'image_net'], "Unknown mode"
 
     print("Dataset folder: {}".format(args.data_folder))

@@ -1,5 +1,6 @@
 from __future__ import print_function, division, absolute_import
 
+import json
 import time
 import argparse
 
@@ -9,7 +10,7 @@ import torch.nn as nn
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-from utils import parseDataFolder
+from utils import parseDataFolder, createFolder
 from preprocessing.data_loader import AutoEncoderDataLoader
 from preprocessing.preprocess import INPUT_DIM
 from preprocessing.utils import deNormalize
@@ -188,7 +189,15 @@ if __name__ == '__main__':
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     args.data_folder = parseDataFolder(args.data_folder)
-    log_folder = "logs/{}/baselines".format(args.data_folder)
+    log_folder = "logs/{}/baselines/autoencoder".format(args.data_folder)
+    createFolder(log_folder, "autoencoder folder already exist")
+
+    # Create fake exp_config for KNN plots
+    with open('{}/exp_config.json'.format(log_folder), 'wb') as f:
+        json.dump({"data_folder": args.data_folder}, f)
+
+    folder_path = '{}/NearestNeighbors/'.format(log_folder)
+    createFolder(folder_path, "NearestNeighbors folder already exist")
 
     print('Log folder: {}'.format(log_folder))
 
@@ -202,11 +211,10 @@ if __name__ == '__main__':
                               log_folder=log_folder, learning_rate=args.learning_rate,
                               cuda=args.cuda)
     learned_states = srl.learn(ground_truth['images_path'], rewards)
-    srl.saveStates(learned_states, ground_truth['images_path'], rewards, log_folder,
-                   name="_autoencoder")
+    srl.saveStates(learned_states, ground_truth['images_path'], rewards, log_folder)
 
     name = "Learned State Representation - {} \n Autoencoder state_dim={}".format(args.data_folder, args.state_dim)
-    path = "{}/learned_states_ae.png".format(log_folder)
+    path = "{}/learned_states.png".format(log_folder)
     plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     if DISPLAY_PLOTS:

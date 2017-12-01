@@ -1,5 +1,4 @@
 {
-  "architecture_name": "resnet",
   "batch_size": 256,
   "data_folder": "staticButtonSimplest",
   "epochs": 1,
@@ -10,7 +9,7 @@
   "learning_rate": 0.001,
   "log_folder": "logs/staticButtonSimplest/modelY2017_M11_D09_H11M28S32_resnet_ProTemCauRep_ST_DIM4_SEED1_priors",
   "model_approach": "priors",
-  "model_type": "cnn",
+  "model_type": "resnet",
   "n_neighbors": 5,
   "priors": [
     "Proportionality",

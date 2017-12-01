@@ -22,7 +22,7 @@ print("Found {} experiments".format(len(experiments)))
 
 knn_mse = []
 # Add here keys from exp_config.json that should be saved in the csv report file
-exp_configs = {'architecture_name': [], 'model_type': [], 'state_dim': []}
+exp_configs = {'model_type': [], 'state_dim': []}
 
 for experiment in experiments:
 

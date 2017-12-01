@@ -18,7 +18,7 @@ from utils import printRed, printGreen, printBlue, parseDataFolder, \
                   printYellow, priorsToString, createFolder
 
 # Fix for matplotlib non-zero return
-# Apparently due to seg fault
+# Apparently due to segmentation fault
 # (https://stackoverflow.com/questions/24139389/unable-to-find-out-what-return-code-of-11-means)
 MATPLOTLIB_WARNING_CODE = -11
 
@@ -34,7 +34,7 @@ def getLogFolderName(exp_config):
     now = datetime.datetime.now()
     date = "Y{}_M{:02d}_D{:02d}_H{:02d}M{:02d}S{:02d}".format(now.year, now.month, now.day, now.hour, now.minute,
                                                               now.second)
-    model_str = "_{}".format(exp_config['architecture_name'])  # exp_config['data_folder'],
+    model_str = "_{}".format(exp_config['model_type'])
     srl_str = "{}_ST_DIM{}_SEED{}".format(priorsToString(exp_config['priors']), exp_config['state_dim'],
                                           exp_config['seed'])
 
@@ -84,6 +84,9 @@ def stateRepresentationLearningCall(exp_config):
     printGreen("\nLearning a state representation...")
 
     args = ['--no-plots']
+    if "Reference" not in exp_config["priors"]:
+        args.extend(['--no_ref_prior'])
+
     for arg in ['learning_rate', 'l1_reg', 'batch_size',
                 'state_dim', 'epochs', 'seed', 'model_type',
                 'log_folder', 'data_folder']:

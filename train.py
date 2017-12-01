@@ -102,22 +102,21 @@ class RoboticPriorsLoss(nn.Module):
 class SRL4robotics(BaseLearner):
     """
     :param state_dim: (int)
-    :param model_type: (str) one of "cnn" or "mlp"
+    :param model_type: (str) one of "resnet" or "mlp"
     :param seed: (int)
     :param learning_rate: (float)
     :param l1_reg: (float)
     :param cuda: (bool)
     """
 
-    def __init__(self, state_dim, model_type="cnn", log_folder="logs/default",
+    def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
-        if model_type == "cnn":
+        if model_type == "resnet":
             self.model = SRLConvolutionalNetwork(self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         elif model_type == "mlp":
-            # input_dim = 224 * 224 * 3
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
@@ -288,7 +287,7 @@ if __name__ == '__main__':
     parser.add_argument('--l1_reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
-    parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
+    parser.add_argument('--model_type', type=str, default="resnet", help='Model architecture (default: "resnet")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log_folder', type=str, default='logs/default_folder',
                         help='Folder within logs/ where the experiment model and plots will be saved')

@@ -1,5 +1,4 @@
 {
-  "architecture_name": "resnet",
   "batch_size": 256,
   "epochs": 1,
   "knn_samples": 5,
@@ -7,13 +6,15 @@
   "l1_reg": 0,
   "learning_rate": 0.001,
   "model_approach": "priors",
-  "model_type": "cnn",
+  "model_type": "resnet",
   "n_neighbors": 5,
   "priors": [
     "Proportionality",
     "Temporal",
     "Causality",
-    "Repeatability"
+    "Repeatability",
+    "Reference"
   ],
-  "use_continuous": false
+  "use_continuous": false,
+  "_comment": "You can add or remove 'Reference' to the list of priors"
 }
