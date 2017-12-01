@@ -93,10 +93,11 @@ class BaseLearner(object):
             predictions.append(self._predFn(obs_var))
         return np.concatenate(predictions, axis=0)
 
-    def predStatesWithDataLoader(self, data_loader):
+    def predStatesWithDataLoader(self, data_loader, restore_train=False):
         """
         Predict states using minibatches to avoid memory issues
         :param data_loader: (Baxter Data Loader object)
+        :param restore_train: (bool) restore train mode (model + dataLoader) after predicting states
         :return: (numpy tensor)
         """
         # Switch to test mode and reset the iterator
@@ -105,9 +106,10 @@ class BaseLearner(object):
         for obs_var in data_loader:
             if self.cuda:
                 obs_var = obs_var.cuda()
-            predictions.append(self._predFn(obs_var))
+            predictions.append(self._predFn(obs_var, restore_train))
         # Switch back to train mode
-        data_loader.trainMode()
+        if restore_train:
+            data_loader.trainMode()
         return np.concatenate(predictions, axis=0)
 
     def learn(self, *args, **kwargs):

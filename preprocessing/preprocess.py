@@ -7,11 +7,10 @@ import argparse
 import json
 import os
 
-import cv2
 import numpy as np
 from tqdm import tqdm
 
-from .utils import getActions, findClosestAction, getDataFrame, preprocessInput, samePoint
+from .utils import getActions, findClosestAction, getDataFrame, samePoint
 # Root folder utils file
 from utils import parseDataFolder
 
@@ -33,7 +32,7 @@ BOUND_SUP = [0.75, 0.60, 0.35]
 IMAGE_WIDTH = 224  # in px
 IMAGE_HEIGHT = 224  # in px
 N_CHANNELS = 3
-MAX_RECORDS = 5000 # No limit
+MAX_RECORDS = 5000  # No limit
 INPUT_DIM = IMAGE_WIDTH * IMAGE_HEIGHT * N_CHANNELS
 
 
@@ -75,7 +74,7 @@ if __name__ == '__main__':
             BOUND_INF = dataset_config['bound_inf']
             BOUND_SUP = dataset_config['bound_sup']
     else:
-        print("No dataset config file found, using default values")
+        print("[WARNING] No dataset config file found, using default values")
 
     record_folders = []
     for item in os.listdir(data_folder):
@@ -170,7 +169,8 @@ if __name__ == '__main__':
         'episode_starts': episode_starts
     }
 
-    assert len(all_rewards) == len(all_images_path), "n_rewards != n_images: {} != {}".format(len(all_rewards), len(all_images_path))
+    assert len(all_rewards) == len(all_images_path), "n_rewards != n_images: {} != {}".format(len(all_rewards),
+                                                                                              len(all_images_path))
 
     print("Saving preprocessed data...")
     np.savez('{}/preprocessed_data.npz'.format(data_folder), **data)
@@ -190,24 +190,19 @@ if __name__ == '__main__':
             print('Warning: 5th prior will not be able to be executed with this\
                   dataset because key parameter in .json config is missing: {}'.format(key))
 
-    # Same Reference Prior (5th prior)
-    # Saving a mask to indicate which datapoints contain the same ref_point (used in 5th prior)
-    # same position observations for 5th prior
-    if not ground_truth['fixed_ref_point'] in all_arm_states:
-        print("""Warning: Exact fixed ref point NOT FOUND in arm_states, Using
-              fixed_ref_point_threshold to find equivalent ref points in arm_states in
-              each data sequence: {}""".format(ground_truth['fixed_ref_point_threshold']]))
+    # Reference Point Prior (5th prior)
+    # Saving a mask to indicate which datapoints
+    # corresponds to the reference point (given a threshold)
+    ref_point, ref_point_threshold = ground_truth['fixed_ref_point'], ground_truth['fixed_ref_point_threshold']
+    print("Searching for reference point:{} with threshold:{}".format(ref_point, ref_point_threshold))
+    is_ref_point_list = np.array([samePoint(all_arm_states[i], ref_point, ref_point_threshold)
+                                  for i in range(len(all_arm_states))])
 
-    same_ref_point_pos_observations = np.array([samePoint(all_arm_states[i],
-                                                          ground_truth['fixed_ref_point'],
-                                                          ground_truth['fixed_ref_point_threshold'])
-                                                for i in range(len(all_arm_states))])
+    data['is_ref_point_list'] = is_ref_point_list
 
-    data['same_ref_point_pos_observations'] = same_ref_point_pos_observations
-
-    assert len(same_ref_point_pos_observations) == len(all_rewards), \
-        "Length of same_ref_point_pos_observations \
-              and all_rewards does not coincide: {}, {}".format(len(same_ref_point_pos_observations), len(all_rewards))
+    assert len(is_ref_point_list) == len(all_rewards), \
+        "Length of is_ref_point_list \
+              and all_rewards does not coincide: {}, {}".format(len(is_ref_point_list), len(all_rewards))
     assert len(all_rewards) == len(all_images_path), \
         "n_rewards != n_images: {}, {}".format(len(all_rewards), len(all_images_path))
 
