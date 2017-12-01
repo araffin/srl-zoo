@@ -73,7 +73,7 @@ Usage:
 python train.py [--epochs N] [--seed S] [--state_dim STATE_DIM]
                 [-bs BATCH_SIZE] [-lr LEARNING_RATE] [--l1_reg L1_REG]
                 [--no-cuda] [--no-plots] [--model_type MODEL_TYPE]
-                [--path PATH] [--data_folder DATA_FOLDER]
+                [--data_folder DATA_FOLDER]
                 [--log_folder LOG_FOLDER]
 
 --epochs N            number of epochs to train (default: 50)
@@ -89,7 +89,6 @@ python train.py [--epochs N] [--seed S] [--state_dim STATE_DIM]
 --no-plots            disables plots
 --model_type MODEL_TYPE
                       Model architecture (default: "cnn")
---path PATH           Path to npz file
 --data_folder DATA_FOLDER
                       Dataset folder
 --log_folder LOG_FOLDER
@@ -98,10 +97,9 @@ python train.py [--epochs N] [--seed S] [--state_dim STATE_DIM]
 ```
 
 
-e.g. with Rico Jonschkowski's data
+Example:
 ```
-python train.py --path slot_car_task_train.npz
-py train.py --path 'data/staticButtonSimplest/preprocessed_data.npz'
+python train.py --data_folder data/path/to/dataset
 ```
 
 ### Evaluation and Plotting
@@ -147,21 +145,41 @@ Example:
 python plotting/knn_images.py --log_folder path/to/an/experiment/log/folder
 ```
 
+### Baselines
+
+Baseline models are saved in `logs/nameOfTheDataset/baselines/` folder.
+
+#### Supervised learning
+
+Example:
+```
+python -m baselines.supervised --data_folder path/to/data/folder
+```
+
+#### Autoencoder
+
+Gaussian noise is added to the input with a factor `0.1`.
+
+Example:
+```
+python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3
+```
 
 ### Dependencies
 
 Recommended configuration: Ubuntu 16.04 with python 2.7 or 3.6
-(should work with python3 though it was only thoroughly tested with python 2)
-Summary:
-```
-conda install matplotlib seaborn pandas scipy numpy scikit-learn tqdm
-```
-or what should you avoid the previous line, installing the Jupyter plugin nb_conda as a jupyter notebook extension (see [2])
+(should work with python3 though it was only thoroughly tested with python2)
+
 
 - OpenCV (version >= 2.4)
 ```
 conda install -c menpo opencv3
 ```
+or
+```
+sudo apt-get install python-opencv (opencv 2.4 - python2)
+```
+
 - PyTorch
 - PyTorchVision
 - Numpy
@@ -208,9 +226,8 @@ SOLUTION 3: Use simple 2-layers neural network model
 python train.py --path path_to_npz.npz --model_type mlp
 
 
-
-
-
 ### Links
-[1] [https://docs.anaconda.com/anaconda/user-guide/tasks/use-jupyter-notebook-extensions] nb_conda plugin
-[https://stackoverflow.com/questions/37085665/in-which-conda-environment-is-jupyter-executing] nb_conda plugin check
+Plugin to work with conda environments and jupyter notebooks:
+
+- [nb_conda plugin](https://docs.anaconda.com/anaconda/user-guide/tasks/use-jupyter-notebook-extensions)
+- [nb_conda plugin check](https://stackoverflow.com/questions/37085665/in-which-conda-environment-is-jupyter-executing)
