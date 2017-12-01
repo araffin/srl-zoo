@@ -165,25 +165,31 @@ class SRL4robotics(BaseLearner):
             print("Removing last minibatch of size {} < batch_size".format(len(minibatchlist[-1])))
             del minibatchlist[-1]
 
-        find_same_actions = lambda index, minibatch: \
-            np.where(np.prod(actions[minibatch] == actions[minibatch[index]], axis=1))[0]
+        def find_same_actions(index, minibatch):
+            """
+            Get observations indices where the same action was performed
+            as in a reference observation
+            :param index: (int)
+            :param minibatch: (numpy array)
+            :return: (numpy array)
+            """
+            return np.where(actions[minibatch] == actions[minibatch[index]])[0]
 
         # same_actions: list of arrays, each containing one pair of observation ids
         same_actions = [
             np.array([[i, j] for i in range(self.batch_size) for j in find_same_actions(i, minibatch) if j > i],
                      dtype='int64') for minibatch in minibatchlist]
 
-        # Here we save which (observation index) samples should be dissimilar because they lead
-        # to different rewards after the same actions. The * represents the mask
-        # of 0s and 1s indicating the fulfilment of the two conditions (= AND gate)
-        # Final [0] gives the array of row indexes where condition is true ([1] gives columns)
-        # np.prod transforms the Jonschkowski required format of action ids
-        # actions = [[1],[6],[4]] -> {1, 6, 4]}
-
-        # check with samples should be dissimilar because they lead to different rewards aften the same actions
-        find_dissimilar = lambda index, minibatch: \
-            np.where(np.prod(actions[minibatch] == actions[minibatch[index]], axis=1) *
-                     (rewards[minibatch + 1] != rewards[minibatch[index] + 1]))[0]
+        def find_dissimilar(index, minibatch):
+            """
+            check which samples should be dissimilar
+            because they lead to different rewards aften the same actions
+            :param index: (int)
+            :param minibatch: (numpy array)
+            :return: (numpy array)
+            """
+            return np.where((actions[minibatch] == actions[minibatch[index]]) *
+                            (rewards[minibatch + 1] != rewards[minibatch[index] + 1]))[0]
 
         dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in find_dissimilar(i, minibatch) if j > i],
                                dtype='int64') for minibatch in minibatchlist]
@@ -197,8 +203,14 @@ class SRL4robotics(BaseLearner):
 
         ref_point_pairs = []
         if len(is_ref_point_list) > 0:
-            find_ref_point = lambda index, minibatch: \
-                np.where(is_ref_point_list[minibatch] * is_ref_point_list[minibatch[index]])[0]
+            def find_ref_point(index, minibatch):
+                """
+                Find observations corresponding to the reference
+                :param index: (int)
+                :param minibatch: (numpy array)
+                :return: (numpy array)
+                """
+                return np.where(is_ref_point_list[minibatch] * is_ref_point_list[minibatch[index]])[0]
 
             ref_point_pairs = [np.array([[i, j] for i in range(self.batch_size)
                                          for j in find_ref_point(i, minibatch) if j > i],

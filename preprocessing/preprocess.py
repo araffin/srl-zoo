@@ -164,7 +164,7 @@ if __name__ == '__main__':
     # Save Everything
     data = {
         'rewards': all_rewards,
-        'actions': all_actions.reshape(-1, 1),  # Only to support Rico's baseline data
+        'actions': all_actions,
         'episode_starts': episode_starts
     }
 
