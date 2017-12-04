@@ -22,6 +22,7 @@ from utils import printRed, printGreen, printBlue, parseDataFolder, \
 # (https://stackoverflow.com/questions/24139389/unable-to-find-out-what-return-code-of-11-means)
 MATPLOTLIB_WARNING_CODE = -11
 NO_PAIRS_ERROR = -404  # return code when no dissimilar/reference pairs where found
+NAN_ERROR = -12  # return code when loss is NaN, consider increasing the NOISE_STD
 
 
 def getLogFolderName(exp_config):
@@ -103,6 +104,9 @@ def stateRepresentationLearningCall(exp_config):
         pprint(exp_config)
         if ok == NO_PAIRS_ERROR:
             printRed("No Pairs found, consider increasing the batch_size or using a different seed")
+            return False
+        elif ok == NAN_ERROR:
+            printRed("NaN Loss, consider increasing NOISE_STD in the gaussian noise layer")
             return False
         elif ok != MATPLOTLIB_WARNING_CODE:
             raise RuntimeError("Error during state representation learning (config file above)")
@@ -203,9 +207,9 @@ if __name__ == '__main__':
         preprocessingCall(exp_config)
 
         # Grid search
-        for seed in [1, 2, 3]:
+        for seed in [1]:
             exp_config['seed'] = seed
-            for state_dim in [2, 3, 4, 5, 6]:
+            for state_dim in [1, 2, 3, 4, 5, 6]:
                 # Update config
                 exp_config['state_dim'] = state_dim
                 log_folder, experiment_name = getLogFolderName(exp_config)

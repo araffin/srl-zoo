@@ -25,7 +25,7 @@ from plotting.representation_plot import plot_representation, plt
 from preprocessing.data_loader import BaxterImageLoader
 from preprocessing.preprocess import INPUT_DIM
 from utils import parseDataFolder
-from pipeline import NO_PAIRS_ERROR
+from pipeline import NO_PAIRS_ERROR, NAN_ERROR
 
 # Python 2/3 compatibility
 try:
@@ -270,6 +270,10 @@ class SRL4robotics(BaseLearner):
             if train_loss < best_error:
                 best_error = train_loss
                 th.save(self.model.state_dict(), best_model_path)
+
+            if np.isnan(train_loss):
+                print("NaN Loss, consider increasing NOISE_STD in the gaussian noise layer")
+                sys.exit(NAN_ERROR)
 
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:

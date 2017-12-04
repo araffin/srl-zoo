@@ -1,13 +1,13 @@
 {
   "batch_size": 256,
-  "epochs": 50,
+  "epochs": 15,
   "knn_samples": 5,
   "knn_seed": 1,
   "l1_reg": 0,
   "learning_rate": 0.001,
   "model_approach": "priors",
   "model_type": "resnet",
-  "n_neighbors": 10,
+  "n_neighbors": 5,
   "priors": [
     "Proportionality",
     "Temporal",
