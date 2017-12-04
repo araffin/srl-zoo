@@ -68,12 +68,16 @@ class BaxterImageLoader(object):
         # Copy data to avoid side effects
         # (it uses more memory but prevent from weird bugs)
         self.minibatchlist = np.array(minibatchlist[:])
-        # Save minibatches original order
-        self.original_minibatchlist = np.array(minibatchlist[:])
+        # Copy useful array to avoid side effects
         self.images_path = images_path[:]
-        self.dissimilar = dissimilar[:]
-        self.same_actions = same_actions[:]
-        self.ref_point_pairs = ref_point_pairs[:] if ref_point_pairs is not None else []
+        self.dissimilar = np.array(dissimilar[:])
+        self.same_actions = np.array(same_actions[:])
+        self.ref_point_pairs = np.array(ref_point_pairs[:]) if ref_point_pairs is not None else np.array([])
+        # Save minibatches original order
+        self.original_minibatchlist = self.minibatchlist.copy()
+        self.original_same_actions = self.same_actions.copy()
+        self.original_dissimilar = self.dissimilar.copy()
+        self.original_ref_point_pairs = self.ref_point_pairs.copy()
 
         # Index of the minibatch in the iterator
         self.current_idx = 0
@@ -139,6 +143,9 @@ class BaxterImageLoader(object):
         """
         self.is_training = True
         self.minibatchlist = self.original_minibatchlist.copy()
+        self.same_actions = self.original_same_actions.copy()
+        self.dissimilar = self.original_dissimilar.copy()
+        self.ref_point_pairs = self.original_ref_point_pairs.copy()
         # Reset the iterator
         self.resetIterator()
 
@@ -224,7 +231,11 @@ class BaxterImageLoader(object):
         """
         Shuffle list of minibatches
         """
-        np.random.shuffle(self.minibatchlist)
+        indices = np.random.permutation(self.n_minibatches).astype(np.int64)
+        self.minibatchlist = self.minibatchlist[indices]
+        self.same_actions = self.same_actions[indices]
+        self.dissimilar = self.dissimilar[indices]
+        self.ref_point_pairs = self.ref_point_pairs[indices]
 
     def resetQueues(self):
         """
