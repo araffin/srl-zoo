@@ -12,8 +12,7 @@
     "Proportionality",
     "Temporal",
     "Causality",
-    "Repeatability",
-    "Reference"
+    "Repeatability"
   ],
   "use_continuous": false,
   "_comment": "You can add or remove 'Reference' to the list of priors"

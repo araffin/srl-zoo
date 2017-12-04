@@ -11,6 +11,7 @@ from __future__ import print_function, division, absolute_import
 
 import argparse
 import time
+import sys
 
 import numpy as np
 import torch as th
@@ -24,6 +25,7 @@ from plotting.representation_plot import plot_representation, plt
 from preprocessing.data_loader import BaxterImageLoader
 from preprocessing.preprocess import INPUT_DIM
 from utils import parseDataFolder
+from pipeline import NO_PAIRS_ERROR
 
 # Python 2/3 compatibility
 try:
@@ -199,7 +201,8 @@ class SRL4robotics(BaseLearner):
                 msg = "No similar or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
                     BATCH_SIZE)
                 msg += "=> Consider increasing the batch_size or changing the seed"
-                raise ValueError(msg)
+                print(msg)
+                sys.exit(NO_PAIRS_ERROR)
 
         ref_point_pairs = []
         if len(is_ref_point_list) > 0:
@@ -222,7 +225,8 @@ class SRL4robotics(BaseLearner):
                             for at least one minibatch (current batch size is {})\n".format(BATCH_SIZE)
                     msg += "=> Consider increasing the batch_size or changing the seed\n same_ref_point_positions: {}".format(
                         ref_point_pairs)
-                    raise ValueError(msg)
+                    print(msg)
+                    sys.exit(NO_PAIRS_ERROR)
 
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
                                                same_actions, dissimilar, ref_point_pairs,
