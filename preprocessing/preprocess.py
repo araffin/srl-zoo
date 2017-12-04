@@ -186,22 +186,23 @@ if __name__ == '__main__':
         if key in dataset_config.keys():
             ground_truth[key] = dataset_config[key]
         else:
-            print('Warning: 5th prior will not be able to be executed with this\
-                  dataset because key parameter in .json config is missing: {}'.format(key))
+            print('Warning: 5th prior will not be able to be executed with this')
+            print('dataset because key parameter in .json config is missing: {}'.format(key))
 
-    # Reference Point Prior (5th prior)
-    # Saving a mask to indicate which datapoints
-    # corresponds to the reference point (given a threshold)
-    ref_point, ref_point_threshold = ground_truth['fixed_ref_point'], ground_truth['fixed_ref_point_threshold']
-    print("Searching for reference point:{} with threshold:{}".format(ref_point, ref_point_threshold))
-    is_ref_point_list = np.array([samePoint(all_arm_states[i], ref_point, ref_point_threshold)
-                                  for i in range(len(all_arm_states))])
+    if 'fixed_ref_point_threshold' in ground_truth.keys():
+        # Reference Point Prior (5th prior)
+        # Saving a mask to indicate which datapoints
+        # corresponds to the reference point (given a threshold)
+        ref_point, ref_point_threshold = ground_truth['fixed_ref_point'], ground_truth['fixed_ref_point_threshold']
+        print("Searching for reference point:{} with threshold:{}".format(ref_point, ref_point_threshold))
+        is_ref_point_list = np.array([samePoint(all_arm_states[i], ref_point, ref_point_threshold)
+                                      for i in range(len(all_arm_states))])
 
-    data['is_ref_point_list'] = is_ref_point_list
+        data['is_ref_point_list'] = is_ref_point_list
 
-    assert len(is_ref_point_list) == len(all_rewards), \
-        "Length of is_ref_point_list \
-              and all_rewards does not coincide: {}, {}".format(len(is_ref_point_list), len(all_rewards))
+        assert len(is_ref_point_list) == len(all_rewards), \
+            "Length of is_ref_point_list \
+                  and all_rewards does not coincide: {}, {}".format(len(is_ref_point_list), len(all_rewards))
     assert len(all_rewards) == len(all_images_path), \
         "n_rewards != n_images: {}, {}".format(len(all_rewards), len(all_images_path))
 
