@@ -8,6 +8,8 @@ import seaborn as sns
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
+from sklearn.neighbors import NearestNeighbors
+
 
 # Python 2/3 compatibility
 try:
@@ -18,10 +20,11 @@ except NameError:
 # Init seaborn
 sns.set()
 
-def createImagePlot(images_path):
-    fig = plt.figure("Image")
-    return plt.imshow(cv2.imread('data/' + images_path[0]) / 255.)
-
+def createInteractivePlot(fig, states, images_path):
+    fig2 = plt.figure("Image")
+    image_plot = plt.imshow(cv2.imread('data/' + images_path[0]) / 255.)
+    callback = ImageFinder(states, image_plot, images_path)
+    fig.canvas.mpl_connect('button_press_event', callback)
 
 def plot_2d_representation(states, rewards, images_path, name="Learned State Representation",
                             add_colorbar=True):
@@ -35,16 +38,12 @@ def plot_2d_representation(states, rewards, images_path, name="Learned State Rep
     if add_colorbar:
         plt.colorbar(label='Reward')
 
-    image_plot = createImagePlot(images_path)
-
-    callback = ImageFinder(states[:, 0], states[:, 1], image_plot, images_path, x_tol=0.1, y_tol=0.1)
-    fig.canvas.mpl_connect('button_press_event', callback)
-
+    createInteractivePlot(fig, states, images_path)
     plt.show()
 
 
 
-def plot_3d_representation(states, rewards, name="Learned State Representation",
+def plot_3d_representation(states, rewards, images_path, name="Learned State Representation",
                            add_colorbar=True):
     plt.ion()
     fig = plt.figure(name)
@@ -59,10 +58,11 @@ def plot_3d_representation(states, rewards, name="Learned State Representation",
     if add_colorbar:
         fig.colorbar(im, label='Reward')
 
+    createInteractivePlot(fig, states, images_path)
     plt.show()
 
 
-def plot_representation(states, rewards, name="Learned State Representation",
+def plot_representation(states, rewards, images_path, name="Learned State Representation",
                         add_colorbar=True, fit_pca=True):
     """
     :param states: (numpy array)
@@ -82,11 +82,11 @@ def plot_representation(states, rewards, name="Learned State Representation",
         # Extend states as 2D:
         states_matrix = np.zeros((states.shape[0], 2))
         states_matrix[:, 0] = states[:, 0]
-        plot_2d_representation(states_matrix, rewards, name, add_colorbar)
+        plot_2d_representation(states_matrix, rewards, images_path, name, add_colorbar)
     elif state_dim == 2:
-        plot_2d_representation(states, rewards, name, add_colorbar)
+        plot_2d_representation(states, rewards, images_path, name, add_colorbar)
     else:
-        plot_3d_representation(states, rewards, name, add_colorbar)
+        plot_3d_representation(states, rewards, images_path, name, add_colorbar)
 
 class ImageFinder(object):
     """
@@ -94,34 +94,31 @@ class ImageFinder(object):
     clicked on.  The point which is closest to the click and within
     xtol and ytol is identified.
     """
-    def __init__(self, xdata, ydata, image_plot, images_path, x_tol=1, y_tol=1):
+    def __init__(self, states, image_plot, images_path):
 
-        self.data = list(zip(xdata, ydata, images_path))
-        self.x_tol, self.y_tol = x_tol, y_tol
         self.image_plot = image_plot
-
-    @staticmethod
-    def distance(x1, x2, y1, y2):
-        """
-        return the distance between two points
-        """
-        return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+        self.images_path = images_path
+        self.knn = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(states)
+        self.state_dim = states.shape[1]
 
     def __call__(self, event):
         if event.inaxes:
-            clickX = event.xdata
-            clickY = event.ydata
-            annotes = []
-            # TODO use nearest neighbors
-            for i, (x, y, path) in enumerate(self.data):
-                if ((clickX - self.x_tol < x < clickX + self.x_tol) and
-                (clickY - self.y_tol < y < clickY + self.y_tol)):
-                    annotes.append((self.distance(x, clickX, y, clickY), x, y, path))
-            if len(annotes) > 0:
-                annotes.sort()
-                distance, x, y, path = annotes[0]
-                if self.image_plot is not None:
-                    self.image_plot.set_data(cv2.imread('data/' + path) / 255.)
+            click_x = event.xdata
+            click_y = event.ydata
+            click_state = np.array([click_x, click_y])
+            if self.state_dim == 3:
+                # TODO: get current state of the plot
+                # and apply the right transformation
+                print("WARNING: 3D click not supported yet")
+                # click_z = event.zdata
+                click_z = 0
+                click_state = np.array([click_x, click_y, click_z])
+
+            click_state = click_state.reshape(1, -1)
+            _, neighbors_indices = self.knn.kneighbors(click_state)
+            path = self.images_path[neighbors_indices.flatten()[0]]
+            # Load the image that corresponds to the clicked point in the space
+            self.image_plot.set_data(cv2.imread('data/' + path) / 255.)
 
 
 
@@ -129,7 +126,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Plotting script for representation')
     parser.add_argument('-i', '--input_file', type=str, default="",
                         help='Path to a npz file containing states and rewards')
-    parser.add_argument('--data_folder', type=str, default="",
+    parser.add_argument('--data_folder', type=str, default="", required=True,
                         help='Path to a dataset folder, it will plot ground truth states')
     args = parser.parse_args()
 
@@ -137,7 +134,7 @@ if __name__ == '__main__':
     if "data/" in args.data_folder:
         args.data_folder = args.data_folder.split('data/')[1].strip("/")
 
-    if args.input_file != "" and args.data_folder != "":
+    if args.input_file != "":
         print("Loading {}...".format(args.input_file))
         states_rewards = np.load(args.input_file)
         images_path = np.load('data/{}/ground_truth.npz'.format(args.data_folder))['images_path']
@@ -145,7 +142,7 @@ if __name__ == '__main__':
 
         input('\nPress any key to exit.')
 
-    elif args.data_folder != "":
+    else:
 
         print("Plotting ground truth...")
         states = np.load('data/{}/ground_truth.npz'.format(args.data_folder))['arm_states']
@@ -153,7 +150,7 @@ if __name__ == '__main__':
         rewards = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['rewards']
         name = "Ground Truth States - {}".format(args.data_folder)
 
-        plot_2d_representation(states, rewards, images_path, name)
+        print("[WARNING] Using 2D plot instead of 3D")
+        states = np.concatenate((states[:, 0].reshape(-1, 1), states[:, 1].reshape(-1, 1)), axis=1)
+        plot_representation(states, rewards, images_path, name)
         input('\nPress any key to exit.')
-    else:
-        print("You must specify one of --input_file or --data_folder")
