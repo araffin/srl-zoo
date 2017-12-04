@@ -565,6 +565,13 @@ class AutoEncoderDataLoader(BaxterImageLoader):
         if not is_training:
             self.testMode()
 
+    def shuffleMinitbatchesOrder(self):
+        """
+        Shuffle list of minibatches
+        """
+        indices = np.random.permutation(self.n_minibatches).astype(np.int64)
+        self.minibatchlist = self.minibatchlist[indices]
+
     def _processNextMinibatch(self):
         """
         Send images to workers and compute inputs/targets

@@ -3,9 +3,9 @@ from __future__ import print_function, division
 import argparse
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
 import numpy as np
+from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
 
 # Python 2/3 compatibility
