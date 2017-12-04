@@ -90,7 +90,8 @@ for image_path, neigbour_indices, distance, image_idx in data:
         plt.imshow(img)
 
         dist_str = 'd={:.4f}'.format(distance[i + 1])
-        state_str = map(lambda x: '{:.3f}'.format(x), states[neighbor_idx])
+        state_str = ", ".join(map(lambda x: '{:.3f}'.format(x), states[neighbor_idx]))
+        state_str = "[{}]".format(state_str)
         neighbor_coord = true_states[neighbor_idx]
         total_error += np.linalg.norm(neighbor_coord - ref_coord)
         n_images += 1

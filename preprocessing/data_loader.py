@@ -235,7 +235,8 @@ class BaxterImageLoader(object):
         self.minibatchlist = self.minibatchlist[indices]
         self.same_actions = self.same_actions[indices]
         self.dissimilar = self.dissimilar[indices]
-        self.ref_point_pairs = self.ref_point_pairs[indices]
+        if len(self.ref_point_pairs) > 0:
+            self.ref_point_pairs = self.ref_point_pairs[indices]
 
     def resetQueues(self):
         """
