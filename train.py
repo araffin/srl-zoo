@@ -307,7 +307,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log_folder', type=str, default='logs/default_folder',
                         help='Folder within logs/ where the experiment model and plots will be saved')
-    parser.add_argument('--no_ref_prior', action='store_false', default=False,
+    parser.add_argument('--no_ref_prior', action='store_true', default=False,
                         help='Disable Fixed Reference Point Prior')
 
     args = parser.parse_args()
