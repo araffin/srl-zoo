@@ -58,22 +58,32 @@ def plot_3d_representation(states, rewards, name="Learned State Representation",
 
 
 def plot_representation(states, rewards, name="Learned State Representation",
-                        add_colorbar=True, path=None):
+                        add_colorbar=True, path=None, fit_pca=True):
+    """
+    :param states: (numpy array)
+    :param reward: (numpy 1D array)
+    :param name: (str)
+    :param add_colorbar: (bool)
+    :param path: (str)
+    :param fit_pca: (bool)
+    """
     state_dim = states.shape[1]
-    if state_dim == 2:
+    if state_dim != 1 and (fit_pca or state_dim > 3):
+        name += " (PCA)"
+        n_components = min(state_dim, 3)
+        print("Fitting PCA with {} components".format(n_components))
+        states = PCA(n_components=n_components).fit_transform(states)
+
+    if state_dim == 1:
+        # Extend states as 2D:
+        states_matrix = np.zeros((states.shape[0], 2))
+        states_matrix[:, 0] = states[:, 0]
+        plot_2d_representation(states_matrix, rewards, name, add_colorbar, path)
+    elif state_dim == 2:
         plot_2d_representation(states, rewards, name, add_colorbar, path)
-    elif state_dim == 3:
-        plot_3d_representation(states, rewards, name, add_colorbar, path)
     else:
-        if state_dim > 3:
-            # PCA with 3 components by default
-            print("Fitting PCA with 3 components")
-            pca = PCA(n_components=3)
-            pca.fit(states)
-            plot_3d_representation(pca.transform(states), rewards, name, add_colorbar, path)
-        else:
-            # TODO: 1d plot
-            print("[WARNING] state dim = {} is not supported for plotting".format(state_dim))
+        plot_3d_representation(states, rewards, name, add_colorbar, path)
+
 
 
 def plot_2d_representation(states, rewards, name="Learned State Representation", add_colorbar=True, path=None):
