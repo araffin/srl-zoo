@@ -167,6 +167,49 @@ class SRL4robotics(BaseLearner):
             print("Removing last minibatch of size {} < batch_size".format(len(minibatchlist[-1])))
             del minibatchlist[-1]
 
+        ref_point_pairs = []
+        if len(is_ref_point_list) > 0:
+            def find_ref_point(index, minibatch):
+                """
+                Find observations corresponding to the reference
+                :param index: (int)
+                :param minibatch: (numpy array)
+                :return: (numpy array)
+                """
+                return np.where(is_ref_point_list[minibatch] * is_ref_point_list[minibatch[index]])[0]
+
+            # Over-sample to make sure that there is at least two reference observations per minibatch
+            ref_point_indices = np.where(is_ref_point_list == True)[0]
+            print("{} reference observations".format(len(ref_point_indices)))
+            assert len(ref_point_indices) >= 2, "Not enough reference observations for the reference prior"
+
+            n_over_sampling = 0
+            for minibatch in minibatchlist:
+                # Check that there is at least two reference observations per minibatch
+                n_ref_observations = np.sum(is_ref_point_list[minibatch])
+                if n_ref_observations <= 1:
+                    n_over_sampling += 1
+                    n_to_sample = 2  # We may have the same observation twice in a minibatch
+                    samples = np.random.choice(ref_point_indices, n_to_sample, replace=False)
+                    for i, sample in enumerate(samples):
+                        minibatch[i] = sample
+            if n_over_sampling:
+                print("[WARNING] Over-sampling for ref prior was applied {} times".format(n_over_sampling))
+
+            ref_point_pairs = [np.array([[i, j] for i in range(self.batch_size)
+                                         for j in find_ref_point(i, minibatch) if j > i],
+                                        dtype='int64') for minibatch in minibatchlist]
+
+            for item in ref_point_pairs:
+                if len(item) == 0:
+                    msg = "No same ref point position observation of the arm was found \
+                            for at least one minibatch (current batch size is {})\n".format(BATCH_SIZE)
+                    msg += "=> Consider increasing the batch_size or changing the seed\n same_ref_point_positions: {}".format(
+                        ref_point_pairs)
+                    print(msg)
+                    sys.exit(NO_PAIRS_ERROR)
+
+
         def find_same_actions(index, minibatch):
             """
             Get observations indices where the same action was performed
@@ -203,30 +246,6 @@ class SRL4robotics(BaseLearner):
                 msg += "=> Consider increasing the batch_size or changing the seed"
                 print(msg)
                 sys.exit(NO_PAIRS_ERROR)
-
-        ref_point_pairs = []
-        if len(is_ref_point_list) > 0:
-            def find_ref_point(index, minibatch):
-                """
-                Find observations corresponding to the reference
-                :param index: (int)
-                :param minibatch: (numpy array)
-                :return: (numpy array)
-                """
-                return np.where(is_ref_point_list[minibatch] * is_ref_point_list[minibatch[index]])[0]
-
-            ref_point_pairs = [np.array([[i, j] for i in range(self.batch_size)
-                                         for j in find_ref_point(i, minibatch) if j > i],
-                                        dtype='int64') for minibatch in minibatchlist]
-
-            for item in ref_point_pairs:
-                if len(item) == 0:
-                    msg = "No same ref point position observation of the arm was found \
-                            for at least one minibatch (current batch size is {})\n".format(BATCH_SIZE)
-                    msg += "=> Consider increasing the batch_size or changing the seed\n same_ref_point_positions: {}".format(
-                        ref_point_pairs)
-                    print(msg)
-                    sys.exit(NO_PAIRS_ERROR)
 
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
                                                same_actions, dissimilar, ref_point_pairs,
