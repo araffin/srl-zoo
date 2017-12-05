@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 
 import argparse
+from textwrap import fill
 
 import cv2
 import matplotlib.pyplot as plt
@@ -10,7 +11,6 @@ from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
-
 # Python 2/3 compatibility
 try:
     input = raw_input
@@ -19,6 +19,8 @@ except NameError:
 
 # Init seaborn
 sns.set()
+TITLE_MAX_LENGTH = 60
+
 
 def createInteractivePlot(fig, states, images_path):
     fig2 = plt.figure("Image")
@@ -31,12 +33,14 @@ def plot_2d_representation(states, rewards, images_path, name="Learned State Rep
     plt.ion()
     fig = plt.figure(name)
     plt.clf()
-    plt.scatter(states[:, 0], states[:, 1], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
-    plt.xlabel('State dimension 1')
-    plt.ylabel('State dimension 2')
-    plt.title(name)
+    ax = fig.add_subplot(111)
+    im = ax.scatter(states[:, 0], states[:, 1], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
+    ax.set_xlabel('State dimension 1')
+    ax.set_ylabel('State dimension 2')
+    ax.set_title(fill(name, TITLE_MAX_LENGTH))
+    fig.tight_layout()
     if add_colorbar:
-        plt.colorbar(label='Reward')
+        fig.colorbar(im, label='Reward')
 
     createInteractivePlot(fig, states, images_path)
     plt.show()
@@ -54,7 +58,8 @@ def plot_3d_representation(states, rewards, images_path, name="Learned State Rep
     ax.set_xlabel('State dimension 1')
     ax.set_ylabel('State dimension 2')
     ax.set_zlabel('State dimension 3')
-    ax.set_title(name)
+    ax.set_title(fill(name, TITLE_MAX_LENGTH))
+    fig.tight_layout()
     if add_colorbar:
         fig.colorbar(im, label='Reward')
 

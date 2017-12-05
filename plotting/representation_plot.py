@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 
 import argparse
+from textwrap import fill
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -17,6 +18,8 @@ except NameError:
 # Init seaborn
 sns.set()
 INTERACTIVE_PLOT = True
+TITLE_MAX_LENGTH = 60
+
 
 def updateDisplayMode():
     """
@@ -37,25 +40,6 @@ def pauseOrClose(fig):
         plt.pause(0.0001)  # Small pause to update the plot
     else:
         plt.close(fig)
-
-def plot_3d_representation(states, rewards, name="Learned State Representation",
-                           add_colorbar=True, path=None):
-    updateDisplayMode()
-    fig = plt.figure(name)
-    plt.clf()
-    ax = fig.add_subplot(111, projection='3d')
-    im = ax.scatter(states[:, 0], states[:, 1], states[:, 2],
-                    s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
-    ax.set_xlabel('State dimension 1')
-    ax.set_ylabel('State dimension 2')
-    ax.set_zlabel('State dimension 3')
-    ax.set_title(name)
-    if add_colorbar:
-        fig.colorbar(im, label='Reward')
-    if path is not None:
-        plt.savefig(path)
-    pauseOrClose(fig)
-
 
 def plot_representation(states, rewards, name="Learned State Representation",
                         add_colorbar=True, path=None, fit_pca=True):
@@ -93,12 +77,34 @@ def plot_2d_representation(states, rewards, name="Learned State Representation",
     plt.scatter(states[:, 0], states[:, 1], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
     plt.xlabel('State dimension 1')
     plt.ylabel('State dimension 2')
-    plt.title(name)
+    plt.title(fill(name, TITLE_MAX_LENGTH))
+    fig.tight_layout()
     if add_colorbar:
         plt.colorbar(label='Reward')
     if path is not None:
         plt.savefig(path)
     pauseOrClose(fig)
+
+
+def plot_3d_representation(states, rewards, name="Learned State Representation",
+                           add_colorbar=True, path=None):
+    updateDisplayMode()
+    fig = plt.figure(name)
+    plt.clf()
+    ax = fig.add_subplot(111, projection='3d')
+    im = ax.scatter(states[:, 0], states[:, 1], states[:, 2],
+                    s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
+    ax.set_xlabel('State dimension 1')
+    ax.set_ylabel('State dimension 2')
+    ax.set_zlabel('State dimension 3')
+    ax.set_title(fill(name, TITLE_MAX_LENGTH))
+    fig.tight_layout()
+    if add_colorbar:
+        fig.colorbar(im, label='Reward')
+    if path is not None:
+        plt.savefig(path)
+    pauseOrClose(fig)
+
 
 def plot_observations(observations, name='Observation Samples'):
     updateDisplayMode()
@@ -111,6 +117,7 @@ def plot_observations(observations, name='Observation Samples'):
         plt.xticks([])
         plt.yticks([])
     pauseOrClose(fig)
+
 
 def plot_image(image, name='Observation Sample'):
     """
