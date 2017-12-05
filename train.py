@@ -20,7 +20,7 @@ from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
-from models.models import SRLConvolutionalNetwork, SRLDenseNetwork
+from models.models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN
 from plotting.representation_plot import plot_representation, plt
 from preprocessing.data_loader import BaxterImageLoader
 from preprocessing.preprocess import INPUT_DIM
@@ -118,6 +118,8 @@ class SRL4robotics(BaseLearner):
 
         if model_type == "resnet":
             self.model = SRLConvolutionalNetwork(self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
+        elif model_type == "custom_cnn":
+            self.model = SRLCustomCNN(self.state_dim, cuda, noise_std=NOISE_STD)
         elif model_type == "mlp":
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         else:

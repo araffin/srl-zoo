@@ -184,6 +184,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
+    parser.add_argument('--noise_factor', type=float, default=0.1, help='Noise factor for denoising autoencoder')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -194,6 +195,7 @@ if __name__ == '__main__':
     args.data_folder = parseDataFolder(args.data_folder)
     log_folder = "logs/{}/baselines/autoencoder".format(args.data_folder)
     createFolder(log_folder, "autoencoder folder already exist")
+    NOISE_FACTOR = args.noise_factor
 
     folder_path = '{}/NearestNeighbors/'.format(log_folder)
     createFolder(folder_path, "NearestNeighbors folder already exist")

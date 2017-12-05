@@ -98,7 +98,7 @@ class DenseNetwork(nn.Module):
 
 class ConvolutionalNetwork(nn.Module):
     """
-    Convolutional Neural Net for State Representation Learning (SRL)
+    Convolutional Neural Network using pretrained ResNet
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
     :param state_dim: (int)
     :param cuda: (bool)
@@ -120,6 +120,47 @@ class ConvolutionalNetwork(nn.Module):
     def forward(self, x):
         x = self.resnet(x)
         return x
+
+
+class SRLCustomCNN(nn.Module):
+    """
+    Convolutional Neural Network for State Representation Learning
+    input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
+    :param state_dim: (int)
+    :param cuda: (bool)
+    :param noise_std: (float)  To avoid NaN (states must be different)
+    """
+
+    def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
+        super(SRLCustomCNN, self).__init__()
+        # Inspired by ResNet:
+        # conv3x3 followed by BatchNorm2d
+        self.conv_layers = nn.Sequential(
+            # 224x224x3 -> 112x112x64
+            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),  # 56x56x64
+
+            conv3x3(in_planes=64, out_planes=64, stride=1),  # 56x56x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),  # 27x27x64
+
+            conv3x3(in_planes=64, out_planes=64, stride=2),  # 14x14x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
+        )
+
+        self.fc = nn.Linear(6 * 6 * 64, state_dim)
+        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
+
+    def forward(self, x):
+        x = self.conv_layers(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return self.noise(x)
 
 
 class LinearAutoEncoder(nn.Module):
@@ -207,7 +248,7 @@ class CNNAutoEncoder(nn.Module):
 
     def __init__(self, state_dim=3):
         super(CNNAutoEncoder, self).__init__()
-        # Inspired from ResNet:
+        # Inspired by ResNet:
         # conv3x3 followed by BatchNorm2d
         # TODO: implement residual connection
         self.encoderConv = nn.Sequential(

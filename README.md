@@ -127,6 +127,19 @@ You can also plot ground truth states with:
 python plotting/representation_plot.py --data_folder path/to/datasetFolder/
 ```
 
+#### Interactive Plot
+
+You can have an interactive plot of a learned representation using:
+```
+python plotting/interactive_plot.py --data_folder path/to/datasetFolder/ -i path/to/states_rewards.npz
+```
+When you click on a state in the representation plot (left click for 2D, **right click for 3D plots**!), it shows the corresponding image along with the reward and the coordinates in the space.
+
+You can also plot ground truth states when you don't specify a npz file:
+```
+python plotting/interactive_plot.py --data_folder path/to/datasetFolder/
+```
+
 #### Create a knn plot and compute KNN-MSE
 
 Usage:
@@ -168,7 +181,7 @@ Gaussian noise is added to the input with a factor `0.1`.
 
 Example:
 ```
-python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3
+python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3 --noise_factor 0.1
 ```
 
 ### Dependencies
