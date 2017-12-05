@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 
 import argparse
+import re
 from textwrap import fill
 
 import cv2
@@ -22,11 +23,22 @@ sns.set()
 TITLE_MAX_LENGTH = 60
 
 
-def createInteractivePlot(fig, states, images_path):
+def loadImage(path):
+    """
+    Load an image and convert it to matplotlib format
+    :param path: (str)
+    """
+    bgr_img = cv2.imread('data/' + path)
+    return cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB) / 255.
+
+
+def createInteractivePlot(fig, ax, states, rewards, images_path):
     fig2 = plt.figure("Image")
-    image_plot = plt.imshow(cv2.imread('data/' + images_path[0]) / 255.)
-    callback = ImageFinder(states, image_plot, images_path)
-    fig.canvas.mpl_connect('button_press_event', callback)
+    image_plot = plt.imshow(loadImage(images_path[0]))
+    # Disable seaborn grid
+    image_plot.axes.grid(False)
+    callback = ImageFinder(states, rewards, image_plot, ax, images_path)
+    fig.canvas.mpl_connect('button_release_event', callback)
 
 def plot_2d_representation(states, rewards, images_path, name="Learned State Representation",
                             add_colorbar=True):
@@ -42,7 +54,7 @@ def plot_2d_representation(states, rewards, images_path, name="Learned State Rep
     if add_colorbar:
         fig.colorbar(im, label='Reward')
 
-    createInteractivePlot(fig, states, images_path)
+    createInteractivePlot(fig, ax, states, rewards, images_path)
     plt.show()
 
 
@@ -63,7 +75,7 @@ def plot_3d_representation(states, rewards, images_path, name="Learned State Rep
     if add_colorbar:
         fig.colorbar(im, label='Reward')
 
-    createInteractivePlot(fig, states, images_path)
+    createInteractivePlot(fig, ax, states, rewards, images_path)
     plt.show()
 
 
@@ -99,12 +111,15 @@ class ImageFinder(object):
     clicked on.  The point which is closest to the click and within
     xtol and ytol is identified.
     """
-    def __init__(self, states, image_plot, images_path):
+    def __init__(self, states, rewards, image_plot, ax, images_path):
 
         self.image_plot = image_plot
         self.images_path = images_path
         self.knn = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(states)
         self.state_dim = states.shape[1]
+        self.ax = ax
+        self.states = states
+        self.rewards = rewards
 
     def __call__(self, event):
         if event.inaxes:
@@ -112,18 +127,27 @@ class ImageFinder(object):
             click_y = event.ydata
             click_state = np.array([click_x, click_y])
             if self.state_dim == 3:
-                # TODO: get current state of the plot
-                # and apply the right transformation
-                print("WARNING: 3D click not supported yet")
-                # click_z = event.zdata
-                click_z = 0
-                click_state = np.array([click_x, click_y, click_z])
+                # Return a string: 'x=0.222, y=0.452, z=0.826'
+                coord_string = self.ax.format_coord(click_x, click_y)
+                if 'azimuth' in coord_string:
+                    # Left click -> right click should be used for 3D
+                    return
+                # Extract coordinates
+                float_num = r"[0-9\.-]+"
+                regex = r"x=(?P<x>" + float_num + ")\s*,\s*y=(?P<y>" + float_num + ")\s*,\s*z=(?P<z>" + float_num + ")"
+                result = re.match(regex, coord_string)
+                click_state = np.array([result.group("x"), result.group("y"), result.group("z")])
 
             click_state = click_state.reshape(1, -1)
             _, neighbors_indices = self.knn.kneighbors(click_state)
-            path = self.images_path[neighbors_indices.flatten()[0]]
+
+            state_idx = neighbors_indices.flatten()[0]
+            title = "{}\n {}\n reward={}".format(fill(self.images_path[state_idx], TITLE_MAX_LENGTH),
+                                                 self.states[state_idx], self.rewards[state_idx])
+            self.image_plot.axes.set_title(title)
+            path = self.images_path[state_idx]
             # Load the image that corresponds to the clicked point in the space
-            self.image_plot.set_data(cv2.imread('data/' + path) / 255.)
+            self.image_plot.set_data(loadImage(path))
 
 
 
@@ -155,7 +179,5 @@ if __name__ == '__main__':
         rewards = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['rewards']
         name = "Ground Truth States - {}".format(args.data_folder)
 
-        print("[WARNING] Using 2D plot instead of 3D")
-        states = np.concatenate((states[:, 0].reshape(-1, 1), states[:, 1].reshape(-1, 1)), axis=1)
         plot_representation(states, rewards, images_path, name)
         input('\nPress any key to exit.')
