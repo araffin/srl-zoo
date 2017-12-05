@@ -21,8 +21,8 @@ from utils import printRed, printGreen, printBlue, parseDataFolder, \
 # Apparently due to segmentation fault
 # (https://stackoverflow.com/questions/24139389/unable-to-find-out-what-return-code-of-11-means)
 MATPLOTLIB_WARNING_CODE = -11
-NO_PAIRS_ERROR = -404  # return code when no dissimilar/reference pairs where found
-NAN_ERROR = -12  # return code when loss is NaN, consider increasing the NOISE_STD
+NO_PAIRS_ERROR = 10  # return code when no dissimilar/reference pairs where found
+NAN_ERROR = 11  # return code when loss is NaN, consider increasing the NOISE_STD
 
 
 def getLogFolderName(exp_config):

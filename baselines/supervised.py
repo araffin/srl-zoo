@@ -166,9 +166,6 @@ if __name__ == '__main__':
     log_folder = "logs/{}/baselines/supervised".format(args.data_folder)
     createFolder(log_folder, "supervised folder already exist")
 
-    # Create fake exp_config for KNN plots
-    with open('{}/exp_config.json'.format(log_folder), 'wb') as f:
-        json.dump({"data_folder": args.data_folder}, f)
 
     folder_path = '{}/NearestNeighbors/'.format(log_folder)
     createFolder(folder_path, "NearestNeighbors folder already exist")
@@ -181,6 +178,10 @@ if __name__ == '__main__':
     # TODO: normalize true states
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
     state_dim = ground_truth['arm_states'].shape[1]
+
+    # Create partial exp_config for KNN plots
+    with open('{}/exp_config.json'.format(log_folder), 'wb') as f:
+        json.dump({"data_folder": args.data_folder, "state_dim": state_dim}, f)
 
     print('Learning a state representation ... ')
     srl = SupervisedLearning(state_dim, model_type=args.model_type, seed=args.seed,

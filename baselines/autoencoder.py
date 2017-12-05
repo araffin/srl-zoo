@@ -193,10 +193,6 @@ if __name__ == '__main__':
     log_folder = "logs/{}/baselines/autoencoder".format(args.data_folder)
     createFolder(log_folder, "autoencoder folder already exist")
 
-    # Create fake exp_config for KNN plots
-    with open('{}/exp_config.json'.format(log_folder), 'wb') as f:
-        json.dump({"data_folder": args.data_folder}, f)
-
     folder_path = '{}/NearestNeighbors/'.format(log_folder)
     createFolder(folder_path, "NearestNeighbors folder already exist")
 
@@ -206,6 +202,11 @@ if __name__ == '__main__':
     rewards = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))['rewards']
 
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
+
+    # Create partial exp_config for KNN plots
+    with open('{}/exp_config.json'.format(log_folder), 'wb') as f:
+        json.dump({"data_folder": args.data_folder, "state_dim": args.state_dim}, f)
+
 
     print('Learning a state representation ... ')
     srl = AutoEncoderLearning(args.state_dim, model_type=args.model_type, seed=args.seed,
