@@ -1,4 +1,6 @@
 {
-  "bound_inf": [0.42,-0.2,-10],
-  "bound_sup": [0.8,0.7,10]
+  "bound_inf": [0.42,-0.1,-0.11],
+  "bound_sup": [0.75,0.60,0.35],
+  "fixed_ref_point": [0.598, 0.300, -0.143],
+  "fixed_ref_point_threshold": 0.04
 }

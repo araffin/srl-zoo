@@ -38,7 +38,6 @@ def imageWorker(image_queue, output_queue, exit_event):
         del im  # Free memory
 
 
-# TODO: autoreset ?
 class BaxterImageLoader(object):
     """
     Data loader for baxter images.
@@ -48,15 +47,17 @@ class BaxterImageLoader(object):
     :param images_path: (numpy 1D array of str)
     :param same_actions: [numpy matrix]
     :param dissimilar: [numpy matrix]
+    :param ref_point_pairs: [numpy matrix]
     :param test_batch_size: (int)
     :param cache_capacity: (int) number of images that can be cached
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
     [WARNING] Set to False, you MUST clean up the loader manually (by calling cleanUp() method)
+    It may also produce deadlocks
     """
 
     def __init__(self, minibatchlist, images_path, same_actions,
-                 dissimilar, test_batch_size=512, cache_capacity=5000,
+                 dissimilar, ref_point_pairs=None, test_batch_size=512, cache_capacity=5000,
                  n_workers=5, auto_cleanup=True):
         super(BaxterImageLoader, self).__init__()
 
@@ -66,11 +67,16 @@ class BaxterImageLoader(object):
         # Copy data to avoid side effects
         # (it uses more memory but prevent from weird bugs)
         self.minibatchlist = np.array(minibatchlist[:])
-        # Save minibatches original order
-        self.original_minibatchlist = np.array(minibatchlist[:])
+        # Copy useful array to avoid side effects
         self.images_path = images_path[:]
-        self.dissimilar = dissimilar[:]
-        self.same_actions = same_actions[:]
+        self.dissimilar = np.array(dissimilar[:])
+        self.same_actions = np.array(same_actions[:])
+        self.ref_point_pairs = np.array(ref_point_pairs[:]) if ref_point_pairs is not None else np.array([])
+        # Save minibatches original order
+        self.original_minibatchlist = self.minibatchlist.copy()
+        self.original_same_actions = self.same_actions.copy()
+        self.original_dissimilar = self.dissimilar.copy()
+        self.original_ref_point_pairs = self.ref_point_pairs.copy()
 
         # Index of the minibatch in the iterator
         self.current_idx = 0
@@ -136,6 +142,9 @@ class BaxterImageLoader(object):
         """
         self.is_training = True
         self.minibatchlist = self.original_minibatchlist.copy()
+        self.same_actions = self.original_same_actions.copy()
+        self.dissimilar = self.original_dissimilar.copy()
+        self.ref_point_pairs = self.original_ref_point_pairs.copy()
         # Reset the iterator
         self.resetIterator()
 
@@ -221,7 +230,12 @@ class BaxterImageLoader(object):
         """
         Shuffle list of minibatches
         """
-        np.random.shuffle(self.minibatchlist)
+        indices = np.random.permutation(self.n_minibatches).astype(np.int64)
+        self.minibatchlist = self.minibatchlist[indices]
+        self.same_actions = self.same_actions[indices]
+        self.dissimilar = self.dissimilar[indices]
+        if len(self.ref_point_pairs) > 0:
+            self.ref_point_pairs = self.ref_point_pairs[indices]
 
     def resetQueues(self):
         """
@@ -333,7 +347,6 @@ class BaxterImageLoader(object):
         obs_indices = self.minibatchlist[i]
 
         batch_size = len(obs_indices)
-
         # If we are training we need addional tensors
         # (next obs, dissimilar and similar pairs)
         if self.is_training:
@@ -341,6 +354,11 @@ class BaxterImageLoader(object):
             same = self.same_actions[i][np.random.permutation(self.same_actions[i].shape[0])]
             # Convert to torch tensor
             diss, same = th.from_numpy(diss), th.from_numpy(same)
+
+            ref_point_pairs = th.zeros(0)  # Empty tensor
+            if len(self.ref_point_pairs) > 0:
+                ref_point_pairs = self.ref_point_pairs[i][np.random.permutation(self.ref_point_pairs[i].shape[0])]
+                ref_point_pairs = th.from_numpy(ref_point_pairs)
 
             # Retrieve observations
             # Define a dict to modify it in the for loop
@@ -353,7 +371,7 @@ class BaxterImageLoader(object):
         self._sendToWorkers(batch_size, indices_list, obs_dict)
 
         if self.is_training:
-            self.preprocess_result = obs_dict['obs'], obs_dict['next_obs'], diss.clone(), same.clone()
+            self.preprocess_result = obs_dict['obs'], obs_dict['next_obs'], diss.clone(), same.clone(), ref_point_pairs.clone()
         else:
             self.preprocess_result = obs_dict['obs']
 
@@ -545,6 +563,13 @@ class AutoEncoderDataLoader(BaxterImageLoader):
         # Training mode is the default one
         if not is_training:
             self.testMode()
+
+    def shuffleMinitbatchesOrder(self):
+        """
+        Shuffle list of minibatches
+        """
+        indices = np.random.permutation(self.n_minibatches).astype(np.int64)
+        self.minibatchlist = self.minibatchlist[indices]
 
     def _processNextMinibatch(self):
         """

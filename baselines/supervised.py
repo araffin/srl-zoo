@@ -1,5 +1,6 @@
 from __future__ import print_function, division, absolute_import
 
+import json
 import time
 import argparse
 
@@ -9,12 +10,13 @@ import torch.nn as nn
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
+import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
 from models.models import ConvolutionalNetwork, DenseNetwork
 from plotting.representation_plot import plot_representation, plt
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import INPUT_DIM
-from utils import parseDataFolder
+from utils import parseDataFolder, createFolder
 
 # Python 2/3 compatibility
 try:
@@ -31,18 +33,18 @@ TEST_BATCH_SIZE = 512
 class SupervisedLearning(BaseLearner):
     """
     :param state_dim: (int)
-    :param model_type: (str) one of "cnn" or "mlp"
+    :param model_type: (str) one of "resnet" or "mlp"
     :param seed: (int)
     :param learning_rate: (float)
     :param cuda: (bool)
     """
 
-    def __init__(self, state_dim, model_type="cnn", log_folder="logs/default",
+    def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, cuda=False):
 
         super(SupervisedLearning, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
-        if model_type == "cnn":
+        if model_type == "resnet":
             self.model = ConvolutionalNetwork(self.state_dim, cuda)
         elif model_type == "mlp":
             self.model = DenseNetwork(INPUT_DIM, self.state_dim)
@@ -55,7 +57,6 @@ class SupervisedLearning(BaseLearner):
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.log_folder = log_folder
-
 
     def learn(self, true_states, images_path, rewards):
         """
@@ -153,16 +154,21 @@ if __name__ == '__main__':
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
-    parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
+    parser.add_argument('--model_type', type=str, default="resnet", help='Model architecture (default: "resnet")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     DISPLAY_PLOTS = not args.no_plots
+    plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     args.data_folder = parseDataFolder(args.data_folder)
-    log_folder = "logs/{}/baselines".format(args.data_folder)
+    log_folder = "logs/{}/baselines/supervised".format(args.data_folder)
+    createFolder(log_folder, "supervised folder already exist")
+
+    folder_path = '{}/NearestNeighbors/'.format(log_folder)
+    createFolder(folder_path, "NearestNeighbors folder already exist")
 
     print('Log folder: {}'.format(log_folder))
 
@@ -173,16 +179,19 @@ if __name__ == '__main__':
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
     state_dim = ground_truth['arm_states'].shape[1]
 
+    # Create partial exp_config for KNN plots
+    with open('{}/exp_config.json'.format(log_folder), 'wb') as f:
+        json.dump({"data_folder": args.data_folder, "state_dim": state_dim}, f)
+
     print('Learning a state representation ... ')
     srl = SupervisedLearning(state_dim, model_type=args.model_type, seed=args.seed,
                              log_folder=log_folder, learning_rate=args.learning_rate,
                              cuda=args.cuda)
     learned_states = srl.learn(ground_truth['arm_states'], ground_truth['images_path'], rewards)
-    srl.saveStates(learned_states, ground_truth['images_path'], rewards, log_folder,
-                   name="_supervised")
+    srl.saveStates(learned_states, ground_truth['images_path'], rewards, log_folder)
 
     name = "Learned State Representation - {} \n Supervised Learning".format(args.data_folder)
-    path = "{}/learned_states_supervised.png".format(log_folder)
+    path = "{}/learned_states.png".format(log_folder)
     plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     if DISPLAY_PLOTS:

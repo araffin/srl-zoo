@@ -1,5 +1,6 @@
 from __future__ import print_function, division, absolute_import
 
+import json
 import time
 import argparse
 
@@ -9,7 +10,8 @@ import torch.nn as nn
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-from utils import parseDataFolder
+import plotting.representation_plot as plot_script
+from utils import parseDataFolder, createFolder
 from preprocessing.data_loader import AutoEncoderDataLoader
 from preprocessing.preprocess import INPUT_DIM
 from preprocessing.utils import deNormalize
@@ -139,9 +141,10 @@ class AutoEncoderLearning(BaseLearner):
                 val_loss += loss.data[0]
 
             val_loss /= len(val_loader)
-            # Plot Reconstructed Image
-            plot_image(deNormalize(noisy_obs[0].data.cpu().numpy()), "Input Validation Image")
-            plot_image(deNormalize(decoded[0].data.cpu().numpy()), "Reconstructed Image")
+            if DISPLAY_PLOTS:
+                # Plot Reconstructed Image
+                plot_image(deNormalize(noisy_obs[0].data.cpu().numpy()), "Input Validation Image")
+                plot_image(deNormalize(decoded[0].data.cpu().numpy()), "Reconstructed Image")
 
             self.model.train()  # Restore train mode
 
@@ -185,10 +188,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     DISPLAY_PLOTS = not args.no_plots
+    plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     args.data_folder = parseDataFolder(args.data_folder)
-    log_folder = "logs/{}/baselines".format(args.data_folder)
+    log_folder = "logs/{}/baselines/autoencoder".format(args.data_folder)
+    createFolder(log_folder, "autoencoder folder already exist")
+
+    folder_path = '{}/NearestNeighbors/'.format(log_folder)
+    createFolder(folder_path, "NearestNeighbors folder already exist")
 
     print('Log folder: {}'.format(log_folder))
 
@@ -197,16 +205,19 @@ if __name__ == '__main__':
 
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
 
+    # Create partial exp_config for KNN plots
+    with open('{}/exp_config.json'.format(log_folder), 'wb') as f:
+        json.dump({"data_folder": args.data_folder, "state_dim": args.state_dim}, f)
+
     print('Learning a state representation ... ')
     srl = AutoEncoderLearning(args.state_dim, model_type=args.model_type, seed=args.seed,
                               log_folder=log_folder, learning_rate=args.learning_rate,
                               cuda=args.cuda)
     learned_states = srl.learn(ground_truth['images_path'], rewards)
-    srl.saveStates(learned_states, ground_truth['images_path'], rewards, log_folder,
-                   name="_autoencoder")
+    srl.saveStates(learned_states, ground_truth['images_path'], rewards, log_folder)
 
     name = "Learned State Representation - {} \n Autoencoder state_dim={}".format(args.data_folder, args.state_dim)
-    path = "{}/learned_states_ae.png".format(log_folder)
+    path = "{}/learned_states.png".format(log_folder)
     plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     if DISPLAY_PLOTS:

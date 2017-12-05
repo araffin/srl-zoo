@@ -6,6 +6,21 @@ import os
 
 import pandas as pd
 
+
+def getKnnMse(path):
+    """
+    Retrieve knn mse score
+    :param path: (str)
+    :return: (float)
+    """
+    try:
+        with open(path) as f:
+            return json.load(f)['knn_mse']
+    except IOError:
+        print("knn_mse.json not found for {}".format(path))
+        return -1
+
+
 parser = argparse.ArgumentParser(description='Create a report file for a given dataset')
 parser.add_argument('-d', '--data_log_folder', type=str, default="", required=True, help='Path to a dataset log folder')
 args = parser.parse_args()
@@ -22,7 +37,7 @@ print("Found {} experiments".format(len(experiments)))
 
 knn_mse = []
 # Add here keys from exp_config.json that should be saved in the csv report file
-exp_configs = {'architecture_name': [], 'model_type': [], 'state_dim': []}
+exp_configs = {'model_type': [], 'state_dim': []}
 
 for experiment in experiments:
 
@@ -31,14 +46,24 @@ for experiment in experiments:
     for key in exp_configs.keys():
         exp_configs[key].append(exp_config[key])
 
+    knn_mse.append(getKnnMse('{}/{}/knn_mse.json'.format(dataset_logfolder, experiment)))
+
+# Baselines
+for baseline in ['autoencoder', 'supervised']:
     try:
-        with open('{}/{}/knn_mse.json'.format(dataset_logfolder, experiment)) as f:
-            knn_mse.append(json.load(f)['knn_mse'])
+        with open('{}/baselines/{}/exp_config.json'.format(dataset_logfolder, baseline)) as f:
+            exp_config = json.load(f)
     except IOError:
-        knn_mse.append(-1)
-        print("knn_mse.json not found for {}".format(experiment))
+        print("exp_config.json not found for {}".format(baseline))
+        continue
+    for key in exp_configs.keys():
+        exp_configs[key].append(exp_config.get(key, None))
+
+    knn_mse.append(getKnnMse('{}/baselines/{}/knn_mse.json'.format(dataset_logfolder, baseline)))
+    experiments.append(baseline)
 
 exp_configs.update({'experiments': experiments, 'knn_mse': knn_mse})
+
 result_df = pd.DataFrame(exp_configs)
 result_df.to_csv('{}/results.csv'.format(dataset_logfolder), sep=",", index=False)
 print("Saved results to {}/results.csv".format(dataset_logfolder))

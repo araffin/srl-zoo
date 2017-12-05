@@ -1,10 +1,8 @@
 from __future__ import print_function, division, absolute_import
 
 import argparse
-import random
 import json
-import os
-import re
+import random
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -36,6 +34,7 @@ with open("{}/exp_config.json".format(args.log_folder), 'rb') as f:
 # Load ground truth and images path
 ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
 states = np.load('{}/states_rewards.npz'.format(args.log_folder))['states']
+
 # TODO: relative states for moving button
 true_states = ground_truth['arm_states']
 images_path = ground_truth['images_path']
@@ -89,7 +88,8 @@ for image_path, neigbour_indices, distance, image_idx in data:
         plt.imshow(img)
 
         dist_str = 'd={:.4f}'.format(distance[i + 1])
-        state_str = map(lambda x: '{:.3f}'.format(x), states[neighbor_idx])
+        state_str = ", ".join(map(lambda x: '{:.3f}'.format(x), states[neighbor_idx]))
+        state_str = "[{}]".format(state_str)
         neighbor_coord = true_states[neighbor_idx]
         total_error += np.linalg.norm(neighbor_coord - ref_coord)
         n_images += 1

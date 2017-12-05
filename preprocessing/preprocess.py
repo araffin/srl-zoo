@@ -7,11 +7,10 @@ import argparse
 import json
 import os
 
-import cv2
 import numpy as np
 from tqdm import tqdm
 
-from .utils import getActions, findClosestAction, getDataFrame, preprocessInput
+from .utils import getActions, findClosestAction, getDataFrame, samePoint
 # Root folder utils file
 from utils import parseDataFolder
 
@@ -23,17 +22,17 @@ text_files = {
     'arm_state': 'recorded_robot_limb_left_endpoint_state.txt'
 }
 
-DELTA_POS = 0.05
+DELTA_POS = 0.05  # delta between each action
 N_ACTIONS = 26
-# Bound for negative rewards
-BOUND_INF = [0.42, -0.1, -0.11]
+# Bound for negative rewards (3D limits of the table)
+BOUND_INF = [0.42, -0.1, -0.11]  # default for nonStaticButton dataset?
 BOUND_SUP = [0.75, 0.60, 0.35]
 
 # Resized image shape
 IMAGE_WIDTH = 224  # in px
 IMAGE_HEIGHT = 224  # in px
 N_CHANNELS = 3
-MAX_RECORDS = 5000 # No limit
+MAX_RECORDS = 5000  # No limit
 INPUT_DIM = IMAGE_WIDTH * IMAGE_HEIGHT * N_CHANNELS
 
 
@@ -57,7 +56,6 @@ if __name__ == '__main__':
                         help='disables warnings')
     args = parser.parse_args()
 
-    assert args.data_folder != "", "You must specify a data_folder parameter "
     assert args.mode in ['tf', 'image_net'], "Unknown mode"
 
     print("Dataset folder: {}".format(args.data_folder))
@@ -72,10 +70,10 @@ if __name__ == '__main__':
         print("Loading dataset config...")
         with open('{}/dataset_config.json'.format(data_folder), 'rb') as f:
             dataset_config = json.load(f)
-        BOUND_INF = dataset_config['bound_inf']
-        BOUND_SUP = dataset_config['bound_sup']
+            BOUND_INF = dataset_config['bound_inf']
+            BOUND_SUP = dataset_config['bound_sup']
     else:
-        print("No dataset config file found, using default values")
+        print("[WARNING] No dataset config file found, using default values")
 
     record_folders = []
     for item in os.listdir(data_folder):
@@ -166,11 +164,12 @@ if __name__ == '__main__':
     # Save Everything
     data = {
         'rewards': all_rewards,
-        'actions': all_actions.reshape(-1, 1),
-        'episode_starts': episode_starts,
+        'actions': all_actions,
+        'episode_starts': episode_starts
     }
 
-    assert len(all_rewards) == len(all_images_path), "n_rewards != n_images: {} != {}".format(len(all_rewards), len(all_images_path))
+    assert len(all_rewards) == len(all_images_path), "n_rewards != n_images: {} != {}".format(len(all_rewards),
+                                                                                              len(all_images_path))
 
     print("Saving preprocessed data...")
     np.savez('{}/preprocessed_data.npz'.format(data_folder), **data)
@@ -179,6 +178,34 @@ if __name__ == '__main__':
         'button_positions': button_positions,
         'arm_states': all_arm_states,
         'actions_deltas': action_to_idx.keys(),
-        'images_path': all_images_path
+        'images_path': all_images_path,
     }
+
+    for key in ['bound_inf', 'bound_sup',
+                'fixed_ref_point_threshold', 'fixed_ref_point']:
+        if key in dataset_config.keys():
+            ground_truth[key] = dataset_config[key]
+        else:
+            print('Warning: 5th prior will not be able to be executed with this')
+            print('dataset because key parameter in .json config is missing: {}'.format(key))
+
+    if 'fixed_ref_point_threshold' in ground_truth.keys():
+        # Reference Point Prior (5th prior)
+        # Saving a mask to indicate which datapoints
+        # corresponds to the reference point (given a threshold)
+        ref_point, ref_point_threshold = ground_truth['fixed_ref_point'], ground_truth['fixed_ref_point_threshold']
+        print("Searching for reference point:{} with threshold:{}".format(ref_point, ref_point_threshold))
+        is_ref_point_list = np.array([samePoint(all_arm_states[i], ref_point, ref_point_threshold)
+                                      for i in range(len(all_arm_states))])
+
+        data['is_ref_point_list'] = is_ref_point_list
+
+        assert len(is_ref_point_list) == len(all_rewards), \
+            "Length of is_ref_point_list \
+                  and all_rewards does not coincide: {}, {}".format(len(is_ref_point_list), len(all_rewards))
+    assert len(all_rewards) == len(all_images_path), \
+        "n_rewards != n_images: {}, {}".format(len(all_rewards), len(all_images_path))
+
+    print("Saving preprocessed data...")
+    np.savez('{}/preprocessed_data.npz'.format(data_folder), **data)
     np.savez('{}/ground_truth.npz'.format(data_folder), **ground_truth)

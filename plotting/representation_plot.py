@@ -1,11 +1,12 @@
 from __future__ import print_function, division
 
 import argparse
+from textwrap import fill
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
 import numpy as np
+from mpl_toolkits.mplot3d import Axes3D  # noqa
 from sklearn.decomposition import PCA
 
 # Python 2/3 compatibility
@@ -17,6 +18,8 @@ except NameError:
 # Init seaborn
 sns.set()
 INTERACTIVE_PLOT = True
+TITLE_MAX_LENGTH = 60
+
 
 def updateDisplayMode():
     """
@@ -28,6 +31,7 @@ def updateDisplayMode():
     else:
         plt.ioff()
 
+
 def pauseOrClose(fig):
     """
     :param fig: (matplotlib figure object)
@@ -37,6 +41,51 @@ def pauseOrClose(fig):
         plt.pause(0.0001)  # Small pause to update the plot
     else:
         plt.close(fig)
+
+
+def plot_representation(states, rewards, name="Learned State Representation",
+                        add_colorbar=True, path=None, fit_pca=True):
+    """
+    :param states: (numpy array)
+    :param rewards: (numpy 1D array)
+    :param name: (str)
+    :param add_colorbar: (bool)
+    :param path: (str)
+    :param fit_pca: (bool)
+    """
+    state_dim = states.shape[1]
+    if state_dim != 1 and (fit_pca or state_dim > 3):
+        name += " (PCA)"
+        n_components = min(state_dim, 3)
+        print("Fitting PCA with {} components".format(n_components))
+        states = PCA(n_components=n_components).fit_transform(states)
+
+    if state_dim == 1:
+        # Extend states as 2D:
+        states_matrix = np.zeros((states.shape[0], 2))
+        states_matrix[:, 0] = states[:, 0]
+        plot_2d_representation(states_matrix, rewards, name, add_colorbar, path)
+    elif state_dim == 2:
+        plot_2d_representation(states, rewards, name, add_colorbar, path)
+    else:
+        plot_3d_representation(states, rewards, name, add_colorbar, path)
+
+
+def plot_2d_representation(states, rewards, name="Learned State Representation", add_colorbar=True, path=None):
+    updateDisplayMode()
+    fig = plt.figure(name)
+    plt.clf()
+    plt.scatter(states[:, 0], states[:, 1], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
+    plt.xlabel('State dimension 1')
+    plt.ylabel('State dimension 2')
+    plt.title(fill(name, TITLE_MAX_LENGTH))
+    fig.tight_layout()
+    if add_colorbar:
+        plt.colorbar(label='Reward')
+    if path is not None:
+        plt.savefig(path)
+    pauseOrClose(fig)
+
 
 def plot_3d_representation(states, rewards, name="Learned State Representation",
                            add_colorbar=True, path=None):
@@ -49,46 +98,14 @@ def plot_3d_representation(states, rewards, name="Learned State Representation",
     ax.set_xlabel('State dimension 1')
     ax.set_ylabel('State dimension 2')
     ax.set_zlabel('State dimension 3')
-    ax.set_title(name)
+    ax.set_title(fill(name, TITLE_MAX_LENGTH))
+    fig.tight_layout()
     if add_colorbar:
         fig.colorbar(im, label='Reward')
     if path is not None:
         plt.savefig(path)
     pauseOrClose(fig)
 
-
-def plot_representation(states, rewards, name="Learned State Representation",
-                        add_colorbar=True, path=None):
-    state_dim = states.shape[1]
-    if state_dim == 2:
-        plot_2d_representation(states, rewards, name, add_colorbar, path)
-    elif state_dim == 3:
-        plot_3d_representation(states, rewards, name, add_colorbar, path)
-    else:
-        if state_dim > 3:
-            # PCA with 3 components by default
-            print("Fitting PCA with 3 components")
-            pca = PCA(n_components=3)
-            pca.fit(states)
-            plot_3d_representation(pca.transform(states), rewards, name, add_colorbar, path)
-        else:
-            # TODO: 1d plot
-            print("[WARNING] state dim = {} is not supported for plotting".format(state_dim))
-
-
-def plot_2d_representation(states, rewards, name="Learned State Representation", add_colorbar=True, path=None):
-    updateDisplayMode()
-    fig = plt.figure(name)
-    plt.clf()
-    plt.scatter(states[:, 0], states[:, 1], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
-    plt.xlabel('State dimension 1')
-    plt.ylabel('State dimension 2')
-    plt.title(name)
-    if add_colorbar:
-        plt.colorbar(label='Reward')
-    if path is not None:
-        plt.savefig(path)
-    pauseOrClose(fig)
 
 def plot_observations(observations, name='Observation Samples'):
     updateDisplayMode()
@@ -102,13 +119,15 @@ def plot_observations(observations, name='Observation Samples'):
         plt.yticks([])
     pauseOrClose(fig)
 
+
 def plot_image(image, name='Observation Sample'):
     """
     Display an image
     :param image: (numpy tensor) (with values in [0, 1])
+    :param name: (str)
     """
     # Reorder channels
-    if image.shape[0] == 3 and len(x.shape) == 3:
+    if image.shape[0] == 3 and len(image.shape) == 3:
         # (n_channels, height, width) -> (width, height, n_channels)
         image = np.transpose(image, (2, 1, 0))
     updateDisplayMode()
