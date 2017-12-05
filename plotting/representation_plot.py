@@ -6,7 +6,7 @@ from textwrap import fill
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d import Axes3D  # noqa
 from sklearn.decomposition import PCA
 
 # Python 2/3 compatibility
@@ -31,6 +31,7 @@ def updateDisplayMode():
     else:
         plt.ioff()
 
+
 def pauseOrClose(fig):
     """
     :param fig: (matplotlib figure object)
@@ -41,11 +42,12 @@ def pauseOrClose(fig):
     else:
         plt.close(fig)
 
+
 def plot_representation(states, rewards, name="Learned State Representation",
                         add_colorbar=True, path=None, fit_pca=True):
     """
     :param states: (numpy array)
-    :param reward: (numpy 1D array)
+    :param rewards: (numpy 1D array)
     :param name: (str)
     :param add_colorbar: (bool)
     :param path: (str)
@@ -67,7 +69,6 @@ def plot_representation(states, rewards, name="Learned State Representation",
         plot_2d_representation(states, rewards, name, add_colorbar, path)
     else:
         plot_3d_representation(states, rewards, name, add_colorbar, path)
-
 
 
 def plot_2d_representation(states, rewards, name="Learned State Representation", add_colorbar=True, path=None):
@@ -123,9 +124,10 @@ def plot_image(image, name='Observation Sample'):
     """
     Display an image
     :param image: (numpy tensor) (with values in [0, 1])
+    :param name: (str)
     """
     # Reorder channels
-    if image.shape[0] == 3 and len(x.shape) == 3:
+    if image.shape[0] == 3 and len(image.shape) == 3:
         # (n_channels, height, width) -> (width, height, n_channels)
         image = np.transpose(image, (2, 1, 0))
     updateDisplayMode()

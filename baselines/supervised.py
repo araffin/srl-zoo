@@ -17,6 +17,7 @@ from plotting.representation_plot import plot_representation, plt
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import INPUT_DIM
 from utils import parseDataFolder, createFolder
+
 # Python 2/3 compatibility
 try:
     input = raw_input
@@ -56,7 +57,6 @@ class SupervisedLearning(BaseLearner):
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.log_folder = log_folder
-
 
     def learn(self, true_states, images_path, rewards):
         """
@@ -166,7 +166,6 @@ if __name__ == '__main__':
     args.data_folder = parseDataFolder(args.data_folder)
     log_folder = "logs/{}/baselines/supervised".format(args.data_folder)
     createFolder(log_folder, "supervised folder already exist")
-
 
     folder_path = '{}/NearestNeighbors/'.format(log_folder)
     createFolder(folder_path, "NearestNeighbors folder already exist")

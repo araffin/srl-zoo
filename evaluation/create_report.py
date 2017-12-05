@@ -6,6 +6,7 @@ import os
 
 import pandas as pd
 
+
 def getKnnMse(path):
     """
     Retrieve knn mse score
@@ -18,6 +19,7 @@ def getKnnMse(path):
     except IOError:
         print("knn_mse.json not found for {}".format(path))
         return -1
+
 
 parser = argparse.ArgumentParser(description='Create a report file for a given dataset')
 parser.add_argument('-d', '--data_log_folder', type=str, default="", required=True, help='Path to a dataset log folder')
@@ -59,7 +61,6 @@ for baseline in ['autoencoder', 'supervised']:
 
     knn_mse.append(getKnnMse('{}/baselines/{}/knn_mse.json'.format(dataset_logfolder, baseline)))
     experiments.append(baseline)
-
 
 exp_configs.update({'experiments': experiments, 'knn_mse': knn_mse})
 

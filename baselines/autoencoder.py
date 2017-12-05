@@ -209,7 +209,6 @@ if __name__ == '__main__':
     with open('{}/exp_config.json'.format(log_folder), 'wb') as f:
         json.dump({"data_folder": args.data_folder, "state_dim": args.state_dim}, f)
 
-
     print('Learning a state representation ... ')
     srl = AutoEncoderLearning(args.state_dim, model_type=args.model_type, seed=args.seed,
                               log_folder=log_folder, learning_rate=args.learning_rate,

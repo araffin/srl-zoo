@@ -73,6 +73,7 @@ def samePoint(pos, ref_pos, threshold):
     to the reference
     :param pos: (numpy array)
     :param ref_pos: (numpy array)
+    :param threshold: (float)
     :return: (bool)
     """
     return np.linalg.norm(ref_pos - pos, 2) <= threshold

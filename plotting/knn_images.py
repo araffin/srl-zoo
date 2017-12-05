@@ -1,10 +1,8 @@
 from __future__ import print_function, division, absolute_import
 
 import argparse
-import random
 import json
-import os
-import re
+import random
 
 import matplotlib.pyplot as plt
 import numpy as np

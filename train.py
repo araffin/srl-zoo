@@ -179,7 +179,7 @@ class SRL4robotics(BaseLearner):
                 return np.where(is_ref_point_list[minibatch] * is_ref_point_list[minibatch[index]])[0]
 
             # Over-sample to make sure that there is at least two reference observations per minibatch
-            ref_point_indices = np.where(is_ref_point_list == True)[0]
+            ref_point_indices = np.where(is_ref_point_list)[0]
             print("{} reference observations".format(len(ref_point_indices)))
             assert len(ref_point_indices) >= 2, "Not enough reference observations for the reference prior"
 
@@ -208,7 +208,6 @@ class SRL4robotics(BaseLearner):
                         ref_point_pairs)
                     print(msg)
                     sys.exit(NO_PAIRS_ERROR)
-
 
         def find_same_actions(index, minibatch):
             """

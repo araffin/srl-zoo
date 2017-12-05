@@ -40,8 +40,9 @@ def createInteractivePlot(fig, ax, states, rewards, images_path):
     callback = ImageFinder(states, rewards, image_plot, ax, images_path)
     fig.canvas.mpl_connect('button_release_event', callback)
 
+
 def plot_2d_representation(states, rewards, images_path, name="Learned State Representation",
-                            add_colorbar=True):
+                           add_colorbar=True):
     plt.ion()
     fig = plt.figure(name)
     plt.clf()
@@ -56,7 +57,6 @@ def plot_2d_representation(states, rewards, images_path, name="Learned State Rep
 
     createInteractivePlot(fig, ax, states, rewards, images_path)
     plt.show()
-
 
 
 def plot_3d_representation(states, rewards, images_path, name="Learned State Representation",
@@ -83,7 +83,8 @@ def plot_representation(states, rewards, images_path, name="Learned State Repres
                         add_colorbar=True, fit_pca=True):
     """
     :param states: (numpy array)
-    :param reward: (numpy 1D array)
+    :param rewards: (numpy 1D array)
+    :param images_path: (str)
     :param name: (str)
     :param add_colorbar: (bool)
     :param fit_pca: (bool)
@@ -105,12 +106,14 @@ def plot_representation(states, rewards, images_path, name="Learned State Repres
     else:
         plot_3d_representation(states, rewards, images_path, name, add_colorbar)
 
+
 class ImageFinder(object):
     """
     Callback for matplotlib to display an annotation when points are
     clicked on.  The point which is closest to the click and within
     xtol and ytol is identified.
     """
+
     def __init__(self, states, rewards, image_plot, ax, images_path):
 
         self.image_plot = image_plot
@@ -148,7 +151,6 @@ class ImageFinder(object):
             path = self.images_path[state_idx]
             # Load the image that corresponds to the clicked point in the space
             self.image_plot.set_data(loadImage(path))
-
 
 
 if __name__ == '__main__':

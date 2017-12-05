@@ -38,7 +38,6 @@ def imageWorker(image_queue, output_queue, exit_event):
         del im  # Free memory
 
 
-# TODO: autoreset ?
 class BaxterImageLoader(object):
     """
     Data loader for baxter images.

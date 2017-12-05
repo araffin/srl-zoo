@@ -15,7 +15,7 @@ from collections import OrderedDict
 from pprint import pprint
 
 from utils import printRed, printGreen, printBlue, parseDataFolder, \
-                  printYellow, priorsToString, createFolder
+    printYellow, priorsToString, createFolder
 
 # Fix for matplotlib non-zero return
 # Apparently due to segmentation fault
@@ -42,8 +42,8 @@ def getLogFolderName(exp_config):
 
     if exp_config['use_continuous']:
         raise NotImplementedError("Continous actions not supported yet")
-        continuous_str = "_cont_MCD{}_S{}".format(MAX_COS_DIST_AMONG_ACTIONS_THRESHOLD, CONTINUOUS_ACTION_SIGMA)
-        continuous_str = continuous_str.replace(".", "_")  # replace decimal points by '_' for folder naming
+        # continuous_str = "_cont_MCD{}_S{}".format(MAX_COS_DIST_AMONG_ACTIONS_THRESHOLD, CONTINUOUS_ACTION_SIGMA)
+        # continuous_str = continuous_str.replace(".", "_")  # replace decimal points by '_' for folder naming
     else:
         continuous_str = ""
 
@@ -150,6 +150,7 @@ def saveConfig(exp_config, print_config=False):
     with open("{}/exp_config.json".format(exp_config['log_folder']), "wb") as f:
         json.dump(exp_config, f)
     print("Saved config to log folder: {}".format(exp_config['log_folder']))
+
 
 if __name__ == '__main__':
 
