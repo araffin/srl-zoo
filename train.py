@@ -12,6 +12,7 @@ from __future__ import print_function, division, absolute_import
 import argparse
 import time
 import sys
+from collections import defaultdict
 
 import numpy as np
 import torch as th
@@ -22,6 +23,7 @@ import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
 from models.models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN
 from plotting.representation_plot import plot_representation, plt
+from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import BaxterImageLoader
 from preprocessing.preprocess import INPUT_DIM
 from utils import parseDataFolder
@@ -48,15 +50,17 @@ class RoboticPriorsLoss(nn.Module):
     """
     :param model: (PyTorch model)
     :param l1_reg: (float) l1 regularization coeff
+    :param loss_history: (dict) will be modified
     """
 
-    def __init__(self, model, l1_reg=0.0):
+    def __init__(self, model, l1_reg=0.0, loss_history=None):
         super(RoboticPriorsLoss, self).__init__()
         # Retrieve only trainable and regularizable parameters (we should exclude biases)
         self.reg_params = [param for name, param in model.named_parameters() if
                            ".bias" not in name and param.requires_grad]
         n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
         self.l1_coeff = (l1_reg / n_params)
+        self.loss_history = loss_history
 
     def forward(self, states, next_states,
                 dissimilar_pairs, same_actions_pairs, ref_point_pairs=None):
@@ -96,9 +100,22 @@ class RoboticPriorsLoss(nn.Module):
 
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
-        loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss \
+        total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss \
                + 5 * repeatability_loss + 1 * fixed_ref_point_loss + self.l1_coeff * l1_loss
-        return loss
+
+        if self.loss_history is not None:
+            weights = [1, 1, 1, 5, 5, 1, self.l1_coeff]
+            names = ['total_loss','temp_coherence_loss', 'causality_loss', 'proportionality_loss',
+                        'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss']
+            losses = [total_loss,temp_coherence_loss, causality_loss, proportionality_loss,
+                        repeatability_loss, fixed_ref_point_loss, l1_loss]
+            for name, w, loss  in zip(names, weights, losses):
+                if len(self.loss_history[name]) > 0:
+                    self.loss_history[name][-1] += w * loss.data[0]
+                else:
+                    self.loss_history[name].append(w * loss.data[0])
+
+        return total_loss
 
 
 class SRL4robotics(BaseLearner):
@@ -233,7 +250,7 @@ class SRL4robotics(BaseLearner):
             because they lead to different rewards aften the same actions
             :param index: (int)
             :param minibatch: (numpy array)
-            :return: (numpy array)
+            :return: (dict, numpy array)
             """
             return np.where((actions[minibatch] == actions[minibatch[index]]) *
                             (rewards[minibatch + 1] != rewards[minibatch[index] + 1]))[0]
@@ -254,7 +271,8 @@ class SRL4robotics(BaseLearner):
                                                cache_capacity=5000)
 
         # TRAINING -----------------------------------------------------------------------------------------------------
-        criterion = RoboticPriorsLoss(self.model, self.l1_reg)
+        loss_history = defaultdict(list)
+        criterion = RoboticPriorsLoss(self.model, self.l1_reg, loss_history)
         best_error = np.inf
         best_model_path = "{}/srl_model.pth".format(self.log_folder)
         self.model.train()
@@ -286,6 +304,14 @@ class SRL4robotics(BaseLearner):
 
             train_loss = epoch_loss / epoch_batches
 
+            # Even if loss_history is modified by RoboticPriorsLoss object
+            # we make it explicit
+            loss_history = criterion.loss_history
+            for key in loss_history.keys():
+                loss_history[key][-1] /= epoch_batches
+                if epoch + 1 < N_EPOCHS:
+                    loss_history[key].append(0)
+
             # Save best model
             # TODO: use a validation set
             if train_loss < best_error:
@@ -313,7 +339,7 @@ class SRL4robotics(BaseLearner):
 
         print("Predicting states for all the observations...")
         # return predicted states for training observations
-        return self.predStatesWithDataLoader(baxter_data_loader, restore_train=False)
+        return loss_history, self.predStatesWithDataLoader(baxter_data_loader, restore_train=False)
 
 
 if __name__ == '__main__':
@@ -363,8 +389,12 @@ if __name__ == '__main__':
         print('Applying 5th fixed ref_point prior...')
         is_ref_point_list = training_data['is_ref_point_list']
 
-    learned_states = srl.learn(ground_truth['images_path'], actions,
-                               rewards, episode_starts, is_ref_point_list)
+    loss_history, learned_states = srl.learn(ground_truth['images_path'], actions,
+                                             rewards, episode_starts, is_ref_point_list)
+    # Save losses losses history
+    np.savez('{}/loss_history.npz'.format(args.log_folder), **loss_history)
+    # Save plot
+    plotLosses(loss_history, args.log_folder)
 
     srl.saveStates(learned_states, ground_truth['images_path'], rewards, args.log_folder)
 
