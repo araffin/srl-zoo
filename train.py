@@ -140,8 +140,8 @@ class SRL4robotics(BaseLearner):
         :param rewards: (numpy 1D array)
         :param episode_starts: (numpy 1D array) boolean array
                                 the ith index is True if one episode starts at this frame
-        :param is_ref_point_list: (numpy 1D array) Boolean array where True values represent states
-                                that corresponds to the reference position
+        :param is_ref_point_list: (numpy 1D array) Boolean array where True values represent observations
+                                that correspond to the reference position
                                 (when using the reference prior)
         :return: (numpy tensor) the learned states for the given observations
         """
@@ -193,7 +193,8 @@ class SRL4robotics(BaseLearner):
                     samples = np.random.choice(ref_point_indices, n_to_sample, replace=False)
                     for i, sample in enumerate(samples):
                         minibatch[i] = sample
-            if n_over_sampling:
+
+            if n_over_sampling > 0:
                 print("[WARNING] Over-sampling for ref prior was applied {} times".format(n_over_sampling))
 
             ref_point_pairs = [np.array([[i, j] for i in range(self.batch_size)
