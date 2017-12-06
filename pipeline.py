@@ -90,9 +90,12 @@ def stateRepresentationLearningCall(exp_config):
     if "Reference" not in exp_config["priors"]:
         args.extend(['--no_ref_prior'])
 
+    if 'limit' not in exp_config.keys():
+        exp_config['limit'] = -1
+
     for arg in ['learning_rate', 'l1_reg', 'batch_size',
                 'state_dim', 'epochs', 'seed', 'model_type',
-                'log_folder', 'data_folder']:
+                'log_folder', 'data_folder', 'limit']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
     ok = subprocess.call(['python', 'train.py'] + args)

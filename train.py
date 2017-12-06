@@ -353,6 +353,7 @@ if __name__ == '__main__':
                         help='random seed (default: 1)')
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('-bs', '--batch_size', type=int, default=256, help='batch_size (default: 256)')
+    parser.add_argument('--limit', type=int, default=-1, help='Limit number of observations (default: -1)')
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1_reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
@@ -381,6 +382,7 @@ if __name__ == '__main__':
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
 
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
+    images_path = ground_truth['images_path']
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
@@ -392,14 +394,23 @@ if __name__ == '__main__':
         print('Applying 5th fixed ref_point prior...')
         is_ref_point_list = training_data['is_ref_point_list']
 
-    loss_history, learned_states = srl.learn(ground_truth['images_path'], actions,
+    if args.limit > 0:
+        limit = args.limit
+        actions = actions[:limit]
+        images_path = images_path[:limit]
+        rewards = rewards[:limit]
+        episode_starts = episode_starts[:limit]
+        if is_ref_point_list is not None:
+            is_ref_point_list = is_ref_point_list[:limit]
+
+    loss_history, learned_states = srl.learn(images_path, actions,
                                              rewards, episode_starts, is_ref_point_list)
     # Save losses losses history
     np.savez('{}/loss_history.npz'.format(args.log_folder), **loss_history)
     # Save plot
     plotLosses(loss_history, args.log_folder)
 
-    srl.saveStates(learned_states, ground_truth['images_path'], rewards, args.log_folder)
+    srl.saveStates(learned_states, images_path, rewards, args.log_folder)
 
     name = "Learned State Representation\n {}".format(args.log_folder.split('/')[-1])
     path = "{}/learned_states.png".format(args.log_folder)

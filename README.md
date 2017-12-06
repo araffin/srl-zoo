@@ -77,7 +77,7 @@ python -m preprocessing.preprocess --data_folder staticButtonSimplest
 Usage:
 ```
 python train.py [--epochs N] [--seed S] [--state_dim STATE_DIM]
-                [-bs BATCH_SIZE] [-lr LEARNING_RATE] [--l1_reg L1_REG]
+                [-bs BATCH_SIZE] [--limit LIMIT] [-lr LEARNING_RATE] [--l1_reg L1_REG]
                 [--no-cuda] [--no-plots] [--model_type MODEL_TYPE]
                 [--data_folder DATA_FOLDER]
                 [--log_folder LOG_FOLDER]
@@ -88,6 +88,7 @@ python train.py [--epochs N] [--seed S] [--state_dim STATE_DIM]
                       state dimension (default: 2)
 -bs BATCH_SIZE, --batch_size BATCH_SIZE
                       batch_size (default: 256)
+--limit LIMIT         Limit number of observations (default: -1)
 -lr LEARNING_RATE, --learning_rate LEARNING_RATE
                       learning rate (default: 0.005)
 --l1_reg L1_REG       L1 regularization coeff (default: 0.0)
