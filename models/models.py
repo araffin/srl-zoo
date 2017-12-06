@@ -18,7 +18,7 @@ class SRLConvolutionalNetwork(nn.Module):
     :param noise_std: (float)  To avoid NaN (states must be different)
     """
 
-    def __init__(self, state_dim=2, batch_size=256, cuda=False, noise_std=1e-6):
+    def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
         super(SRLConvolutionalNetwork, self).__init__()
         self.resnet = models.resnet18(pretrained=True)
         # TODO: add squeezeNet support

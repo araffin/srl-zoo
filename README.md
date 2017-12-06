@@ -189,10 +189,29 @@ python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3 
 Recommended configuration: Ubuntu 16.04 with python 2.7 or 3.6
 (should work with python3 though it was only thoroughly tested with python2)
 
+#### Recommended Method: Use saved conda environment
+
+Create the new environment `srl` from `environment.yml` file:
+```
+conda env create -f environment.yml
+```
+
+Then activate it using:
+```
+source activate srl
+```
+
+Alternatively, you can use requirements.txt file:
+```
+pip install -r requirements.txt
+```
+In that case, you will need to install OpenCV too (cf below).
+
+#### Dependencies details
 
 - OpenCV (version >= 2.4)
 ```
-conda install -c menpo opencv3
+conda install -c menpo opencv
 ```
 or
 ```
@@ -203,6 +222,7 @@ sudo apt-get install python-opencv (opencv 2.4 - python2)
 - PyTorchVision
 - Numpy
 - Scikit-learn
+- Pandas
 
 For plotting:
 - matplotlib

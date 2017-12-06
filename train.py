@@ -103,15 +103,15 @@ class RoboticPriorsLoss(nn.Module):
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
         total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss \
-               + 5 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss
+                     + 5 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss
 
         if self.loss_history is not None:
             weights = [1, 1, 1, 5, 5, w_fixed_point, self.l1_coeff]
-            names = ['total_loss','temp_coherence_loss', 'causality_loss', 'proportionality_loss',
-                        'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss']
-            losses = [total_loss,temp_coherence_loss, causality_loss, proportionality_loss,
-                        repeatability_loss, fixed_ref_point_loss, l1_loss]
-            for name, w, loss  in zip(names, weights, losses):
+            names = ['total_loss', 'temp_coherence_loss', 'causality_loss', 'proportionality_loss',
+                     'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss']
+            losses = [total_loss, temp_coherence_loss, causality_loss, proportionality_loss,
+                      repeatability_loss, fixed_ref_point_loss, l1_loss]
+            for name, w, loss in zip(names, weights, losses):
                 if w > 0:
                     if len(self.loss_history[name]) > 0:
                         self.loss_history[name][-1] += w * loss.data[0]
@@ -137,7 +137,7 @@ class SRL4robotics(BaseLearner):
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
         if model_type == "resnet":
-            self.model = SRLConvolutionalNetwork(self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
+            self.model = SRLConvolutionalNetwork(self.state_dim, cuda, noise_std=NOISE_STD)
         elif model_type == "custom_cnn":
             self.model = SRLCustomCNN(self.state_dim, cuda, noise_std=NOISE_STD)
         elif model_type == "mlp":
