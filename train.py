@@ -85,6 +85,7 @@ class RoboticPriorsLoss(nn.Module):
             similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
             (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
 
+        w_fixed_point = 0
         if len(ref_point_pairs) > 0:
             # Apply reference point prior
             # It assumes all sequences in the dataset share
@@ -94,6 +95,7 @@ class RoboticPriorsLoss(nn.Module):
 
             same_pos_states_diff = states_same_ref_pos_t1 - states_same_ref_pos_t2
             same_pos_states_diff_norm = same_pos_states_diff.norm(2, dim=1)
+            w_fixed_point = 1
             fixed_ref_point_loss = (same_pos_states_diff_norm ** 2).mean()
         else:
             fixed_ref_point_loss = 0
@@ -101,19 +103,20 @@ class RoboticPriorsLoss(nn.Module):
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
         total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss \
-               + 5 * repeatability_loss + 1 * fixed_ref_point_loss + self.l1_coeff * l1_loss
+               + 5 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss
 
         if self.loss_history is not None:
-            weights = [1, 1, 1, 5, 5, 1, self.l1_coeff]
+            weights = [1, 1, 1, 5, 5, w_fixed_point, self.l1_coeff]
             names = ['total_loss','temp_coherence_loss', 'causality_loss', 'proportionality_loss',
                         'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss']
             losses = [total_loss,temp_coherence_loss, causality_loss, proportionality_loss,
                         repeatability_loss, fixed_ref_point_loss, l1_loss]
             for name, w, loss  in zip(names, weights, losses):
-                if len(self.loss_history[name]) > 0:
-                    self.loss_history[name][-1] += w * loss.data[0]
-                else:
-                    self.loss_history[name].append(w * loss.data[0])
+                if w > 0:
+                    if len(self.loss_history[name]) > 0:
+                        self.loss_history[name][-1] += w * loss.data[0]
+                    else:
+                        self.loss_history[name].append(w * loss.data[0])
 
         return total_loss
 
