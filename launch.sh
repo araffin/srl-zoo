@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Params
-data_folder=colorful75
+data_folder=movingButton_staticDelta_staticRightArm
 knn_seed=1
 n_neighbors=5
-knn_samples=5
+knn_samples=15
 
 # State Representation Learning with Priors (grid search)
 python pipeline.py --data_folder data/$data_folder --base_config configs/default.json

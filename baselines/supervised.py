@@ -44,6 +44,7 @@ class SupervisedLearning(BaseLearner):
 
         super(SupervisedLearning, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
+        # TODO: add custom CNN
         if model_type == "resnet":
             self.model = ConvolutionalNetwork(self.state_dim, cuda)
         elif model_type == "mlp":
