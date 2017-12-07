@@ -1,8 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
-import json
-import time
 import argparse
+import time
 
 import numpy as np
 import torch as th
@@ -12,7 +11,8 @@ from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
-from models.models import ConvolutionalNetwork, DenseNetwork
+from models.models import ConvolutionalNetwork, DenseNetwork, CustomCNN
+from pipeline import saveConfig
 from plotting.representation_plot import plot_representation, plt
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import INPUT_DIM
@@ -44,9 +44,10 @@ class SupervisedLearning(BaseLearner):
 
         super(SupervisedLearning, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
-        # TODO: add custom CNN
         if model_type == "resnet":
             self.model = ConvolutionalNetwork(self.state_dim, cuda)
+        elif model_type == "custom_cnn":
+            self.model = CustomCNN(self.state_dim)
         elif model_type == "mlp":
             self.model = DenseNetwork(INPUT_DIM, self.state_dim)
         else:
@@ -145,6 +146,36 @@ class SupervisedLearning(BaseLearner):
         return self.predStatesWithDataLoader(data_loader)
 
 
+def getModelName(args):
+    """
+    :param args: (parsed args object)
+    :return: (str)
+    """
+    name = "supervised_{}_SEED{}".format(args.model_type, args.seed)
+    name += "_EPOCHS{}_BS{}".format(args.epochs, args.batch_size)
+    return name
+
+
+def saveExpConfig(args, log_folder):
+    """
+    :param args: (parsed args object)
+    :param log_folder: (str)
+    """
+    exp_config = {
+        "batch_size": args.batch_size,
+        "data_folder": args.data_folder,
+        "epochs": args.epochs,
+        "learning_rate": args.learning_rate,
+        "limit": args.limit,
+        "log_folder": log_folder,
+        "model_type": args.model_type,
+        "seed": args.seed,
+        "state_dim": args.state_dim,
+    }
+
+    saveConfig(exp_config, print_config=True)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Supervised Learning')
     parser.add_argument('--epochs', type=int, default=50, metavar='N',
@@ -157,6 +188,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model_type', type=str, default="resnet", help='Model architecture (default: "resnet")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
+    parser.add_argument('--limit', type=int, default=-1, help='Limit number of observations (default: -1)')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -165,7 +197,8 @@ if __name__ == '__main__':
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     args.data_folder = parseDataFolder(args.data_folder)
-    log_folder = "logs/{}/baselines/supervised".format(args.data_folder)
+    name = getModelName(args)
+    log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
     createFolder(log_folder, "supervised folder already exist")
 
     folder_path = '{}/NearestNeighbors/'.format(log_folder)
@@ -178,18 +211,26 @@ if __name__ == '__main__':
 
     # TODO: normalize true states
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
-    state_dim = ground_truth['arm_states'].shape[1]
+    true_states = ground_truth['arm_states']
+    images_path = ground_truth['images_path']
+    state_dim = true_states.shape[1]
 
-    # Create partial exp_config for KNN plots
-    with open('{}/exp_config.json'.format(log_folder), 'wb') as f:
-        json.dump({"data_folder": args.data_folder, "state_dim": state_dim}, f)
+    if args.limit > 0:
+        limit = args.limit
+        true_states = true_states[:limit]
+        images_path = images_path[:limit]
+        rewards = rewards[:limit]
+
+    args.state_dim = state_dim
+    saveExpConfig(args, log_folder)
 
     print('Learning a state representation ... ')
     srl = SupervisedLearning(state_dim, model_type=args.model_type, seed=args.seed,
                              log_folder=log_folder, learning_rate=args.learning_rate,
                              cuda=args.cuda)
-    learned_states = srl.learn(ground_truth['arm_states'], ground_truth['images_path'], rewards)
-    srl.saveStates(learned_states, ground_truth['images_path'], rewards, log_folder)
+
+    learned_states = srl.learn(true_states, images_path, rewards)
+    srl.saveStates(learned_states, images_path, rewards, log_folder)
 
     name = "Learned State Representation - {} \n Supervised Learning".format(args.data_folder)
     path = "{}/learned_states.png".format(log_folder)

@@ -117,6 +117,31 @@ def stateRepresentationLearningCall(exp_config):
             return False
 
 
+def baselineCall(exp_config, baseline="supervised"):
+    """
+    :param exp_config: (dict)
+    :param baseline: (str) one of "supervised" or "autoencoder"
+    """
+    printGreen("\n Baseline {}...".format(baseline))
+
+    args = ['--no-plots']
+    config_args = ['epochs', 'seed', 'model_type',
+                   'data_folder', 'limit']
+
+    if baseline == "autoencoder":
+        config_args += ['state_dim']
+
+    for arg in config_args:
+        args.extend(['--{}'.format(arg), str(exp_config[arg])])
+
+    ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
+    if ok != 0:
+        printRed("An error occured, error code: {}".format(ok))
+        pprint(exp_config)
+        raise RuntimeError("Error during baselineCall (config file above)")
+    print("End of training.\n")
+
+
 def knnCall(exp_config):
     """
     Evaluate the representation using knn
@@ -155,17 +180,82 @@ def saveConfig(exp_config, print_config=False):
     print("Saved config to log folder: {}".format(exp_config['log_folder']))
 
 
+def getBaseExpConfig(args):
+    """
+    :param args: (parsed args object)
+    :return: (str)
+    """
+    if not os.path.isfile(args.base_config):
+        printRed("You must specify a valid --base_config json file")
+        sys.exit(1)
+
+    args.data_folder = parseDataFolder(args.data_folder)
+    dataset_path = "data/{}".format(args.data_folder)
+
+    assert os.path.isdir(dataset_path), "Path to dataset folder is not valid: {}".format(dataset_path)
+    with open(args.base_config, 'rb') as f:
+        exp_config = json.load(f)
+    exp_config['data_folder'] = args.data_folder
+    return exp_config
+
+
+def evaluateBaseline(base_config):
+    """
+    Retrieve baseline exp_config by reading last
+    folder created in baselines directory and
+    evaluate the learned representation
+    :param base_config: (dict)
+    :return: (dict)
+    """
+    log_folder = "logs/{}/baselines/".format(base_config['data_folder'])
+    # Get Latest edited folder
+    path = max([log_folder + d for d in os.listdir(log_folder)], key=os.path.getmtime)
+    with open("{}/exp_config.json".format(path), "rb") as f:
+        exp_config = json.load(f)
+    # Update base config params (Retrieve log folder)
+    base_config.update(exp_config)
+    knnCall(base_config)
+    return base_config
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Pipeline script for state representation learning')
     parser.add_argument('-c', '--exp_config', type=str, default="", help='Path to an experiment config file')
     parser.add_argument('--data_folder', type=str, default="", help='Path to a dataset folder')
+    parser.add_argument('--baselines', action='store_true', default=False, help='Run grid search for baselines')
     parser.add_argument('--base_config', type=str, default="configs/default.json",
                         help='Path to overall config file, it contains variables independent from datasets (default: '
                              '/configs/default.json)')
     args = parser.parse_args()
 
-    if args.exp_config != "":
+    if args.baselines and args.data_folder != "":
+        exp_config = getBaseExpConfig(args)
+        # WARNING: batch_size and learning_rate in the base config
+        # are NOT currently taken into account for baselines
+        base_config = exp_config.copy()
+        createFolder("logs/{}/baselines".format(exp_config['data_folder']), "Baseline folder already exist")
+        # Preprocessing if needed
+        preprocessingCall(exp_config)
+
+        # Grid search
+        for seed in [1]:
+            exp_config['seed'] = seed
+            # Supervised Learning
+            for model_type in ['resnet', 'custom_cnn']:
+                exp_config['model_type'] = model_type
+                baselineCall(exp_config, 'supervised')
+                base_config = evaluateBaseline(base_config)
+
+            # Autoencoder
+            exp_config['model_type'] = "cnn"
+            for state_dim in [2, 3, 4, 5, 6]:
+                # Update config
+                exp_config['state_dim'] = state_dim
+                baselineCall(exp_config, 'autoencoder')
+                base_config = evaluateBaseline(base_config)
+
+    elif args.exp_config != "":
         with open(args.exp_config, 'rb') as f:
             exp_config = json.load(f)
 
@@ -189,23 +279,12 @@ if __name__ == '__main__':
             knnCall(exp_config)
 
     elif args.data_folder != "":
-        if not os.path.isfile(args.base_config):
-            printRed("You must specify a valid --base_config json file")
-            sys.exit(-1)
+        exp_config = getBaseExpConfig(args)
 
-        args.data_folder = parseDataFolder(args.data_folder)
-        dataset_path = "data/{}".format(args.data_folder)
+        printGreen("\n Grid search on several state_dim on dataset folder: {} \n".format(exp_config['data_folder']))
 
-        assert os.path.isdir(dataset_path), "Path to dataset folder is not valid: {}".format(dataset_path)
-
-        printGreen("\n Grid search on several state_dim on dataset folder: {} \n".format(args.data_folder))
-
-        with open(args.base_config, 'rb') as f:
-            exp_config = json.load(f)
-        exp_config['data_folder'] = args.data_folder
-
-        createFolder("logs/{}".format(args.data_folder), "Dataset log folder already exist")
-        createFolder("logs/{}/baselines".format(args.data_folder), "Baseline folder already exist")
+        createFolder("logs/{}".format(exp_config['data_folder']), "Dataset log folder already exist")
+        createFolder("logs/{}/baselines".format(exp_config['data_folder']), "Baseline folder already exist")
 
         # Preprocessing
         preprocessingCall(exp_config)

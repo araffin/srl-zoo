@@ -1,11 +1,10 @@
 from __future__ import print_function, division, absolute_import
 
-import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 
-from .custom_layers import GaussianNoise, GaussianNoiseVariant
+from .custom_layers import GaussianNoiseVariant
 
 
 class SRLConvolutionalNetwork(nn.Module):
@@ -13,7 +12,6 @@ class SRLConvolutionalNetwork(nn.Module):
     Convolutional Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
     :param state_dim: (int)
-    :param batch_size: (int)
     :param cuda: (bool)
     :param noise_std: (float)  To avoid NaN (states must be different)
     """
@@ -122,17 +120,15 @@ class ConvolutionalNetwork(nn.Module):
         return x
 
 
-class SRLCustomCNN(nn.Module):
+class CustomCNN(nn.Module):
     """
-    Convolutional Neural Network for State Representation Learning
+    Convolutional Neural Network
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
     :param state_dim: (int)
-    :param cuda: (bool)
-    :param noise_std: (float)  To avoid NaN (states must be different)
     """
 
-    def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
-        super(SRLCustomCNN, self).__init__()
+    def __init__(self, state_dim=2):
+        super(CustomCNN, self).__init__()
         # Inspired by ResNet:
         # conv3x3 followed by BatchNorm2d
         self.conv_layers = nn.Sequential(
@@ -154,12 +150,32 @@ class SRLCustomCNN(nn.Module):
         )
 
         self.fc = nn.Linear(6 * 6 * 64, state_dim)
-        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
 
     def forward(self, x):
         x = self.conv_layers(x)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
+        return x
+
+
+class SRLCustomCNN(nn.Module):
+    """
+    Convolutional Neural Network for State Representation Learning
+    input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
+    :param state_dim: (int)
+    :param cuda: (bool)
+    :param noise_std: (float)  To avoid NaN (states must be different)
+    """
+
+    def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
+        super(SRLCustomCNN, self).__init__()
+        self.cnn = CustomCNN(state_dim)
+        if cuda:
+            self.cnn.cuda()
+        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
+
+    def forward(self, x):
+        x = self.cnn(x)
         return self.noise(x)
 
 

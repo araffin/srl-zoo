@@ -49,7 +49,7 @@ for experiment in experiments:
     knn_mse.append(getKnnMse('{}/{}/knn_mse.json'.format(dataset_logfolder, experiment)))
 
 # Baselines
-for baseline in ['autoencoder', 'supervised']:
+for baseline in os.listdir(dataset_logfolder + "/baselines"):
     try:
         with open('{}/baselines/{}/exp_config.json'.format(dataset_logfolder, baseline)) as f:
             exp_config = json.load(f)
