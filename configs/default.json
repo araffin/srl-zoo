@@ -14,7 +14,7 @@
     "Temporal",
     "Causality",
     "Repeatability",
-    "Reference"
+    "SameEnv"
   ],
   "use_continuous": false,
   "_comment": "You can add or remove 'Reference' to the list of priors"

@@ -63,13 +63,15 @@ class RoboticPriorsLoss(nn.Module):
         self.loss_history = loss_history
 
     def forward(self, states, next_states,
-                dissimilar_pairs, same_actions_pairs, ref_point_pairs=None):
+                dissimilar_pairs, same_actions_pairs, ref_point_pairs,
+                similar_pairs):
         """
         :param states: (th Variable)
         :param next_states: (th Variable)
         :param dissimilar_pairs: (th tensor)
         :param same_actions_pairs: (th tensor)
         :param ref_point_pairs: (th tensor)
+        :param similar_pairs: (th tensor)
         :return: (th Variable)
         """
         state_diff = next_states - states
@@ -90,27 +92,34 @@ class RoboticPriorsLoss(nn.Module):
             # Apply reference point prior
             # It assumes all sequences in the dataset share
             # at least one same 3D pos input image of Baxter arm
-            states_same_ref_pos_t1 = states[ref_point_pairs[:, 0]]
-            states_same_ref_pos_t2 = states[ref_point_pairs[:, 1]]
 
-            same_pos_states_diff = states_same_ref_pos_t1 - states_same_ref_pos_t2
+            same_pos_states_diff = states[ref_point_pairs[:, 1]] - states[ref_point_pairs[:, 0]]
             same_pos_states_diff_norm = same_pos_states_diff.norm(2, dim=1)
             w_fixed_point = 1
             fixed_ref_point_loss = (same_pos_states_diff_norm ** 2).mean()
         else:
             fixed_ref_point_loss = 0
 
+        w_same_env = 0
+        # Same Env prior
+        if len(similar_pairs) > 0:
+            w_same_env = 1
+            same_env_loss = ((states[similar_pairs[:, 1]] - states[similar_pairs[:, 0]]).norm(2, dim=1) ** 2).mean()
+        else:
+            same_env_loss = 0
+
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
         total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss \
-                     + 5 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss
+                     + 5 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
+                     + w_same_env * same_env_loss
 
         if self.loss_history is not None:
-            weights = [1, 1, 1, 5, 5, w_fixed_point, self.l1_coeff]
+            weights = [1, 1, 1, 5, 5, w_fixed_point, self.l1_coeff, w_same_env]
             names = ['total_loss', 'temp_coherence_loss', 'causality_loss', 'proportionality_loss',
-                     'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss']
+                     'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss']
             losses = [total_loss, temp_coherence_loss, causality_loss, proportionality_loss,
-                      repeatability_loss, fixed_ref_point_loss, l1_loss]
+                      repeatability_loss, fixed_ref_point_loss, l1_loss, same_env_loss]
             for name, w, loss in zip(names, weights, losses):
                 if w > 0:
                     if len(self.loss_history[name]) > 0:
@@ -232,7 +241,7 @@ class SRL4robotics(BaseLearner):
                     print(msg)
                     sys.exit(NO_PAIRS_ERROR)
 
-        def find_same_actions(index, minibatch):
+        def findSameActions(index, minibatch):
             """
             Get observations indices where the same action was performed
             as in a reference observation
@@ -244,13 +253,13 @@ class SRL4robotics(BaseLearner):
 
         # same_actions: list of arrays, each containing one pair of observation ids
         same_actions = [
-            np.array([[i, j] for i in range(self.batch_size) for j in find_same_actions(i, minibatch) if j > i],
+            np.array([[i, j] for i in range(self.batch_size) for j in findSameActions(i, minibatch) if j > i],
                      dtype='int64') for minibatch in minibatchlist]
 
-        def find_dissimilar(index, minibatch):
+        def findDissimilar(index, minibatch):
             """
             check which samples should be dissimilar
-            because they lead to different rewards aften the same actions
+            because they lead to different rewards after the same actions
             :param index: (int)
             :param minibatch: (numpy array)
             :return: (dict, numpy array)
@@ -258,12 +267,27 @@ class SRL4robotics(BaseLearner):
             return np.where((actions[minibatch] == actions[minibatch[index]]) *
                             (rewards[minibatch + 1] != rewards[minibatch[index] + 1]))[0]
 
-        dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in find_dissimilar(i, minibatch) if j > i],
+        dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch) if j > i],
                                dtype='int64') for minibatch in minibatchlist]
 
-        for item in same_actions + dissimilar:
+        def findSimilar(index, minibatch):
+            """
+            check which samples should be similar
+            because they lead to same positive rewards after the same actions
+            :param index: (int)
+            :param minibatch: (numpy array)
+            :return: (dict, numpy array)
+            """
+            positive_r = rewards[minibatch[index] + 1] > 0
+            return np.where(positive_r * (actions[minibatch] == actions[minibatch[index]]) *
+                            (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
+
+        similar_pairs = [np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch) if j > i],
+                                  dtype='int64') for minibatch in minibatchlist]
+
+        for item in same_actions + dissimilar + similar_pairs:
             if len(item) == 0:
-                msg = "No similar or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
+                msg = "No same actions, similar or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
                     BATCH_SIZE)
                 msg += "=> Consider increasing the batch_size or changing the seed"
                 print(msg)
@@ -271,7 +295,7 @@ class SRL4robotics(BaseLearner):
 
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
                                                same_actions, dissimilar, ref_point_pairs,
-                                               cache_capacity=5000)
+                                               similar_pairs, cache_capacity=5000)
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
@@ -286,18 +310,23 @@ class SRL4robotics(BaseLearner):
             epoch_loss, epoch_batches = 0, 0
             pbar = tqdm(total=len(minibatchlist))
             baxter_data_loader.resetAndShuffle()
-            for obs, next_obs, same, diss, is_ref_point_list in baxter_data_loader:
+            for _input in baxter_data_loader:
+                # Unpack input
+                obs, next_obs, same, diss, is_ref_point_list, sim_pairs = _input
                 if self.cuda:
                     obs, next_obs = obs.cuda(), next_obs.cuda()
-                    same, diss = same.cuda(), diss.cuda()  #
+                    same, diss = same.cuda(), diss.cuda()
                     if len(is_ref_point_list) > 0:
                         is_ref_point_list = is_ref_point_list.cuda()
+                    if len(sim_pairs) > 0:
+                        sim_pairs = sim_pairs.cuda()
 
                 # Predict states given observations
                 states, next_states = self.model(obs), self.model(next_obs)
 
                 self.optimizer.zero_grad()
-                loss = criterion(states, next_states, diss, same, is_ref_point_list)
+                loss = criterion(states, next_states, diss, same,
+                                 is_ref_point_list, sim_pairs)
                 loss.backward()
                 self.optimizer.step()
                 epoch_loss += loss.data[0]
