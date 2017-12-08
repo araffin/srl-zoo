@@ -48,6 +48,7 @@ class BaxterImageLoader(object):
     :param same_actions: [numpy matrix]
     :param dissimilar: [numpy matrix]
     :param ref_point_pairs: [numpy matrix]
+    :param similar_pairs: [numpy matrix]
     :param test_batch_size: (int)
     :param cache_capacity: (int) number of images that can be cached
     :param n_workers: (int) number of processes used for preprocessing
@@ -57,7 +58,7 @@ class BaxterImageLoader(object):
     """
 
     def __init__(self, minibatchlist, images_path, same_actions,
-                 dissimilar, similar_pairs=None, ref_point_pairs=None,
+                 dissimilar, ref_point_pairs=None, similar_pairs=None,
                  test_batch_size=512, cache_capacity=5000,
                  n_workers=5, auto_cleanup=True):
         super(BaxterImageLoader, self).__init__()

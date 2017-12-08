@@ -87,7 +87,8 @@ class RoboticPriorsLoss(nn.Module):
             similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
             (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
 
-        w_fixed_point = 0
+        w_fixed_point, fixed_ref_point_loss = 0, 0
+        w_same_env, same_env_loss = 0, 0
         if len(ref_point_pairs) > 0:
             # Apply reference point prior
             # It assumes all sequences in the dataset share
@@ -97,16 +98,10 @@ class RoboticPriorsLoss(nn.Module):
             same_pos_states_diff_norm = same_pos_states_diff.norm(2, dim=1)
             w_fixed_point = 1
             fixed_ref_point_loss = (same_pos_states_diff_norm ** 2).mean()
-        else:
-            fixed_ref_point_loss = 0
-
-        w_same_env = 0
-        # Same Env prior
-        if len(similar_pairs) > 0:
+        elif len(similar_pairs) > 0:
+            # Same Env prior
             w_same_env = 1
             same_env_loss = ((states[similar_pairs[:, 1]] - states[similar_pairs[:, 0]]).norm(2, dim=1) ** 2).mean()
-        else:
-            same_env_loss = 0
 
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
