@@ -158,7 +158,8 @@ class SRL4robotics(BaseLearner):
         self.log_folder = log_folder
 
     def learn(self, images_path, actions, rewards,
-              episode_starts, is_ref_point_list=None):
+              episode_starts, is_ref_point_list=None,
+              apply_same_env_prior=False):
         """
         Learn a state representation
         :param images_path: (numpy 1D array)
@@ -169,6 +170,7 @@ class SRL4robotics(BaseLearner):
         :param is_ref_point_list: (numpy 1D array) Boolean array where True values represent observations
                                 that correspond to the reference position
                                 (when using the reference prior)
+        :param apply_same_env_prior: (bool) whether to apply same env prior
         :return: (numpy tensor) the learned states for the given observations
         """
 
@@ -265,24 +267,33 @@ class SRL4robotics(BaseLearner):
         dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch) if j > i],
                                dtype='int64') for minibatch in minibatchlist]
 
-        def findSimilar(index, minibatch):
-            """
-            check which samples should be similar
-            because they lead to same positive rewards after the same actions
-            :param index: (int)
-            :param minibatch: (numpy array)
-            :return: (dict, numpy array)
-            """
-            positive_r = rewards[minibatch[index] + 1] > 0
-            return np.where(positive_r * (actions[minibatch] == actions[minibatch[index]]) *
-                            (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
+        similar_pairs = []
+        if apply_same_env_prior:
+            print("Applying same env prior")
 
-        similar_pairs = [np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch) if j > i],
-                                  dtype='int64') for minibatch in minibatchlist]
+            def findSimilar(index, minibatch):
+                """
+                check which samples should be similar
+                because they lead to same positive rewards after the same actions
+                :param index: (int)
+                :param minibatch: (numpy array)
+                :return: (dict, numpy array)
+                """
+                positive_r = rewards[minibatch[index] + 1] > 0
+                return np.where(positive_r * (actions[minibatch] == actions[minibatch[index]]) *
+                                (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
 
-        for item in same_actions + dissimilar + similar_pairs:
+            similar_pairs = [np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch) if j > i],
+                                      dtype='int64') for minibatch in minibatchlist]
+
+            for item in similar_pairs:
+                if len(item) == 0:
+                    print("No pairs found for one minibatch of similar pairs")
+                    sys.exit(NO_PAIRS_ERROR)
+
+        for item in same_actions + dissimilar:
             if len(item) == 0:
-                msg = "No same actions, similar or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
+                msg = "No same actions or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
                     BATCH_SIZE)
                 msg += "=> Consider increasing the batch_size or changing the seed"
                 print(msg)
@@ -388,6 +399,7 @@ if __name__ == '__main__':
                         help='Folder within logs/ where the experiment model and plots will be saved')
     parser.add_argument('--no_ref_prior', action='store_true', default=False,
                         help='Disable Fixed Reference Point Prior')
+    parser.add_argument('--same_env_prior', action='store_true', default=False, help='Enable same env prior (disables ref prior)')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -395,7 +407,7 @@ if __name__ == '__main__':
     DISPLAY_PLOTS = not args.no_plots
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
-    APPLY_5TH_PRIOR = not args.no_ref_prior
+    APPLY_5TH_PRIOR = not (args.no_ref_prior or args.same_env_prior)
     plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
 
     print('Log folder: {}'.format(args.log_folder))
@@ -428,7 +440,8 @@ if __name__ == '__main__':
             is_ref_point_list = is_ref_point_list[:limit]
 
     loss_history, learned_states = srl.learn(images_path, actions,
-                                             rewards, episode_starts, is_ref_point_list)
+                                             rewards, episode_starts,
+                                             is_ref_point_list, args.same_env_prior)
     # Save losses losses history
     np.savez('{}/loss_history.npz'.format(args.log_folder), **loss_history)
     # Save plot

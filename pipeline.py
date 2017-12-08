@@ -90,6 +90,10 @@ def stateRepresentationLearningCall(exp_config):
     if "Reference" not in exp_config["priors"]:
         args.extend(['--no_ref_prior'])
 
+    if "SameEnv" in exp_config["priors"]:
+        args.extend(['--same_env_prior'])
+
+    # TODO: Remove as soon as possible (only here for backward compatibility)
     if 'limit' not in exp_config.keys():
         exp_config['limit'] = -1
 
@@ -153,7 +157,7 @@ def knnCall(exp_config):
 
     printGreen("\nEvaluating the state representation with KNN")
     args = ['--seed', str(exp_config['knn_seed']), '--n_samples', str(exp_config['knn_samples'])]
-    for arg in ['log_folder', 'n_neighbors']:
+    for arg in ['log_folder', 'n_neighbors', 'n_to_plot']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
     ok = subprocess.call(['python', '-m', 'plotting.knn_images'] + args)
@@ -205,17 +209,22 @@ def evaluateBaseline(base_config):
     folder created in baselines directory and
     evaluate the learned representation
     :param base_config: (dict)
-    :return: (dict)
     """
     log_folder = "logs/{}/baselines/".format(base_config['data_folder'])
     # Get Latest edited folder
     path = max([log_folder + d for d in os.listdir(log_folder)], key=os.path.getmtime)
     with open("{}/exp_config.json".format(path), "rb") as f:
         exp_config = json.load(f)
-    # Update base config params (Retrieve log folder)
-    base_config.update(exp_config)
-    knnCall(base_config)
-    return base_config
+
+    # Update exp config params (knn evaluation)
+    for param in ['knn_samples', 'knn_seed', 'n_neighbors', 'n_to_plot']:
+        exp_config[param] = base_config[param]
+
+    # Save knn params
+    with open("{}/exp_config.json".format(path), "wb") as f:
+        json.dump(exp_config, f)
+
+    knnCall(exp_config)
 
 
 if __name__ == '__main__':
@@ -239,13 +248,13 @@ if __name__ == '__main__':
         preprocessingCall(exp_config)
 
         # Grid search
-        for seed in [1]:
+        for seed in [1, 2, 3]:
             exp_config['seed'] = seed
             # Supervised Learning
             for model_type in ['resnet', 'custom_cnn']:
                 exp_config['model_type'] = model_type
                 baselineCall(exp_config, 'supervised')
-                base_config = evaluateBaseline(base_config)
+                evaluateBaseline(base_config)
 
             # Autoencoder
             exp_config['model_type'] = "cnn"
@@ -253,7 +262,7 @@ if __name__ == '__main__':
                 # Update config
                 exp_config['state_dim'] = state_dim
                 baselineCall(exp_config, 'autoencoder')
-                base_config = evaluateBaseline(base_config)
+                evaluateBaseline(base_config)
 
     elif args.exp_config != "":
         with open(args.exp_config, 'rb') as f:
@@ -292,7 +301,7 @@ if __name__ == '__main__':
         # Grid search
         for seed in [1]:
             exp_config['seed'] = seed
-            for state_dim in [1, 2, 3, 4, 5, 6]:
+            for state_dim in [2, 3, 4, 5, 6]:
                 # Update config
                 exp_config['state_dim'] = state_dim
                 log_folder, experiment_name = getLogFolderName(exp_config)
