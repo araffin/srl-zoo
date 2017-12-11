@@ -185,12 +185,29 @@ Example:
 python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3 --noise_factor 0.1
 ```
 
+#### PCA and t-SNE
+NOTE: before applying t-SNE, a dimension reduction with `n_components=50` is applied for computational reasons.
+
+PCA:
+```
+python -m baselines.pca_tsne --data_folder path/to/data/folder --state_dim 3 --method pca
+```
+
+t-SNE:
+```
+python -m baselines.pca_tsne --data_folder path/to/data/folder --state_dim 3 --method tsne
+```
+
 ### Dependencies
 
 Recommended configuration: Ubuntu 16.04 with python 2.7 or 3.6
 (should work with python3 though it was only thoroughly tested with python2)
 
 #### Recommended Method: Use saved conda environment
+
+[WARNING] There is one dependency that cannot be installed with a package manager (for now):
+[https://github.com/DmitryUlyanov/Multicore-TSNE](https://github.com/DmitryUlyanov/Multicore-TSNE)
+You have to clone the repo and run `pip install .`.
 
 Create the new environment `srl` from `environment.yml` file:
 ```
@@ -224,6 +241,7 @@ sudo apt-get install python-opencv (opencv 2.4 - python2)
 - Numpy
 - Scikit-learn
 - Pandas
+- Multicore t-SNE: [https://github.com/DmitryUlyanov/Multicore-TSNE](https://github.com/DmitryUlyanov/Multicore-TSNE)
 
 For plotting:
 - matplotlib

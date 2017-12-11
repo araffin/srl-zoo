@@ -146,6 +146,27 @@ def baselineCall(exp_config, baseline="supervised"):
     print("End of training.\n")
 
 
+def dimReductionCall(exp_config, baseline="pca"):
+    """
+    :param exp_config: (dict)
+    :param baseline: (str) one of "pca" or "tsne"
+    """
+    printGreen("\n Baseline {}...".format(baseline))
+
+    args = ['--no-plots', '--method', baseline]
+    config_args = ['data_folder', 'limit']
+
+    for arg in config_args:
+        args.extend(['--{}'.format(arg), str(exp_config[arg])])
+
+    ok = subprocess.call(['python', '-m', 'baselines.pca_tsne'] + args)
+    if ok != 0:
+        printRed("An error occured, error code: {}".format(ok))
+        pprint(exp_config)
+        raise RuntimeError("Error during dimReductionCall (config file above)")
+    print("End of training.\n")
+
+
 def knnCall(exp_config):
     """
     Evaluate the representation using knn
@@ -247,8 +268,8 @@ if __name__ == '__main__':
         # Preprocessing if needed
         preprocessingCall(exp_config)
 
-        # Grid search
-        for seed in [1, 2, 3]:
+        # Grid search for baselines
+        for seed in [1]:
             exp_config['seed'] = seed
             # Supervised Learning
             for model_type in ['resnet', 'custom_cnn']:
@@ -263,6 +284,20 @@ if __name__ == '__main__':
                 exp_config['state_dim'] = state_dim
                 baselineCall(exp_config, 'autoencoder')
                 evaluateBaseline(base_config)
+
+        # PCA
+        for state_dim in [2, 3, 4, 5, 6]:
+            # Update config
+            exp_config['state_dim'] = state_dim
+            dimReductionCall(exp_config, 'pca')
+            evaluateBaseline(base_config)
+
+        # t-SNE
+        for state_dim in [2, 3]:
+            # Update config
+            exp_config['state_dim'] = state_dim
+            dimReductionCall(exp_config, 'tsne')
+            evaluateBaseline(base_config)
 
     elif args.exp_config != "":
         with open(args.exp_config, 'rb') as f:

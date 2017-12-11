@@ -8,8 +8,9 @@ import seaborn as sns
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D  # noqa
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-
+# from sklearn.manifold import TSNE
+# Faster implementation of t-SNE:
+from MulticoreTSNE import MulticoreTSNE as TSNE
 # Python 2/3 compatibility
 try:
     input = raw_input
@@ -58,7 +59,7 @@ def plot_tsne(states, rewards, name="T-SNE of Learned States", add_colorbar=True
     """
     assert n_components in [2, 3], "You cannot applied t-SNE with n_components={}".format(n_components)
     t_sne = TSNE(n_components=n_components, perplexity=perplexity,
-                learning_rate=learning_rate, n_iter=n_iter)
+                learning_rate=learning_rate, n_iter=n_iter, verbose=1, n_jobs=4)
     s_tranformed = t_sne.fit_transform(states)
     if n_components == 2:
         plot_2d_representation(s_tranformed, rewards, name, add_colorbar, path)
