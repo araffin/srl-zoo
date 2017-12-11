@@ -185,8 +185,11 @@ class BaxterImageLoader(object):
             start_idx = i * batch_size
             end_idx = min(start_idx + batch_size, len(x_indices))
             excerpt = slice(start_idx, end_idx)
-            minibatchlist.append(x_indices[excerpt])
-            targets.append(y_values[excerpt])
+            # Remove excerpt with no elements
+            if len(x_indices[excerpt]) > 0:
+                minibatchlist.append(x_indices[excerpt])
+                targets.append(y_values[excerpt])
+
         return minibatchlist, targets
 
     def deleteOldCache(self):
