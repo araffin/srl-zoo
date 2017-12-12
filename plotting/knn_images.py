@@ -24,6 +24,8 @@ parser.add_argument('--seed', type=int, default=1, help='random seed (default: 1
 parser.add_argument('-k', '--n_neighbors', type=int, default=5, help='Number of nearest neighbors (default: 5)')
 parser.add_argument('-n', '--n_samples', type=int, default=5, help='Number of test samples (default: 5)')
 parser.add_argument('--n_to_plot', type=int, default=5, help='Number of samples to plot (default: 5)')
+parser.add_argument('--relative_pos', action='store_true', default=False, help='Use relative position as ground_truth')
+
 args = parser.parse_args()
 
 n_neighbors = args.n_neighbors
@@ -39,9 +41,19 @@ with open("{}/exp_config.json".format(args.log_folder), 'rb') as f:
 ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
 states = np.load('{}/states_rewards.npz'.format(args.log_folder))['states']
 
-# TODO: relative states for moving button
 true_states = ground_truth['arm_states']
 images_path = ground_truth['images_path']
+
+if args.relative_pos:
+    print("Using relative position")
+    episode_starts = np.load('data/{}/preprocessed_data.npz'.format(data_folder))['episode_starts']
+    button_positions = ground_truth['button_positions']
+    button_idx = -1
+    for i in range(len(episode_starts)):
+        if episode_starts[i] == 1:
+            button_idx += 1
+        true_states[i] -= button_positions[button_idx]
+
 
 knn_path = '{}/NearestNeighbors'.format(args.log_folder)
 

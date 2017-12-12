@@ -56,6 +56,19 @@ def getLogFolderName(exp_config):
     return log_folder, experiment_name
 
 
+def printConfigOnError(return_code, exp_config, step_name):
+    """
+    :param return_code: (int)
+    :param exp_config: (dict)
+    :param step_name: (str)
+    """
+    if return_code != 0:
+        printRed("An error occured, error code: {}".format(return_code))
+        pprint(exp_config)
+        raise RuntimeError("Error during {} (config file above)".format(step_name))
+    print("End of " + step_name)
+
+
 def preprocessingCall(exp_config, force=False):
     """
     Preprocess the data, if the data are already preprocessed
@@ -72,11 +85,7 @@ def preprocessingCall(exp_config, force=False):
     printGreen("\nPreprocessing dataset...")
     args = ['--data_folder', exp_config['data_folder'], '--no-warnings']
     ok = subprocess.call(['python', '-m', 'preprocessing.preprocess'] + args)
-    if ok != 0:
-        printRed("An error occured, error code: {}".format(ok))
-        pprint(exp_config)
-        raise RuntimeError("Error during preprocessing (config file above)")
-    print("End of preprocessing.\n")
+    printConfigOnError(ok, exp_config, "preprocessing")
 
 
 def stateRepresentationLearningCall(exp_config):
@@ -134,16 +143,14 @@ def baselineCall(exp_config, baseline="supervised"):
 
     if baseline == "autoencoder":
         config_args += ['state_dim']
+    elif baseline == "supervised" and exp_config['relative_pos']:
+        args += ['--relative_pos']
 
     for arg in config_args:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
     ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
-    if ok != 0:
-        printRed("An error occured, error code: {}".format(ok))
-        pprint(exp_config)
-        raise RuntimeError("Error during baselineCall (config file above)")
-    print("End of training.\n")
+    printConfigOnError(ok, exp_config, "baselineCall")
 
 
 def dimReductionCall(exp_config, baseline="pca"):
@@ -160,11 +167,7 @@ def dimReductionCall(exp_config, baseline="pca"):
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
     ok = subprocess.call(['python', '-m', 'baselines.pca_tsne'] + args)
-    if ok != 0:
-        printRed("An error occured, error code: {}".format(ok))
-        pprint(exp_config)
-        raise RuntimeError("Error during dimReductionCall (config file above)")
-    print("End of training.\n")
+    printConfigOnError(ok, exp_config, "dimReductionCall")
 
 
 def knnCall(exp_config):
@@ -177,16 +180,14 @@ def knnCall(exp_config):
     createFolder(folder_path, "NearestNeighbors folder already exist")
 
     printGreen("\nEvaluating the state representation with KNN")
+
     args = ['--seed', str(exp_config['knn_seed']), '--n_samples', str(exp_config['knn_samples'])]
+
     for arg in ['log_folder', 'n_neighbors', 'n_to_plot']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
     ok = subprocess.call(['python', '-m', 'plotting.knn_images'] + args)
-    if ok != 0:
-        printRed("An error occured, error code: {}".format(ok))
-        pprint(exp_config)
-        raise RuntimeError("Error during knn plotting (config file above)")
-    print("End of evaluation.\n")
+    printConfigOnError(ok, exp_config, "knnCall")
 
 
 def saveConfig(exp_config, print_config=False):
@@ -205,6 +206,16 @@ def saveConfig(exp_config, print_config=False):
     print("Saved config to log folder: {}".format(exp_config['log_folder']))
 
 
+def useRelativePosition(data_folder):
+    """
+    :param data_folder: (str)
+    :return: (bool)
+    """
+    with open('data/{}/dataset_config.json'.format(data_folder), 'rb') as f:
+        relative_pos = json.load(f).get('relative_pos', False)
+    return relative_pos
+
+
 def getBaseExpConfig(args):
     """
     :param args: (parsed args object)
@@ -216,11 +227,12 @@ def getBaseExpConfig(args):
 
     args.data_folder = parseDataFolder(args.data_folder)
     dataset_path = "data/{}".format(args.data_folder)
-
     assert os.path.isdir(dataset_path), "Path to dataset folder is not valid: {}".format(dataset_path)
+
     with open(args.base_config, 'rb') as f:
         exp_config = json.load(f)
     exp_config['data_folder'] = args.data_folder
+    exp_config['relative_pos'] = useRelativePosition(args.data_folder)
     return exp_config
 
 
@@ -238,7 +250,7 @@ def evaluateBaseline(base_config):
         exp_config = json.load(f)
 
     # Update exp config params (knn evaluation)
-    for param in ['knn_samples', 'knn_seed', 'n_neighbors', 'n_to_plot']:
+    for param in ['knn_samples', 'knn_seed', 'n_neighbors', 'n_to_plot', 'relative_pos']:
         exp_config[param] = base_config[param]
 
     # Save knn params
@@ -259,6 +271,7 @@ if __name__ == '__main__':
                              '/configs/default.json)')
     args = parser.parse_args()
 
+    # Grid Search on Baselines
     if args.baselines and args.data_folder != "":
         exp_config = getBaseExpConfig(args)
         # WARNING: batch_size and learning_rate in the base config
@@ -299,6 +312,7 @@ if __name__ == '__main__':
             dimReductionCall(exp_config, 'tsne')
             evaluateBaseline(base_config)
 
+    # Reproduce a previous experiment using "exp_config.json"
     elif args.exp_config != "":
         with open(args.exp_config, 'rb') as f:
             exp_config = json.load(f)
@@ -312,6 +326,7 @@ if __name__ == '__main__':
         log_folder, experiment_name = getLogFolderName(exp_config)
         exp_config['log_folder'] = log_folder
         exp_config['experiment_name'] = experiment_name
+        exp_config['relative_pos'] = useRelativePosition(data_folder)
         # Save config in log folder
         saveConfig(exp_config)
         # Preprocess data if needed
@@ -322,6 +337,7 @@ if __name__ == '__main__':
             # Evaluate the representation with kNN
             knnCall(exp_config)
 
+    # Grid on State Representation Learning with Priors
     elif args.data_folder != "":
         exp_config = getBaseExpConfig(args)
 
@@ -336,7 +352,7 @@ if __name__ == '__main__':
         # Grid search
         for seed in [1]:
             exp_config['seed'] = seed
-            for state_dim in [2, 3, 4, 5, 6]:
+            for state_dim in [2, 3, 4, 5, 6, 10, 20]:
                 # Update config
                 exp_config['state_dim'] = state_dim
                 log_folder, experiment_name = getLogFolderName(exp_config)

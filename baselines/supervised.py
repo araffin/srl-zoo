@@ -189,6 +189,8 @@ if __name__ == '__main__':
     parser.add_argument('--model_type', type=str, default="resnet", help='Model architecture (default: "resnet")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--limit', type=int, default=-1, help='Limit number of observations (default: -1)')
+    parser.add_argument('--relative_pos', action='store_true', default=False,
+                        help='Use relative position as ground_truth')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -207,11 +209,22 @@ if __name__ == '__main__':
     print('Log folder: {}'.format(log_folder))
 
     print('Loading data ... ')
-    rewards = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))['rewards']
+    training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
+    rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
 
     # TODO: normalize true states
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
     true_states = ground_truth['arm_states']
+    button_positions = ground_truth['button_positions']
+
+    if args.relative_pos:
+        print("Using relative position")
+        button_idx = -1
+        for i in range(len(episode_starts)):
+            if episode_starts[i] == 1:
+                button_idx += 1
+            true_states[i] -= button_positions[button_idx]
+
     images_path = ground_truth['images_path']
     state_dim = true_states.shape[1]
 
