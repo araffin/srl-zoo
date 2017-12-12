@@ -3,6 +3,7 @@ from __future__ import print_function, division, absolute_import
 import argparse
 import json
 import random
+from textwrap import fill
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,6 +12,7 @@ from PIL import Image
 from sklearn.neighbors import NearestNeighbors
 from tqdm import tqdm
 
+MAX_STATE_LENGTH = 60
 N_NEIGHBORS_PER_LINE = 5
 
 # Init seaborn
@@ -77,6 +79,7 @@ for image_path, neigbour_indices, distance, image_idx in data:
         plt.imshow(img)
         state_str = ", ".join(map(lambda x: '{:.3f}'.format(x), states[image_idx]))
         state_str = "[{}]".format(state_str)
+        state_str = fill(state_str, MAX_STATE_LENGTH)
 
         ref_image.axis('off')
         ref_image.set_title('{}/{}\n {}\n{}'.format(record_folder, frame_name, state_str, ref_coord))
@@ -100,6 +103,8 @@ for image_path, neigbour_indices, distance, image_idx in data:
             dist_str = 'd={:.4f}'.format(distance[i + 1])
             state_str = ", ".join(map(lambda x: '{:.3f}'.format(x), states[neighbor_idx]))
             state_str = "[{}]".format(state_str)
+            state_str = fill(state_str, MAX_STATE_LENGTH)
+
             title = '{}/{}\n {} {}\n{}'.format(neighbor_record_folder, neighbor_frame_name, state_str, dist_str,
                                                neighbor_coord)
             subplot.set_title(title)

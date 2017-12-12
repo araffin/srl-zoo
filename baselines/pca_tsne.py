@@ -106,10 +106,10 @@ for obs_var in data_loader:
     pbar.update(1)
 pbar.close()
 # Save PCA transformation
-with open(log_folder + "pca.pkl", "wb") as f:
+with open(log_folder + "/pca.pkl", "wb") as f:
     pkl.dump(ipca, f)
 
-print("Transform observations to states")
+print("Transforming observations to states")
 predictions = []
 for obs_var in data_loader:
     predictions.append(ipca.transform(toNumpyMatrix(obs_var)))

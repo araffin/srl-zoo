@@ -20,7 +20,7 @@ except NameError:
 # Init seaborn
 sns.set()
 INTERACTIVE_PLOT = True
-TITLE_MAX_LENGTH = 60
+TITLE_MAX_LENGTH = 50
 
 
 def updateDisplayMode():
@@ -45,7 +45,7 @@ def pauseOrClose(fig):
         plt.close(fig)
 
 def plot_tsne(states, rewards, name="T-SNE of Learned States", add_colorbar=True, path=None,
-                n_components=2, perplexity=80.0, learning_rate=200.0, n_iter=500):
+                n_components=3, perplexity=100.0, learning_rate=200.0, n_iter=1000):
     """
     :param states: (numpy array)
     :param rewards: (numpy 1D array)
