@@ -105,12 +105,12 @@ class RoboticPriorsLoss(nn.Module):
 
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
-        total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss \
-                     + 5 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
+        total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
+                     + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
                      + w_same_env * same_env_loss
 
         if self.loss_history is not None:
-            weights = [1, 1, 1, 5, 5, w_fixed_point, self.l1_coeff, w_same_env]
+            weights = [1, 1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
             names = ['total_loss', 'temp_coherence_loss', 'causality_loss', 'proportionality_loss',
                      'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss']
             losses = [total_loss, temp_coherence_loss, causality_loss, proportionality_loss,
