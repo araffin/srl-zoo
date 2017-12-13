@@ -128,6 +128,8 @@ You can also plot ground truth states with:
 python plotting/representation_plot.py --data_folder path/to/datasetFolder/
 ```
 
+To have a different color per episode, you have to pass `--data_folder` argument along with `--per-episode`.
+
 #### Interactive Plot
 
 You can have an interactive plot of a learned representation using:

@@ -197,7 +197,7 @@ class SRL4robotics(BaseLearner):
 
         ref_point_pairs = []
         if len(is_ref_point_list) > 0:
-            def find_ref_point(index, minibatch):
+            def findRefPoint(index, minibatch):
                 """
                 Find observations corresponding to the reference
                 :param index: (int)
@@ -226,7 +226,7 @@ class SRL4robotics(BaseLearner):
                 print("[WARNING] Over-sampling for ref prior was applied {} times".format(n_over_sampling))
 
             ref_point_pairs = [np.array([[i, j] for i in range(self.batch_size)
-                                         for j in find_ref_point(i, minibatch) if j > i],
+                                         for j in findRefPoint(i, minibatch) if j > i],
                                         dtype='int64') for minibatch in minibatchlist]
 
             for item in ref_point_pairs:

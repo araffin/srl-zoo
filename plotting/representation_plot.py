@@ -1,5 +1,6 @@
 from __future__ import print_function, division
 
+import json
 import argparse
 from textwrap import fill
 
@@ -45,7 +46,7 @@ def pauseOrClose(fig):
         plt.close(fig)
 
 def plot_tsne(states, rewards, name="T-SNE of Learned States", add_colorbar=True, path=None,
-                n_components=3, perplexity=100.0, learning_rate=200.0, n_iter=1000):
+                n_components=3, perplexity=100.0, learning_rate=200.0, n_iter=1000, cmap="coolwarm"):
     """
     :param states: (numpy array)
     :param rewards: (numpy 1D array)
@@ -56,19 +57,17 @@ def plot_tsne(states, rewards, name="T-SNE of Learned States", add_colorbar=True
     :param perplexity: (float)
     :param learning_rate: (float)
     :param n_iter: (int)
+    :param cmap: (str)
     """
     assert n_components in [2, 3], "You cannot applied t-SNE with n_components={}".format(n_components)
     t_sne = TSNE(n_components=n_components, perplexity=perplexity,
                 learning_rate=learning_rate, n_iter=n_iter, verbose=1, n_jobs=4)
     s_tranformed = t_sne.fit_transform(states)
-    if n_components == 2:
-        plot_2d_representation(s_tranformed, rewards, name, add_colorbar, path)
-    else:
-        plot_3d_representation(s_tranformed, rewards, name, add_colorbar, path)
+    plot_representation(s_tranformed, rewards, name, add_colorbar, path, cmap=cmap, fit_pca=False)
 
 
 def plot_representation(states, rewards, name="Learned State Representation",
-                        add_colorbar=True, path=None, fit_pca=True):
+                        add_colorbar=True, path=None, fit_pca=True, cmap='coolwarm'):
     """
     :param states: (numpy array)
     :param rewards: (numpy 1D array)
@@ -76,6 +75,7 @@ def plot_representation(states, rewards, name="Learned State Representation",
     :param add_colorbar: (bool)
     :param path: (str)
     :param fit_pca: (bool)
+    :param cmap: (str)
     """
     state_dim = states.shape[1]
     if state_dim != 1 and (fit_pca or state_dim > 3):
@@ -88,18 +88,19 @@ def plot_representation(states, rewards, name="Learned State Representation",
         # Extend states as 2D:
         states_matrix = np.zeros((states.shape[0], 2))
         states_matrix[:, 0] = states[:, 0]
-        plot_2d_representation(states_matrix, rewards, name, add_colorbar, path)
+        plot_2d_representation(states_matrix, rewards, name, add_colorbar, path, cmap)
     elif state_dim == 2:
-        plot_2d_representation(states, rewards, name, add_colorbar, path)
+        plot_2d_representation(states, rewards, name, add_colorbar, path, cmap)
     else:
-        plot_3d_representation(states, rewards, name, add_colorbar, path)
+        plot_3d_representation(states, rewards, name, add_colorbar, path, cmap)
 
 
-def plot_2d_representation(states, rewards, name="Learned State Representation", add_colorbar=True, path=None):
+def plot_2d_representation(states, rewards, name="Learned State Representation",
+                           add_colorbar=True, path=None, cmap='coolwarm'):
     updateDisplayMode()
     fig = plt.figure(name)
     plt.clf()
-    plt.scatter(states[:, 0], states[:, 1], s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
+    plt.scatter(states[:, 0], states[:, 1], s=7, c=rewards, cmap=cmap, linewidths=0.1)
     plt.xlabel('State dimension 1')
     plt.ylabel('State dimension 2')
     plt.title(fill(name, TITLE_MAX_LENGTH))
@@ -112,13 +113,13 @@ def plot_2d_representation(states, rewards, name="Learned State Representation",
 
 
 def plot_3d_representation(states, rewards, name="Learned State Representation",
-                           add_colorbar=True, path=None):
+                           add_colorbar=True, path=None, cmap='coolwarm'):
     updateDisplayMode()
     fig = plt.figure(name)
     plt.clf()
     ax = fig.add_subplot(111, projection='3d')
     im = ax.scatter(states[:, 0], states[:, 1], states[:, 2],
-                    s=7, c=np.clip(rewards, -1, 1), cmap='coolwarm', linewidths=0.1)
+                    s=7, c=rewards, cmap=cmap, linewidths=0.1)
     ax.set_xlabel('State dimension 1')
     ax.set_ylabel('State dimension 2')
     ax.set_zlabel('State dimension 3')
@@ -163,6 +164,22 @@ def plot_image(image, name='Observation Sample'):
     pauseOrClose(fig)
 
 
+def colorPerEpisode(episode_starts):
+    """
+    :param episode_starts: (numpy 1D array)
+    :return: (numpy 1D array)
+    """
+    colors = np.zeros(len(episode_starts))
+    color_idx = -1
+    print(np.sum(episode_starts))
+    for i in range(len(episode_starts)):
+        # New episode
+        if episode_starts[i] == 1:
+            color_idx += 1
+        colors[i] = color_idx
+    return colors
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Plotting script for representation')
     parser.add_argument('-i', '--input_file', type=str, default="",
@@ -170,27 +187,54 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default="",
                         help='Path to a dataset folder, it will plot ground truth states')
     parser.add_argument('--t-sne', action='store_true', default=False, help='Use t-SNE instead of PCA')
+    parser.add_argument('--per-episode', action='store_true', default=False, help='Color states per episodes instead of reward')
     args = parser.parse_args()
+
+    cmap = "tab20" if args.per_episode else "coolwarm"
+    assert not (args.per_episode and args.data_folder == ""), "You must specify a datafolder when using per-episode color"
+    # Remove `data/` from the path if needed
+    if "data/" in args.data_folder:
+        args.data_folder = args.data_folder.split('data/')[1].strip("/")
 
     if args.input_file != "":
         print("Loading {}...".format(args.input_file))
         states_rewards = np.load(args.input_file)
+        rewards = states_rewards['rewards']
+        if args.per_episode:
+            episode_starts = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['episode_starts']
+            rewards = colorPerEpisode(episode_starts)[:len(rewards)]
+
         if args.t_sne:
             print("Using t-SNE...")
-            plot_tsne(states_rewards['states'], states_rewards['rewards'])
+            plot_tsne(states_rewards['states'], rewards, cmap=cmap)
         else:
-            plot_representation(states_rewards['states'], states_rewards['rewards'])
+            plot_representation(states_rewards['states'], rewards, cmap=cmap)
         input('\nPress any key to exit.')
 
     elif args.data_folder != "":
-        # Remove `data/` from the path if needed
-        if "data/" in args.data_folder:
-            args.data_folder = args.data_folder.split('data/')[1].strip("/")
+
         print("Plotting ground truth...")
-        states = np.load('data/{}/ground_truth.npz'.format(args.data_folder))['arm_states']
-        rewards = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['rewards']
+        training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
+        ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
+        true_states = ground_truth['arm_states']
         name = "Ground Truth States - {}".format(args.data_folder)
-        plot_representation(states, rewards, name)
+        episode_starts, rewards = training_data['episode_starts'], training_data['rewards']
+        button_positions = ground_truth['button_positions']
+        with open('data/{}/dataset_config.json'.format(args.data_folder), 'rb') as f:
+            relative_pos = json.load(f).get('relative_pos', False)
+
+        # True state is the relative position to the button
+        if relative_pos:
+            button_idx = -1
+            for i in range(len(episode_starts)):
+                if episode_starts[i] == 1:
+                    button_idx += 1
+                true_states[i] -= button_positions[button_idx]
+
+        if args.per_episode:
+            rewards = colorPerEpisode(episode_starts)
+
+        plot_representation(true_states, rewards, name, cmap=cmap)
         input('\nPress any key to exit.')
 
     else:
