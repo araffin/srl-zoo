@@ -44,7 +44,7 @@ DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 256  #
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
-
+VALIDATION_SIZE = 0.2  # 20% of training data for validation
 
 class RoboticPriorsLoss(nn.Module):
     """
@@ -110,10 +110,10 @@ class RoboticPriorsLoss(nn.Module):
                      + w_same_env * same_env_loss
 
         if self.loss_history is not None:
-            weights = [1, 1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
-            names = ['total_loss', 'temp_coherence_loss', 'causality_loss', 'proportionality_loss',
+            weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
+            names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
                      'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss']
-            losses = [total_loss, temp_coherence_loss, causality_loss, proportionality_loss,
+            losses = [temp_coherence_loss, causality_loss, proportionality_loss,
                       repeatability_loss, fixed_ref_point_loss, l1_loss, same_env_loss]
             for name, w, loss in zip(names, weights, losses):
                 if w > 0:
@@ -194,6 +194,11 @@ class SRL4robotics(BaseLearner):
         if len(minibatchlist[-1]) < self.batch_size:
             print("Removing last minibatch of size {} < batch_size".format(len(minibatchlist[-1])))
             del minibatchlist[-1]
+
+        # Number of minibatches used for validation:
+        n_val_batches = np.round(VALIDATION_SIZE * len(minibatchlist)).astype(np.int64)
+        val_indices = np.random.permutation(len(minibatchlist))[:n_val_batches]
+        print("{} minibatches for validation, {} samples".format(n_val_batches, n_val_batches * BATCH_SIZE))
 
         ref_point_pairs = []
         if len(is_ref_point_list) > 0:
@@ -299,6 +304,7 @@ class SRL4robotics(BaseLearner):
                 print(msg)
                 sys.exit(NO_PAIRS_ERROR)
 
+
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
                                                same_actions, dissimilar, ref_point_pairs,
                                                similar_pairs, cache_capacity=5000)
@@ -314,11 +320,12 @@ class SRL4robotics(BaseLearner):
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             epoch_loss, epoch_batches = 0, 0
+            val_loss = 0
             pbar = tqdm(total=len(minibatchlist))
             baxter_data_loader.resetAndShuffle()
             for _input in baxter_data_loader:
                 # Unpack input
-                obs, next_obs, same, diss, is_ref_point_list, sim_pairs = _input
+                minibatch_idx, obs, next_obs, same, diss, is_ref_point_list, sim_pairs = _input
                 if self.cuda:
                     obs, next_obs = obs.cuda(), next_obs.cuda()
                     same, diss = same.cuda(), diss.cuda()
@@ -333,27 +340,37 @@ class SRL4robotics(BaseLearner):
                 self.optimizer.zero_grad()
                 loss = criterion(states, next_states, diss, same,
                                  is_ref_point_list, sim_pairs)
+                # We have to call backward in both train/val
+                # to avoid memory error
                 loss.backward()
-                self.optimizer.step()
-                epoch_loss += loss.data[0]
-                epoch_batches += 1
+                if minibatch_idx in val_indices:
+                    val_loss += loss.data[0]
+                    # We do not optimize on validation data
+                    # so optimizer.step() is not called
+                else:
+                    self.optimizer.step()
+                    epoch_loss += loss.data[0]
+                    epoch_batches += 1
                 pbar.update(1)
             pbar.close()
 
             train_loss = epoch_loss / epoch_batches
-
+            val_loss /= n_val_batches
             # Even if loss_history is modified by RoboticPriorsLoss object
             # we make it explicit
             loss_history = criterion.loss_history
+            loss_history['train_loss'].append(train_loss)
+            loss_history['val_loss'].append(val_loss)
             for key in loss_history.keys():
+                if key in ['train_loss', 'val_loss']:
+                    continue
                 loss_history[key][-1] /= epoch_batches
                 if epoch + 1 < N_EPOCHS:
                     loss_history[key].append(0)
 
             # Save best model
-            # TODO: use a validation set
-            if train_loss < best_error:
-                best_error = train_loss
+            if val_loss < best_error:
+                best_error = val_loss
                 th.save(self.model.state_dict(), best_model_path)
 
             if np.isnan(train_loss):
@@ -362,7 +379,7 @@ class SRL4robotics(BaseLearner):
 
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:
-                print("Epoch {:3}/{}, loss:{:.4f}".format(epoch + 1, N_EPOCHS, epoch_loss / epoch_batches))
+                print("Epoch {:3}/{}, train_loss:{:.4f} val_loss:{:.4f}".format(epoch + 1, N_EPOCHS, train_loss, val_loss))
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space

@@ -76,6 +76,7 @@ class BaxterImageLoader(object):
         self.ref_point_pairs = np.array(ref_point_pairs[:]) if ref_point_pairs is not None else np.array([])
         self.similar_pairs = np.array(similar_pairs[:]) if similar_pairs is not None else np.array([])
         # Save minibatches original order
+        self.minibatches_indices = np.arange(len(minibatchlist), dtype=np.int64)
         self.original_minibatchlist = self.minibatchlist.copy()
         self.original_same_actions = self.same_actions.copy()
         self.original_dissimilar = self.dissimilar.copy()
@@ -145,6 +146,7 @@ class BaxterImageLoader(object):
         It uses the minibatchlist pass at initialization
         """
         self.is_training = True
+        self.minibatches_indices = np.arange(len(minibatchlist), dtype=np.int64)
         self.minibatchlist = self.original_minibatchlist.copy()
         self.same_actions = self.original_same_actions.copy()
         self.dissimilar = self.original_dissimilar.copy()
@@ -239,6 +241,7 @@ class BaxterImageLoader(object):
         Shuffle list of minibatches
         """
         indices = np.random.permutation(self.n_minibatches).astype(np.int64)
+        self.minibatches_indices = indices
         self.minibatchlist = self.minibatchlist[indices]
         self.same_actions = self.same_actions[indices]
         self.dissimilar = self.dissimilar[indices]
@@ -387,7 +390,7 @@ class BaxterImageLoader(object):
         self._sendToWorkers(batch_size, indices_list, obs_dict)
 
         if self.is_training:
-            self.preprocess_result = obs_dict['obs'], obs_dict['next_obs'],\
+            self.preprocess_result = self.minibatches_indices[i], obs_dict['obs'], obs_dict['next_obs'],\
                                      diss.clone(), same.clone(),\
                                      ref_point_pairs.clone(), similar_pairs.clone()
         else:
