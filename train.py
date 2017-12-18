@@ -279,7 +279,7 @@ class SRL4robotics(BaseLearner):
             def findSimilar(index, minibatch):
                 """
                 check which samples should be similar
-                because they lead to same positive rewards after the same actions
+                because they lead to the same positive rewards after the same actions
                 :param index: (int)
                 :param minibatch: (numpy array)
                 :return: (dict, numpy array)
@@ -287,6 +287,17 @@ class SRL4robotics(BaseLearner):
                 positive_r = rewards[minibatch[index] + 1] > 0
                 return np.where(positive_r * (actions[minibatch] == actions[minibatch[index]]) *
                                 (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
+
+            # def findSimilar(index, minibatch):
+            #     """
+            #     check which samples should be similar
+            #     because they lead to the same positive reward
+            #     :param index: (int)
+            #     :param minibatch: (numpy array)
+            #     :return: (dict, numpy array)
+            #     """
+            #     positive_r = rewards[minibatch[index] + 1] > 0
+            #     return np.where(positive_r * (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
 
             similar_pairs = [np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch) if j > i],
                                       dtype='int64') for minibatch in minibatchlist]
@@ -414,8 +425,8 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log_folder', type=str, default='logs/default_folder',
                         help='Folder within logs/ where the experiment model and plots will be saved')
-    parser.add_argument('--no_ref_prior', action='store_true', default=False,
-                        help='Disable Fixed Reference Point Prior')
+    parser.add_argument('--ref_prior', action='store_true', default=False,
+                        help='Use Fixed Reference Point Prior (cannot be used at the same as other additional priors)')
     parser.add_argument('--same_env_prior', action='store_true', default=False, help='Enable same env prior (disables ref prior)')
 
     args = parser.parse_args()
@@ -424,7 +435,7 @@ if __name__ == '__main__':
     DISPLAY_PLOTS = not args.no_plots
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
-    APPLY_5TH_PRIOR = not (args.no_ref_prior or args.same_env_prior)
+    APPLY_5TH_PRIOR = args.ref_prior and not args.same_env_prior
     plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
 
     print('Log folder: {}'.format(args.log_folder))

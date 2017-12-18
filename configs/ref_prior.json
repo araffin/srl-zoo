@@ -1,6 +1,6 @@
 {
   "batch_size": 256,
-  "epochs": 15,
+  "epochs": 25,
   "knn_samples": 2000,
   "knn_seed": 1,
   "l1_reg": 0,

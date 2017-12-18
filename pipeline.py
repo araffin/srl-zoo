@@ -96,8 +96,8 @@ def stateRepresentationLearningCall(exp_config):
     printGreen("\nLearning a state representation...")
 
     args = ['--no-plots']
-    if "Reference" not in exp_config["priors"]:
-        args.extend(['--no_ref_prior'])
+    if "Reference" in exp_config["priors"]:
+        args.extend(['--ref_prior'])
 
     if "SameEnv" in exp_config["priors"]:
         args.extend(['--same_env_prior'])
@@ -352,7 +352,7 @@ if __name__ == '__main__':
         # Grid search
         for seed in [1]:
             exp_config['seed'] = seed
-            for state_dim in [2, 3, 4, 5, 6, 10, 20]:
+            for state_dim in [2, 3, 4, 5, 10, 20]:
                 # Update config
                 exp_config['state_dim'] = state_dim
                 log_folder, experiment_name = getLogFolderName(exp_config)
