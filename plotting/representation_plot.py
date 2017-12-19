@@ -59,11 +59,11 @@ def plot_tsne(states, rewards, name="T-SNE of Learned States", add_colorbar=True
     :param n_iter: (int)
     :param cmap: (str)
     """
-    assert n_components in [2, 3], "You cannot applied t-SNE with n_components={}".format(n_components)
+    assert n_components in [2, 3], "You cannot apply t-SNE with n_components={}".format(n_components)
     t_sne = TSNE(n_components=n_components, perplexity=perplexity,
                 learning_rate=learning_rate, n_iter=n_iter, verbose=1, n_jobs=4)
-    s_tranformed = t_sne.fit_transform(states)
-    plot_representation(s_tranformed, rewards, name, add_colorbar, path, cmap=cmap, fit_pca=False)
+    s_transformed = t_sne.fit_transform(states)
+    plot_representation(s_transformed, rewards, name, add_colorbar, path, cmap=cmap, fit_pca=False)
 
 
 def plot_representation(states, rewards, name="Learned State Representation",
