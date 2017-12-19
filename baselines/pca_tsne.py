@@ -36,7 +36,7 @@ def saveExpConfig(args, log_folder):
     exp_config = {
         "batch_size": args.batch_size,
         "data_folder": args.data_folder,
-        "limit": args.limit,
+        "training_set_size": args.training_set_size,
         "log_folder": log_folder,
         "state_dim": args.state_dim,
     }
@@ -57,7 +57,7 @@ parser.add_argument('-bs', '--batch_size', type=int, default=16, help='batch_siz
 parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
 parser.add_argument('--method', type=str, default="pca", help='one of "pca" or "tsne"')
 parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
-parser.add_argument('--limit', type=int, default=-1, help='Limit number of observations (default: -1)')
+parser.add_argument('--training_set_size', type=int, default=-1, help='Limit size of the training set (default: -1)')
 parser.add_argument('--state_dim', type=int, default=3, help='State dimension')
 
 args = parser.parse_args()
@@ -77,8 +77,8 @@ print('Loading data ... ')
 rewards = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))['rewards']
 images_path = np.load("data/{}/ground_truth.npz".format(args.data_folder))['images_path']
 
-if args.limit > 0:
-    limit = args.limit
+if args.training_set_size > 0:
+    limit = args.training_set_size
     images_path = images_path[:limit]
     rewards = rewards[:limit]
 

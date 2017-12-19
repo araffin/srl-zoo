@@ -416,7 +416,7 @@ if __name__ == '__main__':
                         help='random seed (default: 1)')
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('-bs', '--batch_size', type=int, default=256, help='batch_size (default: 256)')
-    parser.add_argument('--limit', type=int, default=-1, help='Limit number of observations (default: -1)')
+    parser.add_argument('--training_set_size', type=int, default=-1, help='Limit size of the training set (default: -1)')
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1_reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
@@ -458,8 +458,8 @@ if __name__ == '__main__':
         print('Applying 5th fixed ref_point prior...')
         is_ref_point_list = training_data['is_ref_point_list']
 
-    if args.limit > 0:
-        limit = args.limit
+    if args.training_set_size > 0:
+        limit = args.training_set_size
         actions = actions[:limit]
         images_path = images_path[:limit]
         rewards = rewards[:limit]

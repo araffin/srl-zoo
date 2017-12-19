@@ -103,12 +103,12 @@ def stateRepresentationLearningCall(exp_config):
         args.extend(['--same_env_prior'])
 
     # TODO: Remove as soon as possible (only here for backward compatibility)
-    if 'limit' not in exp_config.keys():
-        exp_config['limit'] = -1
+    if 'training_set_size' not in exp_config.keys():
+        exp_config['training_set_size'] = -1
 
     for arg in ['learning_rate', 'l1_reg', 'batch_size',
                 'state_dim', 'epochs', 'seed', 'model_type',
-                'log_folder', 'data_folder', 'limit']:
+                'log_folder', 'data_folder', 'training_set_size']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
     ok = subprocess.call(['python', 'train.py'] + args)
@@ -139,7 +139,7 @@ def baselineCall(exp_config, baseline="supervised"):
 
     args = ['--no-plots']
     config_args = ['epochs', 'seed', 'model_type',
-                   'data_folder', 'limit']
+                   'data_folder', 'training_set_size']
 
     if baseline == "autoencoder":
         config_args += ['state_dim']
@@ -161,7 +161,7 @@ def dimReductionCall(exp_config, baseline="pca"):
     printGreen("\n Baseline {}...".format(baseline))
 
     args = ['--no-plots', '--method', baseline]
-    config_args = ['data_folder', 'limit']
+    config_args = ['data_folder', 'training_set_size']
 
     for arg in config_args:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])

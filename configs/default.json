@@ -4,7 +4,7 @@
   "knn_samples": 2000,
   "knn_seed": 1,
   "l1_reg": 0,
-  "limit": 6000,
+  "training_set_size": 6000,
   "learning_rate": 0.001,
   "model_approach": "priors",
   "model_type": "custom_cnn",
@@ -15,7 +15,7 @@
     "Temporal",
     "Causality",
     "Repeatability",
-    "SameEnv",
+    "SameEnv"
   ],
   "use_continuous": false,
   "_comment": "You can add or remove 'Reference|SameEnv' to the list of priors"
