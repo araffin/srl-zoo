@@ -1,11 +1,10 @@
 from __future__ import print_function, division, absolute_import
 
-import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 
-from .custom_layers import GaussianNoise, GaussianNoiseVariant
+from .custom_layers import GaussianNoiseVariant
 
 
 class SRLConvolutionalNetwork(nn.Module):
@@ -13,12 +12,11 @@ class SRLConvolutionalNetwork(nn.Module):
     Convolutional Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
     :param state_dim: (int)
-    :param batch_size: (int)
     :param cuda: (bool)
     :param noise_std: (float)  To avoid NaN (states must be different)
     """
 
-    def __init__(self, state_dim=2, batch_size=256, cuda=False, noise_std=1e-6):
+    def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
         super(SRLConvolutionalNetwork, self).__init__()
         self.resnet = models.resnet18(pretrained=True)
         # TODO: add squeezeNet support
@@ -98,7 +96,7 @@ class DenseNetwork(nn.Module):
 
 class ConvolutionalNetwork(nn.Module):
     """
-    Convolutional Neural Net for State Representation Learning (SRL)
+    Convolutional Neural Network using pretrained ResNet
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
     :param state_dim: (int)
     :param cuda: (bool)
@@ -120,6 +118,65 @@ class ConvolutionalNetwork(nn.Module):
     def forward(self, x):
         x = self.resnet(x)
         return x
+
+
+class CustomCNN(nn.Module):
+    """
+    Convolutional Neural Network
+    input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
+    :param state_dim: (int)
+    """
+
+    def __init__(self, state_dim=2):
+        super(CustomCNN, self).__init__()
+        # Inspired by ResNet:
+        # conv3x3 followed by BatchNorm2d
+        self.conv_layers = nn.Sequential(
+            # 224x224x3 -> 112x112x64
+            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),  # 56x56x64
+
+            conv3x3(in_planes=64, out_planes=64, stride=1),  # 56x56x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),  # 27x27x64
+
+            conv3x3(in_planes=64, out_planes=64, stride=2),  # 14x14x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
+        )
+
+        self.fc = nn.Linear(6 * 6 * 64, state_dim)
+
+    def forward(self, x):
+        x = self.conv_layers(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+
+
+class SRLCustomCNN(nn.Module):
+    """
+    Convolutional Neural Network for State Representation Learning
+    input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
+    :param state_dim: (int)
+    :param cuda: (bool)
+    :param noise_std: (float)  To avoid NaN (states must be different)
+    """
+
+    def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
+        super(SRLCustomCNN, self).__init__()
+        self.cnn = CustomCNN(state_dim)
+        if cuda:
+            self.cnn.cuda()
+        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
+
+    def forward(self, x):
+        x = self.cnn(x)
+        return self.noise(x)
 
 
 class LinearAutoEncoder(nn.Module):
@@ -207,7 +264,7 @@ class CNNAutoEncoder(nn.Module):
 
     def __init__(self, state_dim=3):
         super(CNNAutoEncoder, self).__init__()
-        # Inspired from ResNet:
+        # Inspired by ResNet:
         # conv3x3 followed by BatchNorm2d
         # TODO: implement residual connection
         self.encoderConv = nn.Sequential(

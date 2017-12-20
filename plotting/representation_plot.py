@@ -8,6 +8,7 @@ import seaborn as sns
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D  # noqa
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 
 # Python 2/3 compatibility
 try:
@@ -41,6 +42,28 @@ def pauseOrClose(fig):
         plt.pause(0.0001)  # Small pause to update the plot
     else:
         plt.close(fig)
+
+def plot_tsne(states, rewards, name="T-SNE of Learned States", add_colorbar=True, path=None,
+                n_components=2, perplexity=80.0, learning_rate=200.0, n_iter=500):
+    """
+    :param states: (numpy array)
+    :param rewards: (numpy 1D array)
+    :param name: (str)
+    :param add_colorbar: (bool)
+    :param path: (str)
+    :param n_components: (int)
+    :param perplexity: (float)
+    :param learning_rate: (float)
+    :param n_iter: (int)
+    """
+    assert n_components in [2, 3], "You cannot applied t-SNE with n_components={}".format(n_components)
+    t_sne = TSNE(n_components=n_components, perplexity=perplexity,
+                learning_rate=learning_rate, n_iter=n_iter)
+    s_tranformed = t_sne.fit_transform(states)
+    if n_components == 2:
+        plot_2d_representation(s_tranformed, rewards, name, add_colorbar, path)
+    else:
+        plot_3d_representation(s_tranformed, rewards, name, add_colorbar, path)
 
 
 def plot_representation(states, rewards, name="Learned State Representation",
@@ -145,12 +168,17 @@ if __name__ == '__main__':
                         help='Path to a npz file containing states and rewards')
     parser.add_argument('--data_folder', type=str, default="",
                         help='Path to a dataset folder, it will plot ground truth states')
+    parser.add_argument('--t-sne', action='store_true', default=False, help='Use t-SNE instead of PCA')
     args = parser.parse_args()
 
     if args.input_file != "":
         print("Loading {}...".format(args.input_file))
         states_rewards = np.load(args.input_file)
-        plot_representation(states_rewards['states'], states_rewards['rewards'])
+        if args.t_sne:
+            print("Using t-SNE...")
+            plot_tsne(states_rewards['states'], states_rewards['rewards'])
+        else:
+            plot_representation(states_rewards['states'], states_rewards['rewards'])
         input('\nPress any key to exit.')
 
     elif args.data_folder != "":

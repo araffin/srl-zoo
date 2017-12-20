@@ -154,7 +154,7 @@ class ImageFinder(object):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Plotting script for representation')
+    parser = argparse.ArgumentParser(description='Interactive plot of representation (left click for 2D, right click for 3D)')
     parser.add_argument('-i', '--input_file', type=str, default="",
                         help='Path to a npz file containing states and rewards')
     parser.add_argument('--data_folder', type=str, default="", required=True,

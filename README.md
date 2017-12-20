@@ -77,7 +77,7 @@ python -m preprocessing.preprocess --data_folder staticButtonSimplest
 Usage:
 ```
 python train.py [--epochs N] [--seed S] [--state_dim STATE_DIM]
-                [-bs BATCH_SIZE] [-lr LEARNING_RATE] [--l1_reg L1_REG]
+                [-bs BATCH_SIZE] [--limit LIMIT] [-lr LEARNING_RATE] [--l1_reg L1_REG]
                 [--no-cuda] [--no-plots] [--model_type MODEL_TYPE]
                 [--data_folder DATA_FOLDER]
                 [--log_folder LOG_FOLDER]
@@ -88,6 +88,7 @@ python train.py [--epochs N] [--seed S] [--state_dim STATE_DIM]
                       state dimension (default: 2)
 -bs BATCH_SIZE, --batch_size BATCH_SIZE
                       batch_size (default: 256)
+--limit LIMIT         Limit number of observations (default: -1)
 -lr LEARNING_RATE, --learning_rate LEARNING_RATE
                       learning rate (default: 0.005)
 --l1_reg L1_REG       L1 regularization coeff (default: 0.0)
@@ -125,6 +126,19 @@ python plotting/representation_plot.py -i path/to/states_rewards.npz
 You can also plot ground truth states with:
 ```
 python plotting/representation_plot.py --data_folder path/to/datasetFolder/
+```
+
+#### Interactive Plot
+
+You can have an interactive plot of a learned representation using:
+```
+python plotting/interactive_plot.py --data_folder path/to/datasetFolder/ -i path/to/states_rewards.npz
+```
+When you click on a state in the representation plot (left click for 2D, **right click for 3D plots**!), it shows the corresponding image along with the reward and the coordinates in the space.
+
+You can also plot ground truth states when you don't specify a npz file:
+```
+python plotting/interactive_plot.py --data_folder path/to/datasetFolder/
 ```
 
 #### Create a knn plot and compute KNN-MSE
@@ -168,7 +182,7 @@ Gaussian noise is added to the input with a factor `0.1`.
 
 Example:
 ```
-python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3
+python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3 --noise_factor 0.1
 ```
 
 ### Dependencies
@@ -176,10 +190,29 @@ python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3
 Recommended configuration: Ubuntu 16.04 with python 2.7 or 3.6
 (should work with python3 though it was only thoroughly tested with python2)
 
+#### Recommended Method: Use saved conda environment
+
+Create the new environment `srl` from `environment.yml` file:
+```
+conda env create -f environment.yml
+```
+
+Then activate it using:
+```
+source activate srl
+```
+
+Alternatively, you can use requirements.txt file:
+```
+pip install -r requirements.txt
+```
+In that case, you will need to install OpenCV too (cf below).
+
+#### Dependencies details
 
 - OpenCV (version >= 2.4)
 ```
-conda install -c menpo opencv3
+conda install -c menpo opencv
 ```
 or
 ```
@@ -190,6 +223,7 @@ sudo apt-get install python-opencv (opencv 2.4 - python2)
 - PyTorchVision
 - Numpy
 - Scikit-learn
+- Pandas
 
 For plotting:
 - matplotlib

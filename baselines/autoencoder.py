@@ -1,6 +1,5 @@
 from __future__ import print_function, division, absolute_import
 
-import json
 import time
 import argparse
 
@@ -17,6 +16,7 @@ from preprocessing.preprocess import INPUT_DIM
 from preprocessing.utils import deNormalize
 from models.base_learner import BaseLearner
 from models.models import LinearAutoEncoder, DenseAutoEncoder, CNNAutoEncoder
+from pipeline import saveConfig
 from plotting.representation_plot import plot_representation, plt, plot_image
 
 # Python 2/3 compatibility
@@ -171,10 +171,43 @@ class AutoEncoderLearning(BaseLearner):
         return self.predStatesWithDataLoader(data_loader)
 
 
+def getModelName(args):
+    """
+    :param args: (parsed args object)
+    :return: (str)
+    """
+    name = "autoencoder_{}_ST_DIM{}_SEED{}_NOISE{}".format(args.model_type, args.state_dim,
+                                                           args.seed, args.noise_factor)
+    name = name.replace(".", "_")  # replace decimal points by '_' for folder naming
+    name += "_EPOCHS{}_BS{}".format(args.epochs, args.batch_size)
+    return name
+
+
+def saveExpConfig(args, log_folder):
+    """
+    :param args: (parsed args object)
+    :param log_folder: (str)
+    """
+    exp_config = {
+        "batch_size": args.batch_size,
+        "data_folder": args.data_folder,
+        "epochs": args.epochs,
+        "learning_rate": args.learning_rate,
+        "limit": args.limit,
+        "log_folder": log_folder,
+        "noise_factor": args.noise_factor,
+        "model_type": args.model_type,
+        "seed": args.seed,
+        "state_dim": args.state_dim,
+    }
+
+    saveConfig(exp_config, print_config=True)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Supervised Learning')
-    parser.add_argument('--epochs', type=int, default=50, metavar='N',
-                        help='number of epochs to train (default: 50)')
+    parser.add_argument('--epochs', type=int, default=25, metavar='N',
+                        help='number of epochs to train (default: 25)')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     parser.add_argument('-bs', '--batch_size', type=int, default=32, help='batch_size (default: 32)')
@@ -184,6 +217,8 @@ if __name__ == '__main__':
     parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
+    parser.add_argument('--noise_factor', type=float, default=0.1, help='Noise factor for denoising autoencoder')
+    parser.add_argument('--limit', type=int, default=-1, help='Limit number of observations (default: -1)')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -191,9 +226,13 @@ if __name__ == '__main__':
     plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
+    NOISE_FACTOR = args.noise_factor
     args.data_folder = parseDataFolder(args.data_folder)
-    log_folder = "logs/{}/baselines/autoencoder".format(args.data_folder)
+
+    name = getModelName(args)
+    log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
     createFolder(log_folder, "autoencoder folder already exist")
+    saveExpConfig(args, log_folder)
 
     folder_path = '{}/NearestNeighbors/'.format(log_folder)
     createFolder(folder_path, "NearestNeighbors folder already exist")
@@ -202,19 +241,19 @@ if __name__ == '__main__':
 
     print('Loading data ... ')
     rewards = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))['rewards']
+    images_path = np.load("data/{}/ground_truth.npz".format(args.data_folder))['images_path']
 
-    ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
-
-    # Create partial exp_config for KNN plots
-    with open('{}/exp_config.json'.format(log_folder), 'wb') as f:
-        json.dump({"data_folder": args.data_folder, "state_dim": args.state_dim}, f)
+    if args.limit > 0:
+        limit = args.limit
+        images_path = images_path[:limit]
+        rewards = rewards[:limit]
 
     print('Learning a state representation ... ')
     srl = AutoEncoderLearning(args.state_dim, model_type=args.model_type, seed=args.seed,
                               log_folder=log_folder, learning_rate=args.learning_rate,
                               cuda=args.cuda)
-    learned_states = srl.learn(ground_truth['images_path'], rewards)
-    srl.saveStates(learned_states, ground_truth['images_path'], rewards, log_folder)
+    learned_states = srl.learn(images_path, rewards)
+    srl.saveStates(learned_states, images_path, rewards, log_folder)
 
     name = "Learned State Representation - {} \n Autoencoder state_dim={}".format(args.data_folder, args.state_dim)
     path = "{}/learned_states.png".format(log_folder)
