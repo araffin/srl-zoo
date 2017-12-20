@@ -258,6 +258,28 @@ class SRL4robotics(BaseLearner):
             np.array([[i, j] for i in range(self.batch_size) for j in findSameActions(i, minibatch) if j > i],
                      dtype='int64') for minibatch in minibatchlist]
 
+        # Stats about pairs
+        action_set = set(actions)
+        n_actions = np.max(actions) + 1
+        print("{} unique actions / {} actions".format(len(action_set), n_actions))
+        n_pairs_per_action = np.zeros(n_actions, dtype=np.int64)
+        n_obs_per_action = np.zeros(n_actions, dtype=np.int64)
+
+        for i in range(n_actions):
+            n_obs_per_action[i] = np.sum(actions == i)
+
+        print("Number of observations per action")
+        print(n_obs_per_action)
+
+        for pair, minibatch in zip(same_actions, minibatchlist):
+            for i in range(n_actions):
+                n_pairs_per_action[i] += np.sum(actions[minibatch[pair[:, 0]]] == i)
+
+        print("Number of pairs per action:")
+        print(n_pairs_per_action)
+        print("Pairs of {} unique actions".format(np.sum(n_pairs_per_action > 0)))
+
+
         def findDissimilar(index, minibatch):
             """
             check which samples should be dissimilar

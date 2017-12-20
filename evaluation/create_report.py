@@ -37,7 +37,7 @@ print("Found {} experiments".format(len(experiments)))
 
 knn_mse = []
 # Add here keys from exp_config.json that should be saved in the csv report file
-exp_configs = {'model_type': [], 'state_dim': [], 'epochs': [], 'batch_size': []}
+exp_configs = {'model_type': [], 'state_dim': [], 'epochs': [], 'batch_size': [], 'learning_rate': []}
 
 for experiment in experiments:
 
