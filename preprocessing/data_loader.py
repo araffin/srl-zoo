@@ -148,7 +148,7 @@ class BaxterImageLoader(object):
         It uses the minibatchlist pass at initialization
         """
         self.is_training = True
-        self.minibatches_indices = np.arange(len(minibatchlist), dtype=np.int64)
+        self.minibatches_indices = np.arange(len(self.minibatchlist), dtype=np.int64)
         self.minibatchlist = self.original_minibatchlist.copy()
         self.same_actions = self.original_same_actions.copy()
         self.dissimilar = self.original_dissimilar.copy()

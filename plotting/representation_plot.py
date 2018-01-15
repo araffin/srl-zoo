@@ -7,11 +7,12 @@ from textwrap import fill
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from mpl_toolkits.mplot3d import Axes3D  # noqa
+from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
 # from sklearn.manifold import TSNE
 # Faster implementation of t-SNE:
 from MulticoreTSNE import MulticoreTSNE as TSNE
+
 # Python 2/3 compatibility
 try:
     input = raw_input
@@ -45,8 +46,9 @@ def pauseOrClose(fig):
     else:
         plt.close(fig)
 
+
 def plot_tsne(states, rewards, name="T-SNE of Learned States", add_colorbar=True, path=None,
-                n_components=3, perplexity=100.0, learning_rate=200.0, n_iter=1000, cmap="coolwarm"):
+              n_components=3, perplexity=100.0, learning_rate=200.0, n_iter=1000, cmap="coolwarm"):
     """
     :param states: (numpy array)
     :param rewards: (numpy 1D array)
@@ -61,7 +63,7 @@ def plot_tsne(states, rewards, name="T-SNE of Learned States", add_colorbar=True
     """
     assert n_components in [2, 3], "You cannot apply t-SNE with n_components={}".format(n_components)
     t_sne = TSNE(n_components=n_components, perplexity=perplexity,
-                learning_rate=learning_rate, n_iter=n_iter, verbose=1, n_jobs=4)
+                 learning_rate=learning_rate, n_iter=n_iter, verbose=1, n_jobs=4)
     s_transformed = t_sne.fit_transform(states)
     plot_representation(s_transformed, rewards, name, add_colorbar, path, cmap=cmap, fit_pca=False)
 
@@ -180,6 +182,45 @@ def colorPerEpisode(episode_starts):
     return colors
 
 
+def plot_against(states, rewards, title="Representation", fit_pca=False, cmap='coolwarm'):
+    n = states.shape[1]
+    fig, ax_mat = plt.subplots(n, n, figsize=(10, 10), sharex=False, sharey=False)
+    fig.subplots_adjust(hspace=0.0, wspace=0.0)
+
+    if fit_pca:
+        title += " (PCA)"
+        states = PCA(n_components=n).fit_transform(states)
+
+    for i in range(n):
+        for j in range(n):
+            x, y = states[:, i], states[:, j]
+            ax = ax_mat[i, j]
+            ax.scatter(x, y, c=rewards, cmap=cmap, s=5)
+            ax.set_xlim([np.min(x), np.max(x)])
+            ax.set_ylim([np.min(y), np.max(y)])
+
+            # Hide ticks
+            if i != 0 and i != n - 1:
+                ax.xaxis.set_visible(False)
+            if j != 0 and j != n - 1:
+                ax.yaxis.set_visible(False)
+
+            # Set up ticks only on one side for the "edge" subplots...
+            if j == 0:
+                ax.yaxis.set_ticks_position('left')
+            if j == n - 1:
+                ax.yaxis.set_ticks_position('right')
+            if i == 0:
+                ax.set_title("Dim {}".format(j), y=1.2)
+                ax.xaxis.set_ticks_position('top')
+            if i == n - 1:
+                ax.xaxis.set_ticks_position('bottom')
+
+
+    plt.suptitle(title, fontsize=16)
+    plt.show()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Plotting script for representation')
     parser.add_argument('-i', '--input_file', type=str, default="",
@@ -187,11 +228,15 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default="",
                         help='Path to a dataset folder, it will plot ground truth states')
     parser.add_argument('--t-sne', action='store_true', default=False, help='Use t-SNE instead of PCA')
-    parser.add_argument('--per-episode', action='store_true', default=False, help='Color states per episodes instead of reward')
+    parser.add_argument('--per-episode', action='store_true', default=False,
+                        help='Color states per episodes instead of reward')
+    parser.add_argument('--plot-against', action='store_true', default=False,
+                        help='Plot against each dimension')
     args = parser.parse_args()
 
     cmap = "tab20" if args.per_episode else "coolwarm"
-    assert not (args.per_episode and args.data_folder == ""), "You must specify a datafolder when using per-episode color"
+    assert not (args.per_episode and args.data_folder == ""),\
+           "You must specify a datafolder when using per-episode color"
     # Remove `data/` from the path if needed
     if "data/" in args.data_folder:
         args.data_folder = args.data_folder.split('data/')[1].strip("/")
@@ -207,6 +252,9 @@ if __name__ == '__main__':
         if args.t_sne:
             print("Using t-SNE...")
             plot_tsne(states_rewards['states'], rewards, cmap=cmap)
+        elif args.plot_against:
+            print("Plotting against")
+            plot_against(states_rewards['states'], rewards, cmap=cmap)
         else:
             plot_representation(states_rewards['states'], rewards, cmap=cmap)
         input('\nPress any key to exit.')
@@ -234,7 +282,10 @@ if __name__ == '__main__':
         if args.per_episode:
             rewards = colorPerEpisode(episode_starts)
 
-        plot_representation(true_states, rewards, name, cmap=cmap)
+        if args.plot_against:
+            plot_against(true_states, rewards, cmap=cmap)
+        else:
+            plot_representation(true_states, rewards, name, cmap=cmap)
         input('\nPress any key to exit.')
 
     else:

@@ -15,6 +15,17 @@ from tqdm import tqdm
 MAX_STATE_LENGTH = 60
 N_NEIGHBORS_PER_LINE = 5
 
+
+def formatStateStr(state):
+    """
+    :param state: ([float])
+    :return: (str)
+    """
+    state_str = ", ".join(map(lambda x: '{:.3f}'.format(x), state))
+    state_str = "[{}]".format(state_str)
+    return fill(state_str, MAX_STATE_LENGTH)
+
+
 # Init seaborn
 sns.set()
 
@@ -89,10 +100,7 @@ for image_path, neigbour_indices, distance, image_idx in data:
         ref_image = fig.add_subplot(n_lines + 1, 5, 3)
         img = Image.open("data/{}".format(image_path))
         plt.imshow(img)
-        state_str = ", ".join(map(lambda x: '{:.3f}'.format(x), states[image_idx]))
-        state_str = "[{}]".format(state_str)
-        state_str = fill(state_str, MAX_STATE_LENGTH)
-
+        state_str = formatStateStr(states[image_idx])
         ref_image.axis('off')
         ref_image.set_title('{}/{}\n {}\n{}'.format(record_folder, frame_name, state_str, ref_coord))
 
@@ -113,9 +121,7 @@ for image_path, neigbour_indices, distance, image_idx in data:
             plt.imshow(img)
 
             dist_str = 'd={:.4f}'.format(distance[i + 1])
-            state_str = ", ".join(map(lambda x: '{:.3f}'.format(x), states[neighbor_idx]))
-            state_str = "[{}]".format(state_str)
-            state_str = fill(state_str, MAX_STATE_LENGTH)
+            state_str = formatStateStr(states[neighbor_idx])
 
             title = '{}/{}\n {} {}\n{}'.format(neighbor_record_folder, neighbor_frame_name, state_str, dist_str,
                                                neighbor_coord)
