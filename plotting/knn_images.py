@@ -78,6 +78,7 @@ print('seed={}\n'.format(args.seed))
 
 # Sample random images
 images_indices = np.arange(len(images_path))
+n_samples = min(len(images_path), n_samples)
 data = random.sample(zip(images_path, neighbors_indices, distances, images_indices), n_samples)
 # Progressbar
 pbar = tqdm(total=n_samples)
