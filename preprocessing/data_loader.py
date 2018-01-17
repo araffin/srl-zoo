@@ -14,7 +14,7 @@ from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
 
 
-def imageWorker(image_queue, output_queue, exit_event, crop=False):
+def imageWorker(image_queue, output_queue, exit_event):
     """
     Worker that preprocess images
     :param image_queue: (multiprocessing.Queue) queue with the path to the images
@@ -22,19 +22,6 @@ def imageWorker(image_queue, output_queue, exit_event, crop=False):
                           will be added
     :param exit_event: (multiprocessing.Event) Event for exiting the loop
     """
-    # margin_left = 50
-    # margin_top = 0
-    # f = 2  # Scale factor
-    # # TODO: same seed per image
-    # np.random.seed(1)
-    # M1 = np.float32([[  99.,  61.], [ 300.,  100.], [ 111. , 160.]])
-    # M2 = np.float32([[ 112.,   78.], [ 300.,  100.], [ 107.,  160.]])
-    # M3 = np.float32([[  81.,  117.], [ 300.,  100.], [ 103.,  224.]])
-    # M4 = np.float32([[ 138.,   77.], [ 300.,  100.], [ 119. , 199.]])
-    # M5 = np.float32([[ 138.,  126.], [ 300.,  100.], [ 141. , 214.]])
-    # matrices = [M1, M2, M3, M4, M5]
-    # pts1 = np.float32([[100, 100], [300, 100], [100, 200]])
-
     while not exit_event.is_set():
         idx, image_path = image_queue.get()
 
@@ -43,21 +30,6 @@ def imageWorker(image_queue, output_queue, exit_event, crop=False):
             break
 
         im = cv2.imread(image_path)
-        # Crop
-        # if crop:
-        #     margin_left = 0
-        #     # margin_left = np.random.uniform(0, 100)
-        #     # margin_top = np.random.uniform(0, 25)
-        #     # Rotate
-        #     rows, cols, _ = im.shape
-        #     angle = np.random.randint(-10, 10)
-        #     # M = cv2.getRotationMatrix2D((cols/2,rows/2), angle, 1)
-        #     m_i = np.random.randint(len(matrices))
-        #     pts2 = matrices[m_i]
-        #     M = cv2.getAffineTransform(pts1, pts2)
-        #     im = cv2.warpAffine(im, M, (cols,rows))
-        #     margin_top = 0
-        #     im = im[int(margin_top):int(margin_top + IMAGE_HEIGHT * f), int(margin_left):int(margin_left + IMAGE_WIDTH * f)]
         # Resize
         im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
         # Convert BGR to RGB
