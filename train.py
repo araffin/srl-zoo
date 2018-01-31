@@ -46,6 +46,7 @@ BATCH_SIZE = 256  #
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 VALIDATION_SIZE = 0.2  # 20% of training data for validation
 
+
 class RoboticPriorsLoss(nn.Module):
     """
     :param model: (PyTorch model)
@@ -279,7 +280,6 @@ class SRL4robotics(BaseLearner):
         print(n_pairs_per_action)
         print("Pairs of {} unique actions".format(np.sum(n_pairs_per_action > 0)))
 
-
         def findDissimilar(index, minibatch):
             """
             check which samples should be dissimilar
@@ -321,8 +321,9 @@ class SRL4robotics(BaseLearner):
             #     positive_r = rewards[minibatch[index] + 1] > 0
             #     return np.where(positive_r * (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
 
-            similar_pairs = [np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch) if j > i],
-                                      dtype='int64') for minibatch in minibatchlist]
+            similar_pairs = [
+                np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch) if j > i],
+                         dtype='int64') for minibatch in minibatchlist]
 
             for item in similar_pairs:
                 if len(item) == 0:
@@ -336,7 +337,6 @@ class SRL4robotics(BaseLearner):
                 msg += "=> Consider increasing the batch_size or changing the seed"
                 print(msg)
                 sys.exit(NO_PAIRS_ERROR)
-
 
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
                                                same_actions, dissimilar, ref_point_pairs,
@@ -412,7 +412,8 @@ class SRL4robotics(BaseLearner):
 
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:
-                print("Epoch {:3}/{}, train_loss:{:.4f} val_loss:{:.4f}".format(epoch + 1, N_EPOCHS, train_loss, val_loss))
+                print("Epoch {:3}/{}, train_loss:{:.4f} val_loss:{:.4f}".format(epoch + 1, N_EPOCHS, train_loss,
+                                                                                val_loss))
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
@@ -438,7 +439,8 @@ if __name__ == '__main__':
                         help='random seed (default: 1)')
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('-bs', '--batch_size', type=int, default=256, help='batch_size (default: 256)')
-    parser.add_argument('--training_set_size', type=int, default=-1, help='Limit size of the training set (default: -1)')
+    parser.add_argument('--training_set_size', type=int, default=-1,
+                        help='Limit size of the training set (default: -1)')
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1_reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
@@ -449,7 +451,8 @@ if __name__ == '__main__':
                         help='Folder within logs/ where the experiment model and plots will be saved')
     parser.add_argument('--ref_prior', action='store_true', default=False,
                         help='Use Fixed Reference Point Prior (cannot be used at the same as other additional priors)')
-    parser.add_argument('--same_env_prior', action='store_true', default=False, help='Enable same env prior (disables ref prior)')
+    parser.add_argument('--same_env_prior', action='store_true', default=False,
+                        help='Enable same env prior (disables ref prior)')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
