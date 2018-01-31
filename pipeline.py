@@ -161,7 +161,7 @@ def dimReductionCall(exp_config, baseline="pca"):
     printGreen("\n Baseline {}...".format(baseline))
 
     args = ['--no-plots', '--method', baseline]
-    config_args = ['data_folder', 'training_set_size']
+    config_args = ['data_folder', 'training_set_size', 'state_dim']
 
     for arg in config_args:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
@@ -352,7 +352,7 @@ if __name__ == '__main__':
         # Grid search
         for seed in [1]:
             exp_config['seed'] = seed
-            for state_dim in [2, 3, 4, 5, 10, 20]:
+            for state_dim in [3, 4, 6, 10]:
                 # Update config
                 exp_config['state_dim'] = state_dim
                 log_folder, experiment_name = getLogFolderName(exp_config)
