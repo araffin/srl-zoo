@@ -76,7 +76,7 @@ python -m preprocessing.preprocess --data_folder staticButtonSimplest
 
 Usage:
 ```
-train.py [-h] [--epochs N] [--seed S] [--state_dim STATE_DIM]
+python train.py [-h] [--epochs N] [--seed S] [--state_dim STATE_DIM]
                 [-bs BATCH_SIZE] [--training_set_size TRAINING_SET_SIZE]
                 [-lr LEARNING_RATE] [--l1_reg L1_REG] [--no-cuda] [--no-plots]
                 [--model_type MODEL_TYPE] --data_folder DATA_FOLDER
