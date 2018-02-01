@@ -83,7 +83,6 @@ if __name__ == '__main__':
 
                 # Learn a state representation and plot it
                 ok = stateRepresentationLearningCall(exp_config)
-                ok = True
                 if not ok:
                     socket.send_json({'command': Command.ERROR.value})
                     continue
