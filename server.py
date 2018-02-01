@@ -1,7 +1,7 @@
 """
 Server to communicate with RL part
 """
-from __future__ import print_function, division
+from __future__ import print_function, division, absolute_import
 
 import time
 import os
@@ -82,19 +82,17 @@ if __name__ == '__main__':
                 saveConfig(exp_config, print_config=True)
 
                 # Learn a state representation and plot it
-                # ok = stateRepresentationLearningCall(exp_config)
+                ok = stateRepresentationLearningCall(exp_config)
                 ok = True
                 if not ok:
                     socket.send_json({'command': Command.ERROR.value})
                     continue
 
                 # Evaluate the representation with kNN
-                # knnCall(exp_config)
+                knnCall(exp_config)
 
                 path_to_model = os.path.abspath(exp_config['log_folder'])
-                time.sleep(1)
                 socket.send_json({'command': Command.READY.value, 'path': path_to_model})
-                time.sleep(1)
 
             elif command == Command.EXIT:
                 print("Exiting...")
