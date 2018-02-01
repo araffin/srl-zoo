@@ -5,7 +5,6 @@ from __future__ import print_function, division, absolute_import
 
 import time
 import os
-import json
 import argparse
 
 import zmq
@@ -32,18 +31,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port', type=int, default=7777)
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--state_dim', type=int, default=3)
-    parser.add_argument('--data_folder', type=str, required=True)
     args = parser.parse_args()
-
-    try:
-        os.makedirs("data/" + args.data_folder)
-        dataset_config = {'relative_pos': False}
-        with open("data/{}/dataset_config.json".format(args.data_folder), "wb") as f:
-            json.dump(dataset_config, f)
-    except OSError:
-        print("Dataset folder already exist")
-
-    exp_config = getBaseExpConfig(args)
 
     print('Starting up on port number {}'.format(args.port))
     context = zmq.Context()
@@ -54,7 +42,11 @@ if __name__ == '__main__':
     print("Waiting for client...")
     path = os.path.abspath(__file__)
     socket.send_json({'command': Command.HELLO.value, 'path': path})
+    msg = socket.recv_json()
+    args.data_folder = msg.get('data_folder')
     print("Connected to client")
+
+    exp_config = getBaseExpConfig(args)
 
     try:
         while True:
@@ -82,7 +74,10 @@ if __name__ == '__main__':
                 saveConfig(exp_config, print_config=True)
 
                 # Learn a state representation and plot it
-                ok = stateRepresentationLearningCall(exp_config)
+                try:
+                    ok = stateRepresentationLearningCall(exp_config)
+                except RuntimeError:
+                    ok = False
                 if not ok:
                     socket.send_json({'command': Command.ERROR.value})
                     continue
