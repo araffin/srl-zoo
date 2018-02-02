@@ -29,8 +29,6 @@ if __name__ == '__main__':
                         help='Path to overall config file, it contains variables independent from datasets (default: '
                              '/configs/default.json)')
     parser.add_argument('-p', '--port', type=int, default=7777)
-    parser.add_argument('--seed', type=int, default=1)
-    parser.add_argument('--state_dim', type=int, default=3)
     args = parser.parse_args()
 
     print('Starting up on port number {}'.format(args.port))
@@ -44,6 +42,9 @@ if __name__ == '__main__':
     socket.send_json({'command': Command.HELLO.value, 'path': path})
     msg = socket.recv_json()
     args.data_folder = msg.get('data_folder')
+    args.state_dim = msg.get('state_dim')
+    args.seed = msg.get('seed')
+    print(args)
     print("Connected to client")
 
     exp_config = getBaseExpConfig(args)

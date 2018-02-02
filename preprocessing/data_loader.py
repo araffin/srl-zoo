@@ -13,6 +13,19 @@ from torch.autograd import Variable
 from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
 
+def preprocessImage(image):
+    """
+    :param image: (numpy matrix)
+    :return: (numpy matrix)
+    """
+    # Resize
+    im = cv2.resize(image, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
+    # Convert BGR to RGB
+    im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+    # Normalize
+    im = preprocessInput(im.astype(np.float32), mode="image_net")
+    return im
+
 
 def imageWorker(image_queue, output_queue, exit_event):
     """
@@ -29,15 +42,7 @@ def imageWorker(image_queue, output_queue, exit_event):
             image_queue.put((None, None))
             break
 
-        im = cv2.imread(image_path)
-        # Resize
-        im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
-        # Convert BGR to RGB
-        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-        # Normalize
-        im = preprocessInput(im.astype(np.float32), mode="image_net")
-        output_queue.put((idx, im))
-        del im  # Free memory
+        output_queue.put((idx, preprocessImage(cv2.imread(image_path))))
 
 
 class BaxterImageLoader(object):

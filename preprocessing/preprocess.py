@@ -11,8 +11,14 @@ import numpy as np
 from tqdm import tqdm
 
 from .utils import getActions, findClosestAction, getDataFrame, samePoint
-# Root folder utils file
-from utils import parseDataFolder
+
+# Catch the exception when importing from outside
+# of this repo
+try:
+    # Root folder utils file
+    from utils import parseDataFolder
+except ImportError:
+    pass
 
 text_files = {
     'is_pressed': 'recorded_button1_is_pressed.txt',
