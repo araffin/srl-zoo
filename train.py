@@ -200,6 +200,7 @@ class SRL4robotics(BaseLearner):
         n_val_batches = np.round(VALIDATION_SIZE * len(minibatchlist)).astype(np.int64)
         val_indices = np.random.permutation(len(minibatchlist))[:n_val_batches]
         print("{} minibatches for validation, {} samples".format(n_val_batches, n_val_batches * BATCH_SIZE))
+        assert n_val_batches > 0, "Not enough sample to create a validation set"
 
         ref_point_pairs = []
         if len(is_ref_point_list) > 0:

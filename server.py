@@ -42,8 +42,6 @@ if __name__ == '__main__':
     socket.send_json({'command': Command.HELLO.value, 'path': path})
     msg = socket.recv_json()
     args.data_folder = msg.get('data_folder')
-    args.state_dim = msg.get('state_dim')
-    args.seed = msg.get('seed')
     print(args)
     print("Connected to client")
 
@@ -65,9 +63,9 @@ if __name__ == '__main__':
 
                 createFolder("logs/{}".format(exp_config['data_folder']), "Dataset log folder already exist")
 
-                exp_config['seed'] = args.seed
+                exp_config['seed'] = msg.get('seed')
                 # Update config
-                exp_config['state_dim'] = args.state_dim
+                exp_config['state_dim'] = msg.get('state_dim')
                 log_folder, experiment_name = getLogFolderName(exp_config)
                 exp_config['log_folder'] = log_folder
                 exp_config['experiment_name'] = experiment_name
