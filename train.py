@@ -260,6 +260,7 @@ class SRL4robotics(BaseLearner):
             np.array([[i, j] for i in range(self.batch_size) for j in findSameActions(i, minibatch) if j > i],
                      dtype='int64') for minibatch in minibatchlist]
 
+        print("{} observations".format(num_samples))
         # Stats about pairs
         action_set = set(actions)
         n_actions = np.max(actions) + 1
