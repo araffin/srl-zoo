@@ -103,8 +103,7 @@ python train.py [-h] [--epochs N] [--seed S] [--state_dim STATE_DIM]
   --log_folder LOG_FOLDER
                         Folder within logs/ where the experiment model and
                         plots will be saved
-  --ref_prior           Use Fixed Reference Point Prior (cannot be used at the
-                        same as other additional priors)
+  --ref_prior           Use Fixed Reference Point Prior (cannot be used at the same time as SameEnv prior)
   --same_env_prior      Enable same env prior (disables ref prior)
 
 ```
@@ -134,7 +133,7 @@ You can also plot ground truth states with:
 python plotting/representation_plot.py --data_folder path/to/datasetFolder/
 ```
 
-To have a different color per episode, you have to pass `--data_folder` argument along with `--per-episode`.
+To have a different color per episode, you have to pass `--data_folder` argument along with `--color-episode`.
 
 #### Interactive Plot
 

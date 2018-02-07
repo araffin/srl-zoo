@@ -450,7 +450,7 @@ if __name__ == '__main__':
     parser.add_argument('--log_folder', type=str, default='logs/default_folder',
                         help='Folder within logs/ where the experiment model and plots will be saved')
     parser.add_argument('--ref_prior', action='store_true', default=False,
-                        help='Use Fixed Reference Point Prior (cannot be used at the same as other additional priors)')
+                        help='Use Fixed Reference Point Prior (cannot be used at the same time as SameEnv prior)')
     parser.add_argument('--same_env_prior', action='store_true', default=False,
                         help='Enable same env prior (disables ref prior)')
 
