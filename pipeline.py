@@ -33,9 +33,7 @@ def getLogFolderName(exp_config):
     :param exp_config: (dict)
     :return: (str, str)
     """
-    now = datetime.datetime.now()
-    date = "Y{}_M{:02d}_D{:02d}_H{:02d}M{:02d}S{:02d}".format(now.year, now.month, now.day, now.hour, now.minute,
-                                                              now.second)
+    date = datetime.datetime.now().strftime("%d-%m-%y_%Hh%M_%S")
     model_str = "_{}".format(exp_config['model_type'])
     srl_str = "{}_ST_DIM{}_SEED{}".format(priorsToString(exp_config['priors']), exp_config['state_dim'],
                                           exp_config['seed'])
@@ -47,7 +45,7 @@ def getLogFolderName(exp_config):
     else:
         continuous_str = ""
 
-    experiment_name = "model{}{}{}{}_{}".format(date, model_str, continuous_str, srl_str, exp_config['model_approach'])
+    experiment_name = "{}{}{}{}_{}".format(date, model_str, continuous_str, srl_str, exp_config['model_approach'])
 
     printBlue("\nExperiment: {}\n".format(experiment_name))
     log_folder = "logs/{}/{}".format(exp_config['data_folder'], experiment_name)
