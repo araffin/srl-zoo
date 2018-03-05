@@ -76,30 +76,35 @@ python -m preprocessing.preprocess --data_folder staticButtonSimplest
 
 Usage:
 ```
-python train.py [--epochs N] [--seed S] [--state_dim STATE_DIM]
-                [-bs BATCH_SIZE] [--limit LIMIT] [-lr LEARNING_RATE] [--l1_reg L1_REG]
-                [--no-cuda] [--no-plots] [--model_type MODEL_TYPE]
-                [--data_folder DATA_FOLDER]
-                [--log_folder LOG_FOLDER]
+python train.py [-h] [--epochs N] [--seed S] [--state_dim STATE_DIM]
+                [-bs BATCH_SIZE] [--training_set_size TRAINING_SET_SIZE]
+                [-lr LEARNING_RATE] [--l1_reg L1_REG] [--no-cuda] [--no-plots]
+                [--model_type MODEL_TYPE] --data_folder DATA_FOLDER
+                [--log_folder LOG_FOLDER] [--ref_prior] [--same_env_prior]
 
---epochs N            number of epochs to train (default: 50)
---seed S              random seed (default: 1)
---state_dim STATE_DIM
-                      state dimension (default: 2)
--bs BATCH_SIZE, --batch_size BATCH_SIZE
-                      batch_size (default: 256)
---limit LIMIT         Limit number of observations (default: -1)
--lr LEARNING_RATE, --learning_rate LEARNING_RATE
-                      learning rate (default: 0.005)
---l1_reg L1_REG       L1 regularization coeff (default: 0.0)
---no-cuda             disables CUDA training
---no-plots            disables plots
---model_type MODEL_TYPE
-                      Model architecture (default: "resnet")
---data_folder DATA_FOLDER
-                      Dataset folder
---log_folder LOG_FOLDER
-                      Folder within logs/ where the experiment model and plots will be saved
+  -h, --help            show this help message and exit
+  --epochs N            number of epochs to train (default: 50)
+  --seed S              random seed (default: 1)
+  --state_dim STATE_DIM
+                        state dimension (default: 2)
+  -bs BATCH_SIZE, --batch_size BATCH_SIZE
+                        batch_size (default: 256)
+  --training_set_size TRAINING_SET_SIZE
+                        Limit size of the training set (default: -1)
+  -lr LEARNING_RATE, --learning_rate LEARNING_RATE
+                        learning rate (default: 0.005)
+  --l1_reg L1_REG       L1 regularization coeff (default: 0.0)
+  --no-cuda             disables CUDA training
+  --no-plots            disables plots
+  --model_type MODEL_TYPE
+                        Model architecture (default: "resnet")
+  --data_folder DATA_FOLDER
+                        Dataset folder
+  --log_folder LOG_FOLDER
+                        Folder within logs/ where the experiment model and
+                        plots will be saved
+  --ref_prior           Use Fixed Reference Point Prior (cannot be used at the same time as SameEnv prior)
+  --same_env_prior      Enable same env prior (disables ref prior)
 
 ```
 
@@ -127,6 +132,8 @@ You can also plot ground truth states with:
 ```
 python plotting/representation_plot.py --data_folder path/to/datasetFolder/
 ```
+
+To have a different color per episode, you have to pass `--data_folder` argument along with `--color-episode`.
 
 #### Interactive Plot
 
@@ -185,12 +192,29 @@ Example:
 python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3 --noise_factor 0.1
 ```
 
+#### PCA and t-SNE
+NOTE: before applying t-SNE, a dimension reduction with `n_components=50` is applied for computational reasons.
+
+PCA:
+```
+python -m baselines.pca_tsne --data_folder path/to/data/folder --state_dim 3 --method pca
+```
+
+t-SNE:
+```
+python -m baselines.pca_tsne --data_folder path/to/data/folder --state_dim 3 --method tsne
+```
+
 ### Dependencies
 
 Recommended configuration: Ubuntu 16.04 with python 2.7 or 3.6
 (should work with python3 though it was only thoroughly tested with python2)
 
 #### Recommended Method: Use saved conda environment
+
+[WARNING] There is one dependency that cannot be installed with a package manager (for now):
+[https://github.com/DmitryUlyanov/Multicore-TSNE](https://github.com/DmitryUlyanov/Multicore-TSNE)
+You have to clone the repo and run `pip install .`.
 
 Create the new environment `srl` from `environment.yml` file:
 ```
@@ -224,6 +248,7 @@ sudo apt-get install python-opencv (opencv 2.4 - python2)
 - Numpy
 - Scikit-learn
 - Pandas
+- Multicore t-SNE: [https://github.com/DmitryUlyanov/Multicore-TSNE](https://github.com/DmitryUlyanov/Multicore-TSNE)
 
 For plotting:
 - matplotlib

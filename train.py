@@ -44,6 +44,7 @@ DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 256  #
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
+VALIDATION_SIZE = 0.2  # 20% of training data for validation
 
 
 class RoboticPriorsLoss(nn.Module):
@@ -63,13 +64,15 @@ class RoboticPriorsLoss(nn.Module):
         self.loss_history = loss_history
 
     def forward(self, states, next_states,
-                dissimilar_pairs, same_actions_pairs, ref_point_pairs=None):
+                dissimilar_pairs, same_actions_pairs, ref_point_pairs,
+                similar_pairs):
         """
         :param states: (th Variable)
         :param next_states: (th Variable)
         :param dissimilar_pairs: (th tensor)
         :param same_actions_pairs: (th tensor)
         :param ref_point_pairs: (th tensor)
+        :param similar_pairs: (th tensor)
         :return: (th Variable)
         """
         state_diff = next_states - states
@@ -85,32 +88,34 @@ class RoboticPriorsLoss(nn.Module):
             similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
             (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
 
-        w_fixed_point = 0
+        w_fixed_point, fixed_ref_point_loss = 0, 0
+        w_same_env, same_env_loss = 0, 0
         if len(ref_point_pairs) > 0:
             # Apply reference point prior
             # It assumes all sequences in the dataset share
             # at least one same 3D pos input image of Baxter arm
-            states_same_ref_pos_t1 = states[ref_point_pairs[:, 0]]
-            states_same_ref_pos_t2 = states[ref_point_pairs[:, 1]]
 
-            same_pos_states_diff = states_same_ref_pos_t1 - states_same_ref_pos_t2
+            same_pos_states_diff = states[ref_point_pairs[:, 1]] - states[ref_point_pairs[:, 0]]
             same_pos_states_diff_norm = same_pos_states_diff.norm(2, dim=1)
             w_fixed_point = 1
             fixed_ref_point_loss = (same_pos_states_diff_norm ** 2).mean()
-        else:
-            fixed_ref_point_loss = 0
+        elif len(similar_pairs) > 0:
+            # Same Env prior
+            w_same_env = 1
+            same_env_loss = ((states[similar_pairs[:, 1]] - states[similar_pairs[:, 0]]).norm(2, dim=1) ** 2).mean()
 
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
-        total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 5 * proportionality_loss \
-                     + 5 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss
+        total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
+                     + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
+                     + w_same_env * same_env_loss
 
         if self.loss_history is not None:
-            weights = [1, 1, 1, 5, 5, w_fixed_point, self.l1_coeff]
-            names = ['total_loss', 'temp_coherence_loss', 'causality_loss', 'proportionality_loss',
-                     'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss']
-            losses = [total_loss, temp_coherence_loss, causality_loss, proportionality_loss,
-                      repeatability_loss, fixed_ref_point_loss, l1_loss]
+            weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
+            names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
+                     'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss']
+            losses = [temp_coherence_loss, causality_loss, proportionality_loss,
+                      repeatability_loss, fixed_ref_point_loss, l1_loss, same_env_loss]
             for name, w, loss in zip(names, weights, losses):
                 if w > 0:
                     if len(self.loss_history[name]) > 0:
@@ -154,7 +159,8 @@ class SRL4robotics(BaseLearner):
         self.log_folder = log_folder
 
     def learn(self, images_path, actions, rewards,
-              episode_starts, is_ref_point_list=None):
+              episode_starts, is_ref_point_list=None,
+              apply_same_env_prior=False):
         """
         Learn a state representation
         :param images_path: (numpy 1D array)
@@ -165,6 +171,7 @@ class SRL4robotics(BaseLearner):
         :param is_ref_point_list: (numpy 1D array) Boolean array where True values represent observations
                                 that correspond to the reference position
                                 (when using the reference prior)
+        :param apply_same_env_prior: (bool) whether to apply same env prior
         :return: (numpy tensor) the learned states for the given observations
         """
 
@@ -189,9 +196,14 @@ class SRL4robotics(BaseLearner):
             print("Removing last minibatch of size {} < batch_size".format(len(minibatchlist[-1])))
             del minibatchlist[-1]
 
+        # Number of minibatches used for validation:
+        n_val_batches = np.round(VALIDATION_SIZE * len(minibatchlist)).astype(np.int64)
+        val_indices = np.random.permutation(len(minibatchlist))[:n_val_batches]
+        print("{} minibatches for validation, {} samples".format(n_val_batches, n_val_batches * BATCH_SIZE))
+
         ref_point_pairs = []
         if len(is_ref_point_list) > 0:
-            def find_ref_point(index, minibatch):
+            def findRefPoint(index, minibatch):
                 """
                 Find observations corresponding to the reference
                 :param index: (int)
@@ -220,7 +232,7 @@ class SRL4robotics(BaseLearner):
                 print("[WARNING] Over-sampling for ref prior was applied {} times".format(n_over_sampling))
 
             ref_point_pairs = [np.array([[i, j] for i in range(self.batch_size)
-                                         for j in find_ref_point(i, minibatch) if j > i],
+                                         for j in findRefPoint(i, minibatch) if j > i],
                                         dtype='int64') for minibatch in minibatchlist]
 
             for item in ref_point_pairs:
@@ -232,7 +244,7 @@ class SRL4robotics(BaseLearner):
                     print(msg)
                     sys.exit(NO_PAIRS_ERROR)
 
-        def find_same_actions(index, minibatch):
+        def findSameActions(index, minibatch):
             """
             Get observations indices where the same action was performed
             as in a reference observation
@@ -244,13 +256,34 @@ class SRL4robotics(BaseLearner):
 
         # same_actions: list of arrays, each containing one pair of observation ids
         same_actions = [
-            np.array([[i, j] for i in range(self.batch_size) for j in find_same_actions(i, minibatch) if j > i],
+            np.array([[i, j] for i in range(self.batch_size) for j in findSameActions(i, minibatch) if j > i],
                      dtype='int64') for minibatch in minibatchlist]
 
-        def find_dissimilar(index, minibatch):
+        # Stats about pairs
+        action_set = set(actions)
+        n_actions = np.max(actions) + 1
+        print("{} unique actions / {} actions".format(len(action_set), n_actions))
+        n_pairs_per_action = np.zeros(n_actions, dtype=np.int64)
+        n_obs_per_action = np.zeros(n_actions, dtype=np.int64)
+
+        for i in range(n_actions):
+            n_obs_per_action[i] = np.sum(actions == i)
+
+        print("Number of observations per action")
+        print(n_obs_per_action)
+
+        for pair, minibatch in zip(same_actions, minibatchlist):
+            for i in range(n_actions):
+                n_pairs_per_action[i] += np.sum(actions[minibatch[pair[:, 0]]] == i)
+
+        print("Number of pairs per action:")
+        print(n_pairs_per_action)
+        print("Pairs of {} unique actions".format(np.sum(n_pairs_per_action > 0)))
+
+        def findDissimilar(index, minibatch):
             """
             check which samples should be dissimilar
-            because they lead to different rewards aften the same actions
+            because they lead to different rewards after the same actions
             :param index: (int)
             :param minibatch: (numpy array)
             :return: (dict, numpy array)
@@ -258,12 +291,48 @@ class SRL4robotics(BaseLearner):
             return np.where((actions[minibatch] == actions[minibatch[index]]) *
                             (rewards[minibatch + 1] != rewards[minibatch[index] + 1]))[0]
 
-        dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in find_dissimilar(i, minibatch) if j > i],
+        dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch) if j > i],
                                dtype='int64') for minibatch in minibatchlist]
+
+        similar_pairs = []
+        if apply_same_env_prior:
+            print("Applying same env prior")
+
+            def findSimilar(index, minibatch):
+                """
+                check which samples should be similar
+                because they lead to the same positive rewards after the same actions
+                :param index: (int)
+                :param minibatch: (numpy array)
+                :return: (dict, numpy array)
+                """
+                positive_r = rewards[minibatch[index] + 1] > 0
+                return np.where(positive_r * (actions[minibatch] == actions[minibatch[index]]) *
+                                (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
+
+            # def findSimilar(index, minibatch):
+            #     """
+            #     check which samples should be similar
+            #     because they lead to the same positive reward
+            #     :param index: (int)
+            #     :param minibatch: (numpy array)
+            #     :return: (dict, numpy array)
+            #     """
+            #     positive_r = rewards[minibatch[index] + 1] > 0
+            #     return np.where(positive_r * (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
+
+            similar_pairs = [
+                np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch) if j > i],
+                         dtype='int64') for minibatch in minibatchlist]
+
+            for item in similar_pairs:
+                if len(item) == 0:
+                    print("No pairs found for one minibatch of similar pairs")
+                    sys.exit(NO_PAIRS_ERROR)
 
         for item in same_actions + dissimilar:
             if len(item) == 0:
-                msg = "No similar or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
+                msg = "No same actions or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
                     BATCH_SIZE)
                 msg += "=> Consider increasing the batch_size or changing the seed"
                 print(msg)
@@ -271,7 +340,7 @@ class SRL4robotics(BaseLearner):
 
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
                                                same_actions, dissimilar, ref_point_pairs,
-                                               cache_capacity=5000)
+                                               similar_pairs, cache_capacity=5000)
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
@@ -284,41 +353,57 @@ class SRL4robotics(BaseLearner):
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             epoch_loss, epoch_batches = 0, 0
+            val_loss = 0
             pbar = tqdm(total=len(minibatchlist))
             baxter_data_loader.resetAndShuffle()
-            for obs, next_obs, same, diss, is_ref_point_list in baxter_data_loader:
+            for _input in baxter_data_loader:
+                # Unpack input
+                minibatch_idx, obs, next_obs, same, diss, is_ref_point_list, sim_pairs = _input
                 if self.cuda:
                     obs, next_obs = obs.cuda(), next_obs.cuda()
-                    same, diss = same.cuda(), diss.cuda()  #
+                    same, diss = same.cuda(), diss.cuda()
                     if len(is_ref_point_list) > 0:
                         is_ref_point_list = is_ref_point_list.cuda()
+                    if len(sim_pairs) > 0:
+                        sim_pairs = sim_pairs.cuda()
 
                 # Predict states given observations
                 states, next_states = self.model(obs), self.model(next_obs)
 
                 self.optimizer.zero_grad()
-                loss = criterion(states, next_states, diss, same, is_ref_point_list)
+                loss = criterion(states, next_states, diss, same,
+                                 is_ref_point_list, sim_pairs)
+                # We have to call backward in both train/val
+                # to avoid memory error
                 loss.backward()
-                self.optimizer.step()
-                epoch_loss += loss.data[0]
-                epoch_batches += 1
+                if minibatch_idx in val_indices:
+                    val_loss += loss.data[0]
+                    # We do not optimize on validation data
+                    # so optimizer.step() is not called
+                else:
+                    self.optimizer.step()
+                    epoch_loss += loss.data[0]
+                    epoch_batches += 1
                 pbar.update(1)
             pbar.close()
 
             train_loss = epoch_loss / epoch_batches
-
+            val_loss /= n_val_batches
             # Even if loss_history is modified by RoboticPriorsLoss object
             # we make it explicit
             loss_history = criterion.loss_history
+            loss_history['train_loss'].append(train_loss)
+            loss_history['val_loss'].append(val_loss)
             for key in loss_history.keys():
+                if key in ['train_loss', 'val_loss']:
+                    continue
                 loss_history[key][-1] /= epoch_batches
                 if epoch + 1 < N_EPOCHS:
                     loss_history[key].append(0)
 
             # Save best model
-            # TODO: use a validation set
-            if train_loss < best_error:
-                best_error = train_loss
+            if val_loss < best_error:
+                best_error = val_loss
                 th.save(self.model.state_dict(), best_model_path)
 
             if np.isnan(train_loss):
@@ -327,7 +412,8 @@ class SRL4robotics(BaseLearner):
 
             # Then we print the results for this epoch:
             if (epoch + 1) % EPOCH_FLAG == 0:
-                print("Epoch {:3}/{}, loss:{:.4f}".format(epoch + 1, N_EPOCHS, epoch_loss / epoch_batches))
+                print("Epoch {:3}/{}, train_loss:{:.4f} val_loss:{:.4f}".format(epoch + 1, N_EPOCHS, train_loss,
+                                                                                val_loss))
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
@@ -353,7 +439,8 @@ if __name__ == '__main__':
                         help='random seed (default: 1)')
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('-bs', '--batch_size', type=int, default=256, help='batch_size (default: 256)')
-    parser.add_argument('--limit', type=int, default=-1, help='Limit number of observations (default: -1)')
+    parser.add_argument('--training_set_size', type=int, default=-1,
+                        help='Limit size of the training set (default: -1)')
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1_reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
@@ -362,8 +449,10 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log_folder', type=str, default='logs/default_folder',
                         help='Folder within logs/ where the experiment model and plots will be saved')
-    parser.add_argument('--no_ref_prior', action='store_true', default=False,
-                        help='Disable Fixed Reference Point Prior')
+    parser.add_argument('--ref_prior', action='store_true', default=False,
+                        help='Use Fixed Reference Point Prior (cannot be used at the same time as SameEnv prior)')
+    parser.add_argument('--same_env_prior', action='store_true', default=False,
+                        help='Enable same env prior (disables ref prior)')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -371,7 +460,7 @@ if __name__ == '__main__':
     DISPLAY_PLOTS = not args.no_plots
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
-    APPLY_5TH_PRIOR = not args.no_ref_prior
+    APPLY_5TH_PRIOR = args.ref_prior and not args.same_env_prior
     plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
 
     print('Log folder: {}'.format(args.log_folder))
@@ -394,8 +483,8 @@ if __name__ == '__main__':
         print('Applying 5th fixed ref_point prior...')
         is_ref_point_list = training_data['is_ref_point_list']
 
-    if args.limit > 0:
-        limit = args.limit
+    if args.training_set_size > 0:
+        limit = args.training_set_size
         actions = actions[:limit]
         images_path = images_path[:limit]
         rewards = rewards[:limit]
@@ -404,7 +493,8 @@ if __name__ == '__main__':
             is_ref_point_list = is_ref_point_list[:limit]
 
     loss_history, learned_states = srl.learn(images_path, actions,
-                                             rewards, episode_starts, is_ref_point_list)
+                                             rewards, episode_starts,
+                                             is_ref_point_list, args.same_env_prior)
     # Save losses losses history
     np.savez('{}/loss_history.npz'.format(args.log_folder), **loss_history)
     # Save plot

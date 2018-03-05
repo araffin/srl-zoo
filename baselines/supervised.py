@@ -166,7 +166,7 @@ def saveExpConfig(args, log_folder):
         "data_folder": args.data_folder,
         "epochs": args.epochs,
         "learning_rate": args.learning_rate,
-        "limit": args.limit,
+        "training_set_size": args.training_set_size,
         "log_folder": log_folder,
         "model_type": args.model_type,
         "seed": args.seed,
@@ -188,7 +188,9 @@ if __name__ == '__main__':
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model_type', type=str, default="resnet", help='Model architecture (default: "resnet")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
-    parser.add_argument('--limit', type=int, default=-1, help='Limit number of observations (default: -1)')
+    parser.add_argument('--training_set_size', type=int, default=-1, help='Limit size of the training set (default: -1)')
+    parser.add_argument('--relative_pos', action='store_true', default=False,
+                        help='Use relative position as ground_truth')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -207,16 +209,27 @@ if __name__ == '__main__':
     print('Log folder: {}'.format(log_folder))
 
     print('Loading data ... ')
-    rewards = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))['rewards']
+    training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
+    rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
 
     # TODO: normalize true states
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
     true_states = ground_truth['arm_states']
+    button_positions = ground_truth['button_positions']
+
+    if args.relative_pos:
+        print("Using relative position")
+        button_idx = -1
+        for i in range(len(episode_starts)):
+            if episode_starts[i] == 1:
+                button_idx += 1
+            true_states[i] -= button_positions[button_idx]
+
     images_path = ground_truth['images_path']
     state_dim = true_states.shape[1]
 
-    if args.limit > 0:
-        limit = args.limit
+    if args.training_set_size > 0:
+        limit = args.training_set_size
         true_states = true_states[:limit]
         images_path = images_path[:limit]
         rewards = rewards[:limit]

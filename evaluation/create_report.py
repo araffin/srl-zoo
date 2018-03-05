@@ -37,14 +37,14 @@ print("Found {} experiments".format(len(experiments)))
 
 knn_mse = []
 # Add here keys from exp_config.json that should be saved in the csv report file
-exp_configs = {'model_type': [], 'state_dim': []}
+exp_configs = {'model_type': [], 'state_dim': [], 'epochs': [], 'batch_size': [], 'learning_rate': []}
 
 for experiment in experiments:
 
     with open('{}/{}/exp_config.json'.format(dataset_logfolder, experiment)) as f:
         exp_config = json.load(f)
     for key in exp_configs.keys():
-        exp_configs[key].append(exp_config[key])
+        exp_configs[key].append(exp_config.get(key, None))
 
     knn_mse.append(getKnnMse('{}/{}/knn_mse.json'.format(dataset_logfolder, experiment)))
 

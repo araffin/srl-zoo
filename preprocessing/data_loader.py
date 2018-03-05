@@ -32,6 +32,8 @@ def imageWorker(image_queue, output_queue, exit_event):
         im = cv2.imread(image_path)
         # Resize
         im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
+        # Convert BGR to RGB
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         # Normalize
         im = preprocessInput(im.astype(np.float32), mode="image_net")
         output_queue.put((idx, im))
@@ -48,6 +50,7 @@ class BaxterImageLoader(object):
     :param same_actions: [numpy matrix]
     :param dissimilar: [numpy matrix]
     :param ref_point_pairs: [numpy matrix]
+    :param similar_pairs: [numpy matrix]
     :param test_batch_size: (int)
     :param cache_capacity: (int) number of images that can be cached
     :param n_workers: (int) number of processes used for preprocessing
@@ -57,7 +60,8 @@ class BaxterImageLoader(object):
     """
 
     def __init__(self, minibatchlist, images_path, same_actions,
-                 dissimilar, ref_point_pairs=None, test_batch_size=512, cache_capacity=5000,
+                 dissimilar, ref_point_pairs=None, similar_pairs=None,
+                 test_batch_size=512, cache_capacity=5000,
                  n_workers=5, auto_cleanup=True):
         super(BaxterImageLoader, self).__init__()
 
@@ -72,11 +76,14 @@ class BaxterImageLoader(object):
         self.dissimilar = np.array(dissimilar[:])
         self.same_actions = np.array(same_actions[:])
         self.ref_point_pairs = np.array(ref_point_pairs[:]) if ref_point_pairs is not None else np.array([])
+        self.similar_pairs = np.array(similar_pairs[:]) if similar_pairs is not None else np.array([])
         # Save minibatches original order
+        self.minibatches_indices = np.arange(len(minibatchlist), dtype=np.int64)
         self.original_minibatchlist = self.minibatchlist.copy()
         self.original_same_actions = self.same_actions.copy()
         self.original_dissimilar = self.dissimilar.copy()
         self.original_ref_point_pairs = self.ref_point_pairs.copy()
+        self.original_similar_pairs = self.similar_pairs.copy()
 
         # Index of the minibatch in the iterator
         self.current_idx = 0
@@ -141,10 +148,12 @@ class BaxterImageLoader(object):
         It uses the minibatchlist pass at initialization
         """
         self.is_training = True
+        self.minibatches_indices = np.arange(len(self.minibatchlist), dtype=np.int64)
         self.minibatchlist = self.original_minibatchlist.copy()
         self.same_actions = self.original_same_actions.copy()
         self.dissimilar = self.original_dissimilar.copy()
         self.ref_point_pairs = self.original_ref_point_pairs.copy()
+        self.similar_pairs = self.original_similar_pairs.copy()
         # Reset the iterator
         self.resetIterator()
 
@@ -180,8 +189,11 @@ class BaxterImageLoader(object):
             start_idx = i * batch_size
             end_idx = min(start_idx + batch_size, len(x_indices))
             excerpt = slice(start_idx, end_idx)
-            minibatchlist.append(x_indices[excerpt])
-            targets.append(y_values[excerpt])
+            # Remove excerpt with no elements
+            if len(x_indices[excerpt]) > 0:
+                minibatchlist.append(x_indices[excerpt])
+                targets.append(y_values[excerpt])
+
         return minibatchlist, targets
 
     def deleteOldCache(self):
@@ -231,11 +243,15 @@ class BaxterImageLoader(object):
         Shuffle list of minibatches
         """
         indices = np.random.permutation(self.n_minibatches).astype(np.int64)
+        self.minibatches_indices = indices
         self.minibatchlist = self.minibatchlist[indices]
         self.same_actions = self.same_actions[indices]
         self.dissimilar = self.dissimilar[indices]
         if len(self.ref_point_pairs) > 0:
             self.ref_point_pairs = self.ref_point_pairs[indices]
+
+        if len(self.similar_pairs) > 0:
+            self.similar_pairs = self.similar_pairs[indices]
 
     def resetQueues(self):
         """
@@ -360,6 +376,11 @@ class BaxterImageLoader(object):
                 ref_point_pairs = self.ref_point_pairs[i][np.random.permutation(self.ref_point_pairs[i].shape[0])]
                 ref_point_pairs = th.from_numpy(ref_point_pairs)
 
+            similar_pairs = th.zeros(0)  # Empty tensor
+            if len(self.similar_pairs) > 0:
+                similar_pairs = self.similar_pairs[i][np.random.permutation(self.similar_pairs[i].shape[0])]
+                similar_pairs = th.from_numpy(similar_pairs)
+
             # Retrieve observations
             # Define a dict to modify it in the for loop
             obs_dict = {'obs': None, 'next_obs': None}
@@ -371,7 +392,9 @@ class BaxterImageLoader(object):
         self._sendToWorkers(batch_size, indices_list, obs_dict)
 
         if self.is_training:
-            self.preprocess_result = obs_dict['obs'], obs_dict['next_obs'], diss.clone(), same.clone(), ref_point_pairs.clone()
+            self.preprocess_result = self.minibatches_indices[i], obs_dict['obs'], obs_dict['next_obs'],\
+                                     diss.clone(), same.clone(),\
+                                     ref_point_pairs.clone(), similar_pairs.clone()
         else:
             self.preprocess_result = obs_dict['obs']
 

@@ -171,8 +171,6 @@ if __name__ == '__main__':
     assert len(all_rewards) == len(all_images_path), "n_rewards != n_images: {} != {}".format(len(all_rewards),
                                                                                               len(all_images_path))
 
-    print("Saving preprocessed data...")
-    np.savez('{}/preprocessed_data.npz'.format(data_folder), **data)
 
     ground_truth = {
         'button_positions': button_positions,

@@ -193,7 +193,7 @@ def saveExpConfig(args, log_folder):
         "data_folder": args.data_folder,
         "epochs": args.epochs,
         "learning_rate": args.learning_rate,
-        "limit": args.limit,
+        "training_set_size": args.training_set_size,
         "log_folder": log_folder,
         "noise_factor": args.noise_factor,
         "model_type": args.model_type,
@@ -218,7 +218,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('--noise_factor', type=float, default=0.1, help='Noise factor for denoising autoencoder')
-    parser.add_argument('--limit', type=int, default=-1, help='Limit number of observations (default: -1)')
+    parser.add_argument('--training_set_size', type=int, default=-1, help='Limit size of the training set (default: -1)')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -243,8 +243,8 @@ if __name__ == '__main__':
     rewards = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))['rewards']
     images_path = np.load("data/{}/ground_truth.npz".format(args.data_folder))['images_path']
 
-    if args.limit > 0:
-        limit = args.limit
+    if args.training_set_size > 0:
+        limit = args.training_set_size
         images_path = images_path[:limit]
         rewards = rewards[:limit]
 

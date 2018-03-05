@@ -1,10 +1,11 @@
 #!/bin/bash
 
 # Params
-data_folder=staticButtonSimplest
+data_folder=colorful75
 
 # State Representation Learning with Priors (grid search)
 python pipeline.py --data_folder data/$data_folder --base_config configs/default.json
+python pipeline.py --data_folder data/$data_folder --base_config configs/ref_prior.json
 python pipeline.py --data_folder data/$data_folder --base_config configs/original_priors.json
 # Baselines (grid search)
 python pipeline.py --baselines --data_folder data/$data_folder --base_config configs/default.json

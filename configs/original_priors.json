@@ -1,14 +1,15 @@
 {
   "batch_size": 256,
-  "epochs": 15,
-  "knn_samples": 15,
+  "epochs": 25,
+  "knn_samples": 2000,
   "knn_seed": 1,
   "l1_reg": 0,
-  "limit": 6000,
+  "training_set_size": 6000,
   "learning_rate": 0.001,
   "model_approach": "priors",
   "model_type": "custom_cnn",
   "n_neighbors": 5,
+  "n_to_plot": 5,
   "priors": [
     "Proportionality",
     "Temporal",
