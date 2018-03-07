@@ -12,7 +12,7 @@ from torch.autograd import Variable
 
 from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
-
+DUAL_CAM = True
 
 def imageWorker(image_queue, output_queue, exit_event):
     """
@@ -28,14 +28,40 @@ def imageWorker(image_queue, output_queue, exit_event):
         if idx is None:
             image_queue.put((None, None))
             break
+        #print("IM PATH:",image_path)
+        
+        if DUAL_CAM:
 
-        im = cv2.imread(image_path)
-        # Resize
-        im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
-        # Convert BGR to RGB
-        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-        # Normalize
-        im = preprocessInput(im.astype(np.float32), mode="image_net")
+            im1 = cv2.imread(image_path+"_1.jpg")
+            # Resize
+            im1 = cv2.resize(im1, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
+            # Convert BGR to RGB
+            im1 = cv2.cvtColor(im1, cv2.COLOR_BGR2RGB)
+            # Normalize
+            im1 = preprocessInput(im1.astype(np.float32), mode="image_net")
+
+            #second cam
+            im2 = cv2.imread(image_path+"_2.jpg")
+            # Resize
+            im2 = cv2.resize(im2, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
+            # Convert BGR to RGB
+            im2 = cv2.cvtColor(im2, cv2.COLOR_BGR2RGB)
+            # Normalize
+            im2 = preprocessInput(im2.astype(np.float32), mode="image_net")
+            
+            #print("shapes im 1",im1.shape)
+            #stacking along channels
+            im = np.dstack((im1,im2))
+            
+            #print("shapes im stack",im.shape)
+        else:
+            im = cv2.imread(image_path+"_1.jpg")
+            # Resize
+            im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
+            # Convert BGR to RGB
+            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+            # Normalize
+                    
         output_queue.put((idx, im))
         del im  # Free memory
 

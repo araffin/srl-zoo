@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import torchvision.models as models
 
 from .custom_layers import GaussianNoiseVariant
-
+from  preprocessing.preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
 
 class SRLConvolutionalNetwork(nn.Module):
     """
@@ -55,6 +55,10 @@ class SRLDenseNetwork(nn.Module):
     def __init__(self, input_dim, state_dim=2, batch_size=256,
                  cuda=False, n_hidden=32, noise_std=1e-6):
         super(SRLDenseNetwork, self).__init__()
+        print("input dim : ",input_dim)
+        print("input type : ",type(input_dim))
+        input_dim = input_dim * 2
+                
         self.fc1 = nn.Linear(input_dim, n_hidden)
         self.fc2 = nn.Linear(n_hidden, state_dim)
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
@@ -133,7 +137,7 @@ class CustomCNN(nn.Module):
         # conv3x3 followed by BatchNorm2d
         self.conv_layers = nn.Sequential(
             # 224x224x3 -> 112x112x64
-            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.Conv2d(N_CHANNELS, 64, kernel_size=7, stride=2, padding=3, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),  # 56x56x64
@@ -269,7 +273,7 @@ class CNNAutoEncoder(nn.Module):
         # TODO: implement residual connection
         self.encoderConv = nn.Sequential(
             # 224x224x3 -> 112x112x64
-            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.Conv2d(N_CHANNELS, 64, kernel_size=7, stride=2, padding=3, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),  # 56x56x64

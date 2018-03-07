@@ -31,7 +31,7 @@ BOUND_SUP = [0.75, 0.60, 0.35]
 # Resized image shape
 IMAGE_WIDTH = 224  # in px
 IMAGE_HEIGHT = 224  # in px
-N_CHANNELS = 3
+N_CHANNELS = 6 #3
 MAX_RECORDS = 5000  # No limit
 INPUT_DIM = IMAGE_WIDTH * IMAGE_HEIGHT * N_CHANNELS
 
