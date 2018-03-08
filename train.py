@@ -129,7 +129,7 @@ class RoboticPriorsLoss(nn.Module):
 class SRL4robotics(BaseLearner):
     """
     :param state_dim: (int)
-    :param model_type: (str) one of "resnet" or "mlp"
+    :param model_type: (str) one of "resnet", "mlp" or "custom_cnn"
     :param seed: (int)
     :param learning_rate: (float)
     :param l1_reg: (float)
@@ -447,7 +447,8 @@ if __name__ == '__main__':
     parser.add_argument('--l1_reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
-    parser.add_argument('--model_type', type=str, default="resnet", help='Model architecture (default: "resnet")')
+    parser.add_argument('--model_type', type=str, default="custom_cnn", choices=['custom_cnn', 'resnet', 'mlp'],
+                        help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log_folder', type=str, default='logs/default_folder',
                         help='Folder within logs/ where the experiment model and plots will be saved')

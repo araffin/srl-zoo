@@ -33,7 +33,7 @@ def getLogFolderName(exp_config):
     :param exp_config: (dict)
     :return: (str, str)
     """
-    date = datetime.datetime.now().strftime("%d-%m-%y_%Hh%M_%S")
+    date = datetime.datetime.now().strftime("%m-%d-%y_%Hh%M_%S")
     model_str = "_{}".format(exp_config['model_type'])
     srl_str = "{}_ST_DIM{}_SEED{}".format(priorsToString(exp_config['priors']), exp_config['state_dim'],
                                           exp_config['seed'])
@@ -290,25 +290,25 @@ if __name__ == '__main__':
 
             # Autoencoder
             exp_config['model_type'] = "cnn"
-            for state_dim in [2, 3, 4, 5, 6]:
+            for state_dim in [3, 4, 5, 6]:
                 # Update config
                 exp_config['state_dim'] = state_dim
                 baselineCall(exp_config, 'autoencoder')
                 evaluateBaseline(base_config)
 
         # PCA
-        for state_dim in [2, 3, 4, 5, 6]:
+        for state_dim in [3, 4, 5, 6]:
             # Update config
             exp_config['state_dim'] = state_dim
             dimReductionCall(exp_config, 'pca')
             evaluateBaseline(base_config)
 
         # t-SNE
-        for state_dim in [2, 3]:
-            # Update config
-            exp_config['state_dim'] = state_dim
-            dimReductionCall(exp_config, 'tsne')
-            evaluateBaseline(base_config)
+        # for state_dim in [2, 3]:
+        #     # Update config
+        #     exp_config['state_dim'] = state_dim
+        #     dimReductionCall(exp_config, 'tsne')
+        #     evaluateBaseline(base_config)
 
     # Reproduce a previous experiment using "exp_config.json"
     elif args.exp_config != "":
@@ -348,7 +348,7 @@ if __name__ == '__main__':
         preprocessingCall(exp_config)
 
         # Grid search
-        for seed in [1]:
+        for seed in [0]:
             exp_config['seed'] = seed
             for state_dim in [3, 4, 6, 10]:
                 # Update config
