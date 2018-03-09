@@ -131,7 +131,7 @@ class BaseLearner(object):
         """
         print("Saving image path to state representation")
         image_to_state = {path: list(map(str, state)) for path, state in zip(images_path, states)}
-        with open("{}/image_to_state{}.json".format(log_folder, name), 'wb') as f:
+        with open("{}/image_to_state{}.json".format(log_folder, name), 'w') as f:
             json.dump(image_to_state, f, sort_keys=True)
         print("Saving states and rewards")
         states_rewards = {'states': states, 'rewards': rewards}

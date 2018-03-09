@@ -209,7 +209,7 @@ def useRelativePosition(data_folder):
     :param data_folder: (str)
     :return: (bool)
     """
-    with open('data/{}/dataset_config.json'.format(data_folder), 'rb') as f:
+    with open('data/{}/dataset_config.json'.format(data_folder), 'r') as f:
         relative_pos = json.load(f).get('relative_pos', False)
     return relative_pos
 
@@ -227,7 +227,7 @@ def getBaseExpConfig(args):
     dataset_path = "data/{}".format(args.data_folder)
     assert os.path.isdir(dataset_path), "Path to dataset folder is not valid: {}".format(dataset_path)
 
-    with open(args.base_config, 'rb') as f:
+    with open(args.base_config, 'r') as f:
         exp_config = json.load(f)
     exp_config['data_folder'] = args.data_folder
     exp_config['relative_pos'] = useRelativePosition(args.data_folder)
@@ -312,7 +312,7 @@ if __name__ == '__main__':
 
     # Reproduce a previous experiment using "exp_config.json"
     elif args.exp_config != "":
-        with open(args.exp_config, 'rb') as f:
+        with open(args.exp_config, 'r') as f:
             exp_config = json.load(f)
 
         print("\n Pipeline using json config file: {} \n".format(args.exp_config))

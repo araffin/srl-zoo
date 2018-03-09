@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
     if os.path.isfile('{}/dataset_config.json'.format(data_folder)):
         print("Loading dataset config...")
-        with open('{}/dataset_config.json'.format(data_folder), 'rb') as f:
+        with open('{}/dataset_config.json'.format(data_folder), 'r') as f:
             dataset_config = json.load(f)
             BOUND_INF = dataset_config['bound_inf']
             BOUND_SUP = dataset_config['bound_sup']
