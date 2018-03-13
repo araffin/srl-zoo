@@ -21,7 +21,7 @@ from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
-from models.models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN
+from models.models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, SRLSiameseCNN
 from plotting.representation_plot import plot_representation, plt
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import BaxterImageLoader
@@ -45,7 +45,6 @@ EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 256  #
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 VALIDATION_SIZE = 0.2  # 20% of training data for validation
-
 
 class RoboticPriorsLoss(nn.Module):
     """
@@ -134,16 +133,23 @@ class SRL4robotics(BaseLearner):
     :param learning_rate: (float)
     :param l1_reg: (float)
     :param cuda: (bool)
+    :param multi_gpu (bool)
+    :param multi_view (bool)
     """
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
-                 seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False):
+                 seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False, multi_gpu=False,multi_view=False):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
+
+        self.multi_view=multi_view
 
         if model_type == "resnet":
             self.model = SRLConvolutionalNetwork(self.state_dim, cuda, noise_std=NOISE_STD)
         elif model_type == "custom_cnn":
+            #if not multi_view:
+            #    self.model = SRLSiameseCNN(self.state_dim, cuda, noise_std=NOISE_STD)
+            #else:
             self.model = SRLCustomCNN(self.state_dim, cuda, noise_std=NOISE_STD)
         elif model_type == "mlp":
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
@@ -153,6 +159,9 @@ class SRL4robotics(BaseLearner):
 
         if cuda:
             self.model.cuda()
+        if multi_gpu:
+            self.model = nn.DataParallel(self.model)
+            
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.l1_reg = l1_reg
@@ -243,7 +252,39 @@ class SRL4robotics(BaseLearner):
                         ref_point_pairs)
                     print(msg)
                     sys.exit(NO_PAIRS_ERROR)
+        
+        def findDissimilar(index, minibatch):
+            """
+            check which samples should be dissimilar
+            because they lead to different rewards after the same actions
+            :param index: (int)
+            :param minibatch: (numpy array)
+            :return: (dict, numpy array)
+            """
+            return np.where((actions[minibatch] == actions[minibatch[index]]) *
+                            (rewards[minibatch + 1] != rewards[minibatch[index] + 1]))[0]
 
+        dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch) if j > i],
+                               dtype='int64') for minibatch in minibatchlist]
+                               
+        #Swapping relevant pairs to have at least a pair of dissimilar obs in every minibatches
+        print('Dealing with minibatches missing dissimilar pairs...')
+        for minibatch_id, d in enumerate(dissimilar):
+            if len(d) == 0:
+                #print('d',d)
+                #print('empty item d:', minibatch_id)
+                for m_id, minibatch in enumerate(minibatchlist):
+                    for i in range(self.batch_size):
+                        for j in findDissimilar(i, minibatch):                            
+                            if (j > i) & (minibatch_id !=m_id) :                                
+                                tmp = minibatch[j]                                
+                                minibatch[j] = minibatchlist[minibatch_id][j]
+                                minibatchlist[minibatch_id][j] = tmp                                
+                                dissimilar[minibatch_id] = np.array([[i,j]])
+                                break
+                            
+        #dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch) if j > i],
+        #                       dtype='int64') for minibatch in minibatchlist]                
         def findSameActions(index, minibatch):
             """
             Get observations indices where the same action was performed
@@ -258,7 +299,8 @@ class SRL4robotics(BaseLearner):
         same_actions = [
             np.array([[i, j] for i in range(self.batch_size) for j in findSameActions(i, minibatch) if j > i],
                      dtype='int64') for minibatch in minibatchlist]
-
+                     
+        
         # Stats about pairs
         action_set = set(actions)
         n_actions = np.max(actions) + 1
@@ -280,20 +322,8 @@ class SRL4robotics(BaseLearner):
         print(n_pairs_per_action)
         print("Pairs of {} unique actions".format(np.sum(n_pairs_per_action > 0)))
 
-        def findDissimilar(index, minibatch):
-            """
-            check which samples should be dissimilar
-            because they lead to different rewards after the same actions
-            :param index: (int)
-            :param minibatch: (numpy array)
-            :return: (dict, numpy array)
-            """
-            return np.where((actions[minibatch] == actions[minibatch[index]]) *
-                            (rewards[minibatch + 1] != rewards[minibatch[index] + 1]))[0]
 
-        dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch) if j > i],
-                               dtype='int64') for minibatch in minibatchlist]
-
+                
         similar_pairs = []
         if apply_same_env_prior:
             print("Applying same env prior")
@@ -302,7 +332,7 @@ class SRL4robotics(BaseLearner):
                 """
                 check which samples should be similar
                 because they lead to the same positive rewards after the same actions
-                :param index: (int)
+:                :param index: (int)
                 :param minibatch: (numpy array)
                 :return: (dict, numpy array)
                 """
@@ -340,7 +370,7 @@ class SRL4robotics(BaseLearner):
 
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
                                                same_actions, dissimilar, ref_point_pairs,
-                                               similar_pairs, cache_capacity=5000)
+                                               similar_pairs, cache_capacity=100,multi_view=self.multi_view) #default=5000
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
@@ -368,6 +398,7 @@ class SRL4robotics(BaseLearner):
                         sim_pairs = sim_pairs.cuda()
 
                 # Predict states given observations
+                #print("train.py - obs.shape :",obs.shape,next_obs.shape)
                 states, next_states = self.model(obs), self.model(next_obs)
 
                 self.optimizer.zero_grad()
@@ -453,7 +484,13 @@ if __name__ == '__main__':
                         help='Use Fixed Reference Point Prior (cannot be used at the same time as SameEnv prior)')
     parser.add_argument('--same_env_prior', action='store_true', default=False,
                         help='Enable same env prior (disables ref prior)')
-
+    parser.add_argument('--multi_gpu',action='store_true', default=False,
+                        help='Enable use of parallelization on multiple gpus')  
+    # for MULTI_GPU see http://pytorch.org/tutorials/beginner/blitz/data_parallel_tutorial.html
+    
+    parser.add_argument('--multi_view',action='store_true', default=False,
+                        help='Enable use of multiple camera')
+                        
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     args.data_folder = parseDataFolder(args.data_folder)
@@ -476,7 +513,7 @@ if __name__ == '__main__':
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
-                       l1_reg=args.l1_reg, cuda=args.cuda)
+                       l1_reg=args.l1_reg, cuda=args.cuda, multi_gpu=args.multi_gpu,multi_view=args.multi_view)
 
     is_ref_point_list = None
     if APPLY_5TH_PRIOR:
