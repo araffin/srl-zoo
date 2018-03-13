@@ -33,7 +33,7 @@ def getLogFolderName(exp_config):
     :param exp_config: (dict)
     :return: (str, str)
     """
-    date = datetime.datetime.now().strftime("%m-%d-%y_%Hh%M_%S")
+    date = datetime.datetime.now().strftime("%y-%m-%d_%Hh%M_%S")
     model_str = "_{}".format(exp_config['model_type'])
     srl_str = "{}_ST_DIM{}_SEED{}".format(priorsToString(exp_config['priors']), exp_config['state_dim'],
                                           exp_config['seed'])
