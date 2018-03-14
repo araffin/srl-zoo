@@ -13,12 +13,12 @@ class SRLConvolutionalNetwork(nn.Module):
     """
     Convolutional Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
-    :param stateDim: (int)
+    :param state_dim: (int)
     :param cuda: (bool)
     :param noise_std: (float)  To avoid NaN (states must be different)
     """
 
-    def __init__(self, stateDim=2, cuda=False, noise_std=1e-6):
+    def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
         super(SRLConvolutionalNetwork, self).__init__()
         self.resnet = models.resnet18(pretrained=True)
         # TODO: add squeezeNet support
@@ -29,12 +29,12 @@ class SRLConvolutionalNetwork(nn.Module):
         # Replace the last fully-connected layer
         n_units = self.resnet.fc.in_features
         print("{} units in the last layer".format(n_units))
-        self.resnet.fc = nn.Linear(n_units, stateDim)
+        self.resnet.fc = nn.Linear(n_units, state_dim)
         if cuda:
             self.resnet.cuda()
         # This variant does not require the batch_size
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
-        # self.noise = GaussianNoise(batch_size, stateDim, noise_std, cuda=cuda)
+        # self.noise = GaussianNoise(batch_size, state_dim, noise_std, cuda=cuda)
 
     def forward(self, x):
         x = self.resnet(x)
@@ -46,21 +46,21 @@ class SRLDenseNetwork(nn.Module):
     """
     Dense Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W) (to be consistent with CNN network)
-    :param inputDim: (int) 3 x H x H
-    :param stateDim: (int)
+    :param input_dim: (int) 3 x H x H
+    :param state_dim: (int)
     :param noise_std: (float)  To avoid NaN (states must be different)
     :param batch_size: (int)
     :param cuda: (bool)
     :param n_hidden: (int)
     """
 
-    def __init__(self, inputDim, stateDim=2, batch_size=256,
+    def __init__(self, input_dim, state_dim=2, batch_size=256,
                  cuda=False, n_hidden=32, noise_std=1e-6):
         super(SRLDenseNetwork, self).__init__()
-        self.fc1 = nn.Linear(inputDim, n_hidden)
-        self.fc2 = nn.Linear(n_hidden, stateDim)
+        self.fc1 = nn.Linear(input_dim, n_hidden)
+        self.fc2 = nn.Linear(n_hidden, state_dim)
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
-        # self.noise = GaussianNoise(batch_size, stateDim, noise_std, cuda=cuda)
+        # self.noise = GaussianNoise(batch_size, state_dim, noise_std, cuda=cuda)
 
     def forward(self, x):
         # Flatten input
@@ -75,16 +75,16 @@ class DenseNetwork(nn.Module):
     """
     Dense Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W) (to be consistent with CNN network)
-    :param inputDim: (int) 3 x H x H
-    :param stateDim: (int)
+    :param input_dim: (int) 3 x H x H
+    :param state_dim: (int)
     :param n_hidden: (int)
     :param drop_p: (float) Dropout proba
     """
 
-    def __init__(self, inputDim, stateDim=2, n_hidden=64, drop_p=0.5):
+    def __init__(self, input_dim, state_dim=2, n_hidden=64, drop_p=0.5):
         super(DenseNetwork, self).__init__()
-        self.fc1 = nn.Linear(inputDim, n_hidden)
-        self.fc2 = nn.Linear(n_hidden, stateDim)
+        self.fc1 = nn.Linear(input_dim, n_hidden)
+        self.fc2 = nn.Linear(n_hidden, state_dim)
         self.drop_p = drop_p
 
     def forward(self, x):
@@ -100,11 +100,11 @@ class ConvolutionalNetwork(nn.Module):
     """
     Convolutional Neural Network using pretrained ResNet
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
-    :param stateDim: (int)
+    :param state_dim: (int)
     :param cuda: (bool)
     """
 
-    def __init__(self, stateDim=2, cuda=False):
+    def __init__(self, state_dim=2, cuda=False):
         super(ConvolutionalNetwork, self).__init__()
         self.resnet = models.resnet18(pretrained=True)
         # Freeze params
@@ -113,7 +113,7 @@ class ConvolutionalNetwork(nn.Module):
         # Replace the last fully-connected layer
         n_units = self.resnet.fc.in_features
         print("{} units in the last layer".format(n_units))
-        self.resnet.fc = nn.Linear(n_units, stateDim)
+        self.resnet.fc = nn.Linear(n_units, state_dim)
         if cuda:
             self.resnet.cuda()
 
@@ -126,10 +126,10 @@ class CustomCNN(nn.Module):
     """
     Convolutional Neural Network
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
-    :param stateDim: (int)
+    :param state_dim: (int)
     """
 
-    def __init__(self, stateDim=2):
+    def __init__(self, state_dim=2):
         super(CustomCNN, self).__init__()
         # Inspired by ResNet:
         # conv3x3 followed by BatchNorm2d
@@ -151,7 +151,7 @@ class CustomCNN(nn.Module):
             nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
         )
 
-        self.fc = nn.Linear(6 * 6 * 64, stateDim)
+        self.fc = nn.Linear(6 * 6 * 64, state_dim)
 
     def forward(self, x):
         x = self.conv_layers(x)
@@ -164,14 +164,14 @@ class SRLCustomCNN(nn.Module):
     """
     Convolutional Neural Network for State Representation Learning
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
-    :param stateDim: (int)
+    :param state_dim: (int)
     :param cuda: (bool)
     :param noise_std: (float)  To avoid NaN (states must be different)
     """
 
-    def __init__(self, stateDim=2, cuda=False, noise_std=1e-6):
+    def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
         super(SRLCustomCNN, self).__init__()
-        self.cnn = CustomCNN(stateDim)
+        self.cnn = CustomCNN(state_dim)
         if cuda:
             self.cnn.cuda()
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
@@ -183,19 +183,19 @@ class SRLCustomCNN(nn.Module):
 
 class LinearAutoEncoder(nn.Module):
     """
-    :param inputDim: (int)
-    :param stateDim: (int)
+    :param input_dim: (int)
+    :param state_dim: (int)
     """
 
-    def __init__(self, inputDim, stateDim=3):
+    def __init__(self, input_dim, state_dim=3):
         super(LinearAutoEncoder, self).__init__()
 
         self.encoder = nn.Sequential(
-            nn.Linear(inputDim, stateDim),
+            nn.Linear(input_dim, state_dim),
         )
 
         self.decoder = nn.Sequential(
-            nn.Linear(stateDim, inputDim),
+            nn.Linear(state_dim, input_dim),
         )
 
     def forward(self, x):
@@ -213,27 +213,27 @@ class DenseAutoEncoder(nn.Module):
     """
     Dense autoencoder network
     Known issue: it reconstructs the image but omits the robot arm
-    :param inputDim: (int)
-    :param stateDim: (int)
+    :param input_dim: (int)
+    :param state_dim: (int)
     """
 
-    def __init__(self, inputDim, stateDim=3):
+    def __init__(self, input_dim, state_dim=3):
         super(DenseAutoEncoder, self).__init__()
 
         self.encoder = nn.Sequential(
-            nn.Linear(inputDim, 50),
+            nn.Linear(input_dim, 50),
             nn.Tanh(),
             nn.Linear(50, 50),
             nn.Tanh(),
-            nn.Linear(50, stateDim),
+            nn.Linear(50, state_dim),
         )
 
         self.decoder = nn.Sequential(
-            nn.Linear(stateDim, 50),
+            nn.Linear(state_dim, 50),
             nn.Tanh(),
             nn.Linear(50, 50),
             nn.Tanh(),
-            nn.Linear(50, inputDim),
+            nn.Linear(50, input_dim),
         )
 
     def forward(self, x):
@@ -263,15 +263,15 @@ class CNNAutoEncoder(nn.Module):
     """
     Custom convolutional autoencoder network
     Input dim (same as ResNet): 3x224x224
-    :param stateDim: (int)
+    :param state_dim: (int)
     """
 
-    def __init__(self, stateDim=3):
+    def __init__(self, state_dim=3):
         super(CNNAutoEncoder, self).__init__()
         # Inspired by ResNet:
         # conv3x3 followed by BatchNorm2d
         # TODO: implement residual connection
-        self.encoderConv = nn.Sequential(
+        self.encoder_conv = nn.Sequential(
             # 224x224x3 -> 112x112x64
             nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
             nn.BatchNorm2d(64),
@@ -289,14 +289,14 @@ class CNNAutoEncoder(nn.Module):
             nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
         )
 
-        self.encoderFC = nn.Sequential(
-            nn.Linear(6 * 6 * 64, stateDim)
+        self.encoder_FC = nn.Sequential(
+            nn.Linear(6 * 6 * 64, state_dim)
         )
 
-        self.decoderFC = nn.Sequential(
-            nn.Linear(stateDim, 6 * 6 * 64)
+        self.decoder_FC = nn.Sequential(
+            nn.Linear(state_dim, 6 * 6 * 64)
         )
-        self.decoderConv = nn.Sequential(
+        self.decoder_conv = nn.Sequential(
             nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2),  # 13x13x64
             nn.BatchNorm2d(64),
             nn.ReLU(True),
@@ -317,12 +317,12 @@ class CNNAutoEncoder(nn.Module):
         )
 
     def forward(self, x):
-        encoded = self.encoderConv(x)
+        encoded = self.encoder_conv(x)
         encoded = encoded.view(encoded.size(0), -1)
-        encoded = self.encoderFC(encoded)
-        decoded = self.decoderFC(encoded)
+        encoded = self.encoder_FC(encoded)
+        decoded = self.decoder_FC(encoded)
         decoded = decoded.view(encoded.size(0), 64, 6, 6)
-        decoded = self.decoderConv(decoded)
+        decoded = self.decoder_conv(decoded)
         return encoded, decoded
 
 
@@ -330,25 +330,25 @@ class DenseVAE(nn.Module):
     """
     Dense VAE network
     Known issue: it reconstructs the image but omits the robot arm
-    :param inputDim: (int)
-    :param stateDim: (int)
+    :param input_dim: (int)
+    :param state_dim: (int)
     """
 
-    def __init__(self, inputDim, stateDim=3):
+    def __init__(self, input_dim, state_dim=3):
         super(DenseVAE, self).__init__()
 
-        self.inputDim = inputDim
+        self.input_dim = input_dim
 
-        self.encoderFC1 = nn.Linear(inputDim, 50)
-        self.encoderFC21 = nn.Linear(50, stateDim)
-        self.encoderFC22 = nn.Linear(50, stateDim)
+        self.encoder_FC1 = nn.Linear(input_dim, 50)
+        self.encoder_FC21 = nn.Linear(50, state_dim)
+        self.encoder_FC22 = nn.Linear(50, state_dim)
 
         self.decoder = nn.Sequential(
-            nn.Linear(stateDim, 50),
+            nn.Linear(state_dim, 50),
             nn.ReLU(),
             nn.Linear(50, 50),
             nn.ReLU(),
-            nn.Linear(50, inputDim),
+            nn.Linear(50, input_dim),
         )
 
         self.relu = nn.ReLU()
@@ -357,8 +357,8 @@ class DenseVAE(nn.Module):
     def encode(self, x):
         # Flatten input
         x = x.view(x.size(0), -1)
-        x = self.relu(self.encoderFC1(x))
-        return self.encoderFC21(x), self.encoderFC22(x)
+        x = self.relu(self.encoder_FC1(x))
+        return self.encoder_FC21(x), self.encoder_FC22(x)
 
     def reparameterize(self, mu, logvar):
         """
@@ -387,15 +387,15 @@ class CNNVAE(nn.Module):
     """
     Custom convolutional VAE network
     Input dim (same as ResNet): 3x224x224
-    :param stateDim: (int)
+    :param state_dim: (int)
     """
 
-    def __init__(self, stateDim=3):
+    def __init__(self, state_dim=3):
         super(CNNVAE, self).__init__()
         # Inspired by ResNet:
         # conv3x3 followed by BatchNorm2d
         # TODO: implement residual connection
-        self.encoderConv = nn.Sequential(
+        self.encoder_conv = nn.Sequential(
             # 224x224x3 -> 112x112x64
             nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
             nn.BatchNorm2d(64),
@@ -413,13 +413,13 @@ class CNNVAE(nn.Module):
             nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
         )
 
-        self.encoderFC1 = nn.Linear(6 * 6 * 64, stateDim)
-        self.encoderFC2 = nn.Linear(6 * 6 * 64, stateDim)
+        self.encoder_FC1 = nn.Linear(6 * 6 * 64, state_dim)
+        self.encoder_FC2 = nn.Linear(6 * 6 * 64, state_dim)
 
-        self.decoderFC = nn.Sequential(
-            nn.Linear(stateDim, 6 * 6 * 64)
+        self.decoder_FC = nn.Sequential(
+            nn.Linear(state_dim, 6 * 6 * 64)
         )
-        self.decoderConv = nn.Sequential(
+        self.decoder_conv = nn.Sequential(
             nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2),  # 13x13x64
             nn.BatchNorm2d(64),
             nn.ReLU(True),
@@ -440,9 +440,9 @@ class CNNVAE(nn.Module):
         )
 
     def encode(self, x):
-        x = self.encoderConv(x)
+        x = self.encoder_conv(x)
         x = x.view(x.size(0), -1)
-        return self.encoderFC1(x), self.encoderFC2(x)
+        return self.encoder_FC1(x), self.encoder_FC2(x)
 
     def reparameterize(self, mu, logvar):
         """
@@ -460,7 +460,7 @@ class CNNVAE(nn.Module):
     def forward(self, x):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
-        decoded = self.decoderFC(z)
+        decoded = self.decoder_FC(z)
         decoded = decoded.view(x.size(0), 64, 6, 6)
-        decoded = self.decoderConv(decoded)
+        decoded = self.decoder_conv(decoded)
         return decoded, mu, logvar
