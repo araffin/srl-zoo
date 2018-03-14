@@ -5,7 +5,6 @@ import argparse
 
 import numpy as np
 import torch as th
-import torch.nn as nn
 from torch.nn import functional as F
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
@@ -80,7 +79,9 @@ class VAELearning(BaseLearner):
             return states.data.cpu().numpy()
         return states.data.numpy()
 
-    def _lossFunction(self, decoded, obs, mu, logvar):
+
+    @staticmethod
+    def _lossFunction(decoded, obs, mu, logvar):
         """
         Reconstruction + KL divergence losses summed over all elements and batch
         :param decoded: (Pytorch Variable)
@@ -95,9 +96,9 @@ class VAELearning(BaseLearner):
         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
         # https://arxiv.org/abs/1312.6114
         # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-        KLD = -0.5 * th.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        kl_divergence = -0.5 * th.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
-        return generation_loss + KLD
+        return generation_loss + kl_divergence
 
     def learn(self, images_path, rewards):
         """
@@ -138,7 +139,7 @@ class VAELearning(BaseLearner):
 
                 self.optimizer.zero_grad()
                 decoded, mu, logvar = self.model(noisy_obs)
-                loss = self._lossFunction(decoded, obs, mu, logvar)
+                loss = VAELearning._lossFunction(decoded, obs, mu, logvar)
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.data[0]
@@ -155,7 +156,7 @@ class VAELearning(BaseLearner):
                     noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
 
                 decoded, mu, logvar = self.model(noisy_obs)
-                loss = self._lossFunction(decoded, obs, mu, logvar)
+                loss = VAELearning._lossFunction(decoded, obs, mu, logvar)
                 val_loss += loss.data[0]
 
             val_loss /= len(val_loader)
