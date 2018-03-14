@@ -12,6 +12,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
+
 # Python 2/3 compatibility
 try:
     input = raw_input
@@ -22,22 +23,32 @@ except NameError:
 sns.set()
 TITLE_MAX_LENGTH = 60
 
-
-def loadImage(path):
+def loadImage(path,view=0):
     """
     Load an image and convert it to matplotlib format
     :param path: (str)
+    :param view: (int) : 0 for normal, 1/2 for multi_view
     """
+    if view>0:
+        path +="_"+str(view)+".jpg"
+        #print("view:",view)
+    #print("path :",path)    
     bgr_img = cv2.imread('data/' + path)
     return cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB) / 255.
 
 
-def createInteractivePlot(fig, ax, states, rewards, images_path):
-    fig2 = plt.figure("Image")
-    image_plot = plt.imshow(loadImage(images_path[0]))
+def createInteractivePlot(fig, ax, states, rewards, images_path, view=0):
+    name_img="Image"
+    if view > 0:
+        name_img+="_"+str(view)
+    fig2 = plt.figure(name_img)
+    #fig2.add_subplot()
+    image_plot = plt.imshow(loadImage(images_path[0],view))
+    
     # Disable seaborn grid
-    image_plot.axes.grid(False)
-    callback = ImageFinder(states, rewards, image_plot, ax, images_path)
+    image_plot.axes.grid(False) 
+    #plt.show()
+    callback = ImageFinder(states, rewards, image_plot, ax, images_path,view)
     fig.canvas.mpl_connect('button_release_event', callback)
 
 
@@ -60,7 +71,7 @@ def plot_2d_representation(states, rewards, images_path, name="Learned State Rep
 
 
 def plot_3d_representation(states, rewards, images_path, name="Learned State Representation",
-                           add_colorbar=True):
+                           add_colorbar=True, multi_view=False):
     plt.ion()
     fig = plt.figure(name)
     plt.clf()
@@ -74,13 +85,19 @@ def plot_3d_representation(states, rewards, images_path, name="Learned State Rep
     fig.tight_layout()
     if add_colorbar:
         fig.colorbar(im, label='Reward')
-
-    createInteractivePlot(fig, ax, states, rewards, images_path)
+    #print("img paths ",images_path)
+    
+    if multi_view:
+        createInteractivePlot(fig, ax, states, rewards, images_path,view=1)
+        createInteractivePlot(plt.figure(name), ax, states, rewards, images_path,view=2)
+    else:
+        createInteractivePlot(fig, ax, states, rewards, images_path)
+        
     plt.show()
 
 
 def plot_representation(states, rewards, images_path, name="Learned State Representation",
-                        add_colorbar=True, fit_pca=True):
+                        add_colorbar=True, fit_pca=True, multi_view=False):
     """
     :param states: (numpy array)
     :param rewards: (numpy 1D array)
@@ -88,6 +105,7 @@ def plot_representation(states, rewards, images_path, name="Learned State Repres
     :param name: (str)
     :param add_colorbar: (bool)
     :param fit_pca: (bool)
+    :param multi_view: (bool)
     """
     state_dim = states.shape[1]
     if state_dim != 1 and (fit_pca or state_dim > 3):
@@ -104,7 +122,7 @@ def plot_representation(states, rewards, images_path, name="Learned State Repres
     elif state_dim == 2:
         plot_2d_representation(states, rewards, images_path, name, add_colorbar)
     else:
-        plot_3d_representation(states, rewards, images_path, name, add_colorbar)
+        plot_3d_representation(states, rewards, images_path, name, add_colorbar, multi_view)
 
 
 class ImageFinder(object):
@@ -114,7 +132,7 @@ class ImageFinder(object):
     xtol and ytol is identified.
     """
 
-    def __init__(self, states, rewards, image_plot, ax, images_path):
+    def __init__(self, states, rewards, image_plot, ax, images_path,view=0):
 
         self.image_plot = image_plot
         self.images_path = images_path
@@ -123,6 +141,7 @@ class ImageFinder(object):
         self.ax = ax
         self.states = states
         self.rewards = rewards
+        self.view=view
 
     def __call__(self, event):
         if event.inaxes:
@@ -150,7 +169,7 @@ class ImageFinder(object):
             self.image_plot.axes.set_title(title)
             path = self.images_path[state_idx]
             # Load the image that corresponds to the clicked point in the space
-            self.image_plot.set_data(loadImage(path))
+            self.image_plot.set_data(loadImage(path,self.view))
 
 
 if __name__ == '__main__':
@@ -159,6 +178,8 @@ if __name__ == '__main__':
                         help='Path to a npz file containing states and rewards')
     parser.add_argument('--data_folder', type=str, default="", required=True,
                         help='Path to a dataset folder, it will plot ground truth states')
+    parser.add_argument('--multi_view',action='store_true', default=False,
+                        help='Enable use of multiple camera')                        
     args = parser.parse_args()
 
     # Remove `data/` from the path if needed
@@ -169,7 +190,7 @@ if __name__ == '__main__':
         print("Loading {}...".format(args.input_file))
         states_rewards = np.load(args.input_file)
         images_path = np.load('data/{}/ground_truth.npz'.format(args.data_folder))['images_path']
-        plot_representation(states_rewards['states'], states_rewards['rewards'], images_path)
+        plot_representation(states_rewards['states'], states_rewards['rewards'], images_path, multi_view=args.multi_view)
 
         input('\nPress any key to exit.')
 
@@ -181,5 +202,5 @@ if __name__ == '__main__':
         rewards = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['rewards']
         name = "Ground Truth States - {}".format(args.data_folder)
 
-        plot_representation(states, rewards, images_path, name)
+        plot_representation(states, rewards, images_path, name, multi_view=args.multi_view)
         input('\nPress any key to exit.')

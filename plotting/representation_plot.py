@@ -278,7 +278,7 @@ if __name__ == '__main__':
         name = "Ground Truth States - {}".format(args.data_folder)
         episode_starts, rewards = training_data['episode_starts'], training_data['rewards']
         button_positions = ground_truth['button_positions']
-        with open('data/{}/dataset_config.json'.format(args.data_folder), 'rb') as f:
+        with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
             relative_pos = json.load(f).get('relative_pos', False)
 
         # True state is the relative position to the button

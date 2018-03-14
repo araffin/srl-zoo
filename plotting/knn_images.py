@@ -36,6 +36,8 @@ parser.add_argument('-k', '--n_neighbors', type=int, default=5, help='Number of 
 parser.add_argument('-n', '--n_samples', type=int, default=5, help='Number of test samples (default: 5)')
 parser.add_argument('--n_to_plot', type=int, default=5, help='Number of samples to plot (default: 5)')
 parser.add_argument('--relative_pos', action='store_true', default=False, help='Use relative position as ground_truth')
+parser.add_argument('--multi_view', action='store_true', default=False, help='manager multi_view data paths')
+
 
 args = parser.parse_args()
 
@@ -98,6 +100,9 @@ for image_path, neigbour_indices, distance, image_idx in data:
 
         # Add reference image
         # subplot: (i, j, k) i rows, j columns, k^th plot | n_plots: i * j
+
+        if args.multi_view:
+            image_path+='_1.jpg'
         ref_image = fig.add_subplot(n_lines + 1, 5, 3)
         img = Image.open("data/{}".format(image_path))
         plt.imshow(img)
@@ -117,7 +122,8 @@ for image_path, neigbour_indices, distance, image_idx in data:
             image_path = images_path[neighbor_idx]
             neighbor_record_folder = image_path.split("/")[1]
             neighbor_frame_name = image_path.split("/")[-1].split(".")[0]
-
+            if args.multi_view:
+                image_path+='_1.jpg'
             img = Image.open("data/{}".format(image_path))
             plt.imshow(img)
 
