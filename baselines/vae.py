@@ -29,7 +29,7 @@ except NameError:
 DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 32
-NOISE_FACTOR = 0.1
+NOISE_FACTOR = 0
 TEST_BATCH_SIZE = 512
 
 
@@ -235,7 +235,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
-    parser.add_argument('--noise_factor', type=float, default=0.1, help='Noise factor for denoising vae')
+    parser.add_argument('--noise_factor', type=float, default=0, help='Noise factor for denoising vae')
     parser.add_argument('--training_set_size', type=int, default=-1, help='Limit size of the training set (default: -1)')
 
     args = parser.parse_args()
