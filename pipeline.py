@@ -304,11 +304,11 @@ if __name__ == '__main__':
             evaluateBaseline(base_config)
 
         # t-SNE
-        # for state_dim in [2, 3]:
-        #     # Update config
-        #     exp_config['state_dim'] = state_dim
-        #     dimReductionCall(exp_config, 'tsne')
-        #     evaluateBaseline(base_config)
+        for state_dim in [2, 3]:
+            # Update config
+            exp_config['state_dim'] = state_dim
+            dimReductionCall(exp_config, 'tsne')
+            evaluateBaseline(base_config)
 
     # Reproduce a previous experiment using "exp_config.json"
     elif args.exp_config != "":

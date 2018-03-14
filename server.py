@@ -3,7 +3,6 @@ Server to communicate with RL part
 """
 from __future__ import print_function, division, absolute_import
 
-import time
 import os
 import argparse
 
@@ -24,7 +23,7 @@ class Command(Enum):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='Pipeline script for state representation learning')
+    parser = argparse.ArgumentParser(description='Server to interface RL with state representation learning')
     parser.add_argument('--base_config', type=str, default="configs/default.json",
                         help='Path to overall config file, it contains variables independent from datasets (default: '
                              '/configs/default.json)')
