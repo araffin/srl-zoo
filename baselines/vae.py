@@ -90,7 +90,6 @@ class VAELearning(BaseLearner):
         :return: (Pytorch Variable)
         """
         generation_loss = F.mse_loss(decoded, obs, size_average=False)
-        #BCE = F.binary_cross_entropy(decoded, obs.view(-1, INPUT_DIM), size_average=False)
 
         # see Appendix B from VAE paper:
         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
