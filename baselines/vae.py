@@ -36,6 +36,7 @@ class VAELearning(BaseLearner):
     """
     :param state_dim: (int)
     :param model_type: (str) one of "cnn" or "mlp"
+    :param log_folder: (str)
     :param seed: (int)
     :param learning_rate: (float)
     :param cuda: (bool)
