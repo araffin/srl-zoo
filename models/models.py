@@ -185,6 +185,7 @@ class LinearAutoEncoder(nn.Module):
     :param input_dim: (int)
     :param state_dim: (int)
     """
+
     def __init__(self, input_dim, state_dim=3):
         super(LinearAutoEncoder, self).__init__()
 
@@ -214,6 +215,7 @@ class DenseAutoEncoder(nn.Module):
     :param input_dim: (int)
     :param state_dim: (int)
     """
+
     def __init__(self, input_dim, state_dim=3):
         super(DenseAutoEncoder, self).__init__()
 
@@ -323,7 +325,6 @@ class CNNAutoEncoder(nn.Module):
         return encoded, decoded
 
 
-
 class DenseVAE(nn.Module):
     """
     Dense VAE network
@@ -331,6 +332,7 @@ class DenseVAE(nn.Module):
     :param input_dim: (int)
     :param state_dim: (int)
     """
+
     def __init__(self, input_dim, state_dim=3):
         super(DenseVAE, self).__init__()
 
@@ -409,7 +411,6 @@ class CNNVAE(nn.Module):
         self.encoderFC1 = nn.Linear(6 * 6 * 64, state_dim)
         self.encoderFC2 = nn.Linear(6 * 6 * 64, state_dim)
 
-
         self.decoderFC = nn.Sequential(
             nn.Linear(state_dim, 6 * 6 * 64)
         )
@@ -432,7 +433,6 @@ class CNNVAE(nn.Module):
 
             nn.ConvTranspose2d(64, 3, kernel_size=4, stride=2),  # 224x224x3
         )
-
 
     def encode(self, x):
         x = self.encoderConv(x)
