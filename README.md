@@ -193,6 +193,7 @@ python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3 
 ```
 
 #### PCA and t-SNE
+
 NOTE: before applying t-SNE, a dimension reduction with `n_components=50` is applied for computational reasons.
 
 PCA:
@@ -203,6 +204,13 @@ python -m baselines.pca_tsne --data_folder path/to/data/folder --state_dim 3 --m
 t-SNE:
 ```
 python -m baselines.pca_tsne --data_folder path/to/data/folder --state_dim 3 --method tsne
+```
+
+### SRL Server for Reinforcement Learning
+
+This feature is currently experimental. It will launch a server that will learn a srl model and send a response to the RL client when  it is ready.
+```
+python server.py
 ```
 
 ### Dependencies

@@ -26,7 +26,7 @@ from plotting.representation_plot import plot_representation, plt
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import BaxterImageLoader
 from preprocessing.preprocess import INPUT_DIM
-from utils import parseDataFolder
+from utils import parseDataFolder, printRed, printYellow
 from pipeline import NO_PAIRS_ERROR, NAN_ERROR
 
 # Python 2/3 compatibility
@@ -129,7 +129,7 @@ class RoboticPriorsLoss(nn.Module):
 class SRL4robotics(BaseLearner):
     """
     :param state_dim: (int)
-    :param model_type: (str) one of "resnet" or "mlp"
+    :param model_type: (str) one of "resnet", "mlp" or "custom_cnn"
     :param seed: (int)
     :param learning_rate: (float)
     :param l1_reg: (float)
@@ -188,18 +188,19 @@ class SRL4robotics(BaseLearner):
         np.random.shuffle(indices)
 
         # split indices into minibatches. minibatchlist is a list of lists; each
-        # list is the id of the observation preserved thorough the training
+        # list is the id of the observation preserved through the training
         minibatchlist = [np.array(sorted(indices[start_idx:start_idx + self.batch_size]))
                          for start_idx in range(0, num_samples - self.batch_size + 1, self.batch_size)]
 
         if len(minibatchlist[-1]) < self.batch_size:
-            print("Removing last minibatch of size {} < batch_size".format(len(minibatchlist[-1])))
+            printYellow("Removing last minibatch of size {} < batch_size".format(len(minibatchlist[-1])))
             del minibatchlist[-1]
 
         # Number of minibatches used for validation:
         n_val_batches = np.round(VALIDATION_SIZE * len(minibatchlist)).astype(np.int64)
         val_indices = np.random.permutation(len(minibatchlist))[:n_val_batches]
         print("{} minibatches for validation, {} samples".format(n_val_batches, n_val_batches * BATCH_SIZE))
+        assert n_val_batches > 0, "Not enough sample to create a validation set"
 
         ref_point_pairs = []
         if len(is_ref_point_list) > 0:
@@ -259,6 +260,7 @@ class SRL4robotics(BaseLearner):
             np.array([[i, j] for i in range(self.batch_size) for j in findSameActions(i, minibatch) if j > i],
                      dtype='int64') for minibatch in minibatchlist]
 
+        print("{} observations".format(num_samples))
         # Stats about pairs
         action_set = set(actions)
         n_actions = np.max(actions) + 1
@@ -298,28 +300,28 @@ class SRL4robotics(BaseLearner):
         if apply_same_env_prior:
             print("Applying same env prior")
 
-            def findSimilar(index, minibatch):
-                """
-                check which samples should be similar
-                because they lead to the same positive rewards after the same actions
-                :param index: (int)
-                :param minibatch: (numpy array)
-                :return: (dict, numpy array)
-                """
-                positive_r = rewards[minibatch[index] + 1] > 0
-                return np.where(positive_r * (actions[minibatch] == actions[minibatch[index]]) *
-                                (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
-
             # def findSimilar(index, minibatch):
             #     """
             #     check which samples should be similar
-            #     because they lead to the same positive reward
+            #     because they lead to the same positive rewards after the same actions
             #     :param index: (int)
             #     :param minibatch: (numpy array)
             #     :return: (dict, numpy array)
             #     """
             #     positive_r = rewards[minibatch[index] + 1] > 0
-            #     return np.where(positive_r * (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
+            #     return np.where(positive_r * (actions[minibatch] == actions[minibatch[index]]) *
+            #                     (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
+
+            def findSimilar(index, minibatch):
+                """
+                check which samples should be similar
+                because they lead to the same positive reward
+                :param index: (int)
+                :param minibatch: (numpy array)
+                :return: (dict, numpy array)
+                """
+                positive_r = rewards[minibatch[index] + 1] > 0
+                return np.where(positive_r * (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
 
             similar_pairs = [
                 np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch) if j > i],
@@ -327,7 +329,7 @@ class SRL4robotics(BaseLearner):
 
             for item in similar_pairs:
                 if len(item) == 0:
-                    print("No pairs found for one minibatch of similar pairs")
+                    printRed("No pairs found for one minibatch of similar pairs")
                     sys.exit(NO_PAIRS_ERROR)
 
         for item in same_actions + dissimilar:
@@ -335,7 +337,7 @@ class SRL4robotics(BaseLearner):
                 msg = "No same actions or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
                     BATCH_SIZE)
                 msg += "=> Consider increasing the batch_size or changing the seed"
-                print(msg)
+                printRed(msg)
                 sys.exit(NO_PAIRS_ERROR)
 
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
@@ -445,7 +447,8 @@ if __name__ == '__main__':
     parser.add_argument('--l1_reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
-    parser.add_argument('--model_type', type=str, default="resnet", help='Model architecture (default: "resnet")')
+    parser.add_argument('--model_type', type=str, default="custom_cnn", choices=['custom_cnn', 'resnet', 'mlp'],
+                        help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log_folder', type=str, default='logs/default_folder',
                         help='Folder within logs/ where the experiment model and plots will be saved')

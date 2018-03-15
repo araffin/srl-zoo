@@ -33,9 +33,7 @@ def getLogFolderName(exp_config):
     :param exp_config: (dict)
     :return: (str, str)
     """
-    now = datetime.datetime.now()
-    date = "Y{}_M{:02d}_D{:02d}_H{:02d}M{:02d}S{:02d}".format(now.year, now.month, now.day, now.hour, now.minute,
-                                                              now.second)
+    date = datetime.datetime.now().strftime("%y-%m-%d_%Hh%M_%S")
     model_str = "_{}".format(exp_config['model_type'])
     srl_str = "{}_ST_DIM{}_SEED{}".format(priorsToString(exp_config['priors']), exp_config['state_dim'],
                                           exp_config['seed'])
@@ -47,7 +45,7 @@ def getLogFolderName(exp_config):
     else:
         continuous_str = ""
 
-    experiment_name = "model{}{}{}{}_{}".format(date, model_str, continuous_str, srl_str, exp_config['model_approach'])
+    experiment_name = "{}{}{}{}_{}".format(date, model_str, continuous_str, srl_str, exp_config['model_approach'])
 
     printBlue("\nExperiment: {}\n".format(experiment_name))
     log_folder = "logs/{}/{}".format(exp_config['data_folder'], experiment_name)
@@ -211,7 +209,7 @@ def useRelativePosition(data_folder):
     :param data_folder: (str)
     :return: (bool)
     """
-    with open('data/{}/dataset_config.json'.format(data_folder), 'rb') as f:
+    with open('data/{}/dataset_config.json'.format(data_folder), 'r') as f:
         relative_pos = json.load(f).get('relative_pos', False)
     return relative_pos
 
@@ -229,7 +227,7 @@ def getBaseExpConfig(args):
     dataset_path = "data/{}".format(args.data_folder)
     assert os.path.isdir(dataset_path), "Path to dataset folder is not valid: {}".format(dataset_path)
 
-    with open(args.base_config, 'rb') as f:
+    with open(args.base_config, 'r') as f:
         exp_config = json.load(f)
     exp_config['data_folder'] = args.data_folder
     exp_config['relative_pos'] = useRelativePosition(args.data_folder)
@@ -300,7 +298,7 @@ if __name__ == '__main__':
                     evaluateBaseline(base_config)
 
         # PCA
-        for state_dim in [2, 3, 4, 5, 6]:
+        for state_dim in [3, 4, 5, 6]:
             # Update config
             exp_config['state_dim'] = state_dim
             dimReductionCall(exp_config, 'pca')
@@ -315,7 +313,7 @@ if __name__ == '__main__':
 
     # Reproduce a previous experiment using "exp_config.json"
     elif args.exp_config != "":
-        with open(args.exp_config, 'rb') as f:
+        with open(args.exp_config, 'r') as f:
             exp_config = json.load(f)
 
         print("\n Pipeline using json config file: {} \n".format(args.exp_config))
@@ -351,7 +349,7 @@ if __name__ == '__main__':
         preprocessingCall(exp_config)
 
         # Grid search
-        for seed in [1]:
+        for seed in [0]:
             exp_config['seed'] = seed
             for state_dim in [3, 4, 6, 10]:
                 # Update config
