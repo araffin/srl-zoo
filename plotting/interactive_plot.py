@@ -181,5 +181,5 @@ if __name__ == '__main__':
         rewards = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['rewards']
         name = "Ground Truth States - {}".format(args.data_folder)
 
-        plot_representation(states, rewards, images_path, name)
+        plot_representation(states, rewards, images_path, name, fit_pca=False)
         input('\nPress any key to exit.')
