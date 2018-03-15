@@ -139,7 +139,7 @@ def baselineCall(exp_config, baseline="supervised"):
     config_args = ['epochs', 'seed', 'model_type',
                    'data_folder', 'training_set_size']
 
-    if baseline == "autoencoder":
+    if baseline in ["autoencoder", "vae"]:
         config_args += ['state_dim']
     elif baseline == "supervised" and exp_config['relative_pos']:
         args += ['--relative_pos']
@@ -288,13 +288,14 @@ if __name__ == '__main__':
                 baselineCall(exp_config, 'supervised')
                 evaluateBaseline(base_config)
 
-            # Autoencoder
+            # Autoencoder and VAE
             exp_config['model_type'] = "cnn"
-            for state_dim in [3, 4, 5, 6]:
-                # Update config
-                exp_config['state_dim'] = state_dim
-                baselineCall(exp_config, 'autoencoder')
-                evaluateBaseline(base_config)
+            for baseline in ['autoencoder', 'vae']:
+                for state_dim in [3, 4, 5, 6]:
+                    # Update config
+                    exp_config['state_dim'] = state_dim
+                    baselineCall(exp_config, baseline)
+                    evaluateBaseline(base_config)
 
         # PCA
         for state_dim in [3, 4, 5, 6]:

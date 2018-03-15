@@ -71,6 +71,7 @@ def plot_tsne(states, rewards, name="T-SNE of Learned States", add_colorbar=True
 def plot_representation(states, rewards, name="Learned State Representation",
                         add_colorbar=True, path=None, fit_pca=True, cmap='coolwarm'):
     """
+    Plot learned state representation using rewards for coloring
     :param states: (numpy array)
     :param rewards: (numpy 1D array)
     :param name: (str)
@@ -160,7 +161,7 @@ def plot_image(image, name='Observation Sample'):
     updateDisplayMode()
     fig = plt.figure(name)
     plt.imshow(image, interpolation='nearest')
-    plt.gca().invert_yaxis()
+    # plt.gca().invert_yaxis()
     plt.xticks([])
     plt.yticks([])
     pauseOrClose(fig)
@@ -183,6 +184,15 @@ def colorPerEpisode(episode_starts):
 
 
 def plot_against(states, rewards, title="Representation", fit_pca=False, cmap='coolwarm'):
+    """
+    State dimensions are plotted one against the other (it creates a matrix of 2d representation)
+    using rewards for coloring
+    :param states: (numpy tensor)
+    :param reward: (numpy array)
+    :param title: (str)
+    :param fit_pca: (bool)
+    :param cmap: (str)
+    """
     n = states.shape[1]
     fig, ax_mat = plt.subplots(n, n, figsize=(10, 10), sharex=False, sharey=False)
     fig.subplots_adjust(hspace=0.0, wspace=0.0)
@@ -228,14 +238,14 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default="",
                         help='Path to a dataset folder, it will plot ground truth states')
     parser.add_argument('--t-sne', action='store_true', default=False, help='Use t-SNE instead of PCA')
-    parser.add_argument('--per-episode', action='store_true', default=False,
+    parser.add_argument('--color-episode', action='store_true', default=False,
                         help='Color states per episodes instead of reward')
     parser.add_argument('--plot-against', action='store_true', default=False,
                         help='Plot against each dimension')
     args = parser.parse_args()
 
-    cmap = "tab20" if args.per_episode else "coolwarm"
-    assert not (args.per_episode and args.data_folder == ""),\
+    cmap = "tab20" if args.color_episode else "coolwarm"
+    assert not (args.color_episode and args.data_folder == ""),\
            "You must specify a datafolder when using per-episode color"
     # Remove `data/` from the path if needed
     if "data/" in args.data_folder:
@@ -245,7 +255,7 @@ if __name__ == '__main__':
         print("Loading {}...".format(args.input_file))
         states_rewards = np.load(args.input_file)
         rewards = states_rewards['rewards']
-        if args.per_episode:
+        if args.color_episode:
             episode_starts = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['episode_starts']
             rewards = colorPerEpisode(episode_starts)[:len(rewards)]
 
@@ -279,7 +289,7 @@ if __name__ == '__main__':
                     button_idx += 1
                 true_states[i] -= button_positions[button_idx]
 
-        if args.per_episode:
+        if args.color_episode:
             rewards = colorPerEpisode(episode_starts)
 
         if args.plot_against:
