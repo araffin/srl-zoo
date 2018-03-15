@@ -161,7 +161,7 @@ def plot_image(image, name='Observation Sample'):
     updateDisplayMode()
     fig = plt.figure(name)
     plt.imshow(image, interpolation='nearest')
-    plt.gca().invert_yaxis()
+    # plt.gca().invert_yaxis()
     plt.xticks([])
     plt.yticks([])
     pauseOrClose(fig)
