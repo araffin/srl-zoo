@@ -289,11 +289,11 @@ class CNNAutoEncoder(nn.Module):
             nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
         )
 
-        self.encoder_FC = nn.Sequential(
+        self.encoder_fc = nn.Sequential(
             nn.Linear(6 * 6 * 64, state_dim)
         )
 
-        self.decoder_FC = nn.Sequential(
+        self.decoder_fc = nn.Sequential(
             nn.Linear(state_dim, 6 * 6 * 64)
         )
         self.decoder_conv = nn.Sequential(
@@ -319,8 +319,8 @@ class CNNAutoEncoder(nn.Module):
     def forward(self, x):
         encoded = self.encoder_conv(x)
         encoded = encoded.view(encoded.size(0), -1)
-        encoded = self.encoder_FC(encoded)
-        decoded = self.decoder_FC(encoded)
+        encoded = self.encoder_fc(encoded)
+        decoded = self.decoder_fc(encoded)
         decoded = decoded.view(encoded.size(0), 64, 6, 6)
         decoded = self.decoder_conv(decoded)
         return encoded, decoded
@@ -329,7 +329,6 @@ class CNNAutoEncoder(nn.Module):
 class DenseVAE(nn.Module):
     """
     Dense VAE network
-    Known issue: it reconstructs the image but omits the robot arm
     :param input_dim: (int)
     :param state_dim: (int)
     """
@@ -339,9 +338,9 @@ class DenseVAE(nn.Module):
 
         self.input_dim = input_dim
 
-        self.encoder_FC1 = nn.Linear(input_dim, 50)
-        self.encoder_FC21 = nn.Linear(50, state_dim)
-        self.encoder_FC22 = nn.Linear(50, state_dim)
+        self.encoder_fc1 = nn.Linear(input_dim, 50)
+        self.encoder_fc21 = nn.Linear(50, state_dim)
+        self.encoder_fc22 = nn.Linear(50, state_dim)
 
         self.decoder = nn.Sequential(
             nn.Linear(state_dim, 50),
@@ -357,18 +356,25 @@ class DenseVAE(nn.Module):
     def encode(self, x):
         # Flatten input
         x = x.view(x.size(0), -1)
-        x = self.relu(self.encoder_FC1(x))
-        return self.encoder_FC21(x), self.encoder_FC22(x)
+        x = self.relu(self.encoder_fc1(x))
+        return self.encoder_fc21(x), self.encoder_fc22(x)
 
     def reparameterize(self, mu, logvar):
         """
-        reparameterize for the backpropagation of z instead of q.
+        Reparameterize for the backpropagation of z instead of q.
+        (See "The reparameterization trick" section of https://arxiv.org/abs/1312.6114)
         :param mu: (Pytorch Variable)
         :param logvar: (Pytorch Variable)
         """
         if self.training:
+            # logvar = \log(\sigma^2) = 2 * \log(\sigma)
+            # \sigma = \exp(0.5 * logvar)
             std = logvar.mul(0.5).exp_()
-            eps = Variable(th.Tensor(std.size()).normal_())
+            # Sample \epsilon from normal distribution
+            # use std to create a new variable, so we don't have to care
+            # about running on GPU or not
+            eps = Variable(std.data.new(std.size()).normal_())
+            # Then multiply with the standard deviation and add the mean
             return eps.mul(std).add_(mu)
         else:
             return mu
@@ -413,10 +419,10 @@ class CNNVAE(nn.Module):
             nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
         )
 
-        self.encoder_FC1 = nn.Linear(6 * 6 * 64, state_dim)
-        self.encoder_FC2 = nn.Linear(6 * 6 * 64, state_dim)
+        self.encoder_fc1 = nn.Linear(6 * 6 * 64, state_dim)
+        self.encoder_fc2 = nn.Linear(6 * 6 * 64, state_dim)
 
-        self.decoder_FC = nn.Sequential(
+        self.decoder_fc = nn.Sequential(
             nn.Linear(state_dim, 6 * 6 * 64)
         )
         self.decoder_conv = nn.Sequential(
@@ -442,17 +448,22 @@ class CNNVAE(nn.Module):
     def encode(self, x):
         x = self.encoder_conv(x)
         x = x.view(x.size(0), -1)
-        return self.encoder_FC1(x), self.encoder_FC2(x)
+        return self.encoder_fc1(x), self.encoder_fc2(x)
 
     def reparameterize(self, mu, logvar):
         """
-        reparameterize for the backpropagation of z instead of q.
+        Reparameterize for the backpropagation of z instead of q.
+        (See "The reparameterization trick" section of https://arxiv.org/abs/1312.6114)
         :param mu: (Pytorch Variable)
         :param logvar: (Pytorch Variable)
         """
         if self.training:
+            # logvar = \log(\sigma^2) = 2 * \log(\sigma)
+            # \sigma = \exp(0.5 * logvar)
             std = logvar.mul(0.5).exp_()
-            eps = Variable(th.Tensor(std.size()).normal_())
+            # Sample \epsilon from normal distribution
+            eps = Variable(std.data.new(std.size()).normal_())
+            # Then multiply with the standard deviation and add the mean
             return eps.mul(std).add_(mu)
         else:
             return mu
@@ -460,7 +471,7 @@ class CNNVAE(nn.Module):
     def forward(self, x):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
-        decoded = self.decoder_FC(z)
+        decoded = self.decoder_fc(z)
         decoded = decoded.view(x.size(0), 64, 6, 6)
         decoded = self.decoder_conv(decoded)
         return decoded, mu, logvar
