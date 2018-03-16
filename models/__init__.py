@@ -1,2 +1,2 @@
 from .models import SRLConvolutionalNetwork, SRLDenseNetwork, DenseNetwork, \
-                    ConvolutionalNetwork, CustomCNN, SRLCustomCNN, CNNAutoEncoder
+                    ConvolutionalNetwork, CustomCNN, SRLCustomCNN, CNNAutoEncoder, CNNVAE

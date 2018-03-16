@@ -23,6 +23,7 @@ class SRLConvolutionalNetwork(nn.Module):
         self.resnet = models.resnet18(pretrained=True)
         # TODO: add squeezeNet support
         # self.squeezeNet = models.squeezenet1_0(pretrained=True)
+        # TODO: freeze less layers
         # Freeze params
         for param in self.resnet.parameters():
             param.requires_grad = False
