@@ -125,7 +125,7 @@ class VAELearning(BaseLearner):
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         best_error = np.inf
-        best_model_path = "{}/srl_ae_model.pth".format(self.log_folder)
+        best_model_path = "{}/srl_vae_model.pth".format(self.log_folder)
         print("Training...")
         self.model.train()
         start_time = time.time()
