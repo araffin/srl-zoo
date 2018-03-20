@@ -30,9 +30,8 @@ def loadImage(path,view=0):
     :param view: (int) : 0 for normal, 1/2 for multi_view
     """
     if view>0:
-        path +="_"+str(view)+".jpg"
-        #print("view:",view)
-    #print("path :",path)    
+        path +="_"+str(view)
+    path+=".jpg"
     bgr_img = cv2.imread('data/' + path)
     return cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB) / 255.
 
@@ -42,12 +41,10 @@ def createInteractivePlot(fig, ax, states, rewards, images_path, view=0):
     if view > 0:
         name_img+="_"+str(view)
     fig2 = plt.figure(name_img)
-    #fig2.add_subplot()
     image_plot = plt.imshow(loadImage(images_path[0],view))
     
     # Disable seaborn grid
     image_plot.axes.grid(False) 
-    #plt.show()
     callback = ImageFinder(states, rewards, image_plot, ax, images_path,view)
     fig.canvas.mpl_connect('button_release_event', callback)
 
@@ -85,7 +82,6 @@ def plot_3d_representation(states, rewards, images_path, name="Learned State Rep
     fig.tight_layout()
     if add_colorbar:
         fig.colorbar(im, label='Reward')
-    #print("img paths ",images_path)
     
     if multi_view:
         createInteractivePlot(fig, ax, states, rewards, images_path,view=1)

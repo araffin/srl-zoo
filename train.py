@@ -17,11 +17,12 @@ from collections import defaultdict
 import numpy as np
 import torch as th
 import torch.nn as nn
+import torch.nn.functional as F
 from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
-from models.models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, SRLSiameseCNN
+from models.models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet
 from plotting.representation_plot import plot_representation, plt
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import BaxterImageLoader
@@ -124,6 +125,96 @@ class RoboticPriorsLoss(nn.Module):
 
         return total_loss
 
+class RoboticPriorsTripletLoss(nn.Module):
+    """
+    :param model: (PyTorch model)
+    :param l1_reg: (float) l1 regularization coeff
+    :param loss_history: (dict) will be modified
+    """
+
+    def __init__(self, model, l1_reg=0.0, loss_history=None):
+        super(RoboticPriorsTripletLoss, self).__init__()
+        # Retrieve only trainable and regularizable parameters (we should exclude biases)
+        self.reg_params = [param for name, param in model.named_parameters() if
+                           ".bias" not in name and param.requires_grad]
+        n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
+        self.l1_coeff = (l1_reg / n_params)
+        self.loss_history = loss_history
+   
+    # Override in the case of use of Time-Contrastive Triplet Loss 
+    def forward(self, states, p_states, n_states, next_states, # , next_p_states, next_n_states,
+                dissimilar_pairs, same_actions_pairs, ref_point_pairs,
+                similar_pairs, alpha=0.2):
+        """
+        :alpha : (Float) margin that is enforced between positive & neg observation (TCN Triplet Loss)
+        :param states: (th Variable) states for the anchor obs
+        :param p_states (th Variable) states for the positive obs
+        :param n_states (th Variable) states for the negative obs
+        :param next_states: (th Variable)        
+        :param next_p_states (th Variable) 
+        :param next_n_states (th Variable) 
+        :param dissimilar_pairs: (th tensor)
+        :param same_actions_pairs: (th tensor)
+        :param ref_point_pairs: (th tensor)
+        :param similar_pairs: (th tensor)
+        :return: (th Variable)
+        """
+        state_diff = next_states - states
+        state_diff_norm = state_diff.norm(2, dim=1)
+        similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
+        temp_coherence_loss = (state_diff_norm ** 2).mean()
+        causality_loss = similarity(states[dissimilar_pairs[:, 0]],
+                                    states[dissimilar_pairs[:, 1]]).mean()
+        proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
+                                 state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
+
+        repeatability_loss = (
+            similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
+            (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
+
+        w_fixed_point, fixed_ref_point_loss = 0, 0
+        w_same_env, same_env_loss = 0, 0
+        if len(ref_point_pairs) > 0:
+            # Apply reference point prior
+            # It assumes all sequences in the dataset share
+            # at least one same 3D pos input image of Baxter arm
+
+            same_pos_states_diff = states[ref_point_pairs[:, 1]] - states[ref_point_pairs[:, 0]]
+            same_pos_states_diff_norm = same_pos_states_diff.norm(2, dim=1)
+            w_fixed_point = 1
+            fixed_ref_point_loss = (same_pos_states_diff_norm ** 2).mean()
+        elif len(similar_pairs) > 0:
+            # Same Env prior
+            w_same_env = 1
+            same_env_loss = ((states[similar_pairs[:, 1]] - states[similar_pairs[:, 0]]).norm(2, dim=1) ** 2).mean()
+
+        l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
+
+        # Time-Constrastive Triplet Loss
+        distance_positive = (states - p_states).pow(2).sum(1)
+        distance_negative = (states - n_states).pow(2).sum(1)
+        tcn_trplet_loss = F.relu(distance_positive - distance_negative + alpha)
+        tcn_trplet_loss = tcn_trplet_loss.mean()
+        
+        total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
+                     + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
+                     + w_same_env * same_env_loss \
+                     + 1 * tcn_trplet_loss
+                     
+        if self.loss_history is not None:
+            weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
+            names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
+                     'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss']
+            losses = [temp_coherence_loss, causality_loss, proportionality_loss,
+                      repeatability_loss, fixed_ref_point_loss, l1_loss, same_env_loss]
+            for name, w, loss in zip(names, weights, losses):
+                if w > 0:
+                    if len(self.loss_history[name]) > 0:
+                        self.loss_history[name][-1] += w * loss.data[0]
+                    else:
+                        self.loss_history[name].append(w * loss.data[0])
+
+        return total_loss
 
 class SRL4robotics(BaseLearner):
     """
@@ -147,10 +238,10 @@ class SRL4robotics(BaseLearner):
         if model_type == "resnet":
             self.model = SRLConvolutionalNetwork(self.state_dim, cuda, noise_std=NOISE_STD)
         elif model_type == "custom_cnn":
-            #if not multi_view:
-            #    self.model = SRLSiameseCNN(self.state_dim, cuda, noise_std=NOISE_STD)
-            #else:
             self.model = SRLCustomCNN(self.state_dim, cuda, noise_std=NOISE_STD)
+        elif model_type == "triplet_cnn" : 
+            print('chosen model : triplet_cnn')
+            self.model = TripletNet(self.state_dim, cuda, noise_std=NOISE_STD)            
         elif model_type == "mlp":
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         else:
@@ -166,6 +257,7 @@ class SRL4robotics(BaseLearner):
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.l1_reg = l1_reg
         self.log_folder = log_folder
+        self.model_type=model_type
 
     def learn(self, images_path, actions, rewards,
               episode_starts, is_ref_point_list=None,
@@ -200,7 +292,7 @@ class SRL4robotics(BaseLearner):
         # list is the id of the observation preserved thorough the training
         minibatchlist = [np.array(sorted(indices[start_idx:start_idx + self.batch_size]))
                          for start_idx in range(0, num_samples - self.batch_size + 1, self.batch_size)]
-
+        
         if len(minibatchlist[-1]) < self.batch_size:
             print("Removing last minibatch of size {} < batch_size".format(len(minibatchlist[-1])))
             del minibatchlist[-1]
@@ -340,26 +432,30 @@ class SRL4robotics(BaseLearner):
                 return np.where(positive_r * (actions[minibatch] == actions[minibatch[index]]) *
                                 (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
 
-            # def findSimilar(index, minibatch):
-            #     """
-            #     check which samples should be similar
-            #     because they lead to the same positive reward
-            #     :param index: (int)
-            #     :param minibatch: (numpy array)
-            #     :return: (dict, numpy array)
-            #     """
-            #     positive_r = rewards[minibatch[index] + 1] > 0
-            #     return np.where(positive_r * (rewards[minibatch + 1] == rewards[minibatch[index] + 1]))[0]
-
             similar_pairs = [
                 np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch) if j > i],
                          dtype='int64') for minibatch in minibatchlist]
 
-            for item in similar_pairs:
-                if len(item) == 0:
-                    print("No pairs found for one minibatch of similar pairs")
-                    sys.exit(NO_PAIRS_ERROR)
-
+#            for item in similar_pairs:
+#                if len(item) == 0:
+#                    print("No pairs found for one minibatch of similar pairs")
+#                    sys.exit(NO_PAIRS_ERROR)
+#       
+            print('Dealing with minibatches missing sissimilar pairs...')
+            for minibatch_id, d in enumerate(similar_pairs):
+                if len(d) == 0:
+                    #print('d',d)
+                    print('empty item d:', minibatch_id)
+                    for m_id, minibatch in enumerate(minibatchlist):
+                        for i in range(self.batch_size):
+                            for j in findSimilar(i, minibatch):                            
+                                if (j > i) & (minibatch_id !=m_id) :                                
+                                    tmp = minibatch[j]                                
+                                    minibatch[j] = minibatchlist[minibatch_id][j]
+                                    minibatchlist[minibatch_id][j] = tmp                                
+                                    similar_pairs[minibatch_id] = np.array([[i,j]])
+                                    break
+            print(similar_pairs)
         for item in same_actions + dissimilar:
             if len(item) == 0:
                 msg = "No same actions or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
@@ -371,10 +467,13 @@ class SRL4robotics(BaseLearner):
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
                                                same_actions, dissimilar, ref_point_pairs,
                                                similar_pairs, cache_capacity=100,multi_view=self.multi_view) #default=5000
-
+        #print('Mini-batches dims : ',minibatchlist[0].shape,minibatchlist[0])
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
-        criterion = RoboticPriorsLoss(self.model, self.l1_reg, loss_history)
+        if self.model_type == "triplet_cnn":
+            criterion = RoboticPriorsTripletLoss(self.model, self.l1_reg, loss_history)
+        else:
+            criterion = RoboticPriorsLoss(self.model, self.l1_reg, loss_history)
         best_error = np.inf
         best_model_path = "{}/srl_model.pth".format(self.log_folder)
         self.model.train()
@@ -396,14 +495,22 @@ class SRL4robotics(BaseLearner):
                         is_ref_point_list = is_ref_point_list.cuda()
                     if len(sim_pairs) > 0:
                         sim_pairs = sim_pairs.cuda()
-
+                
+                self.optimizer.zero_grad()
                 # Predict states given observations
                 #print("train.py - obs.shape :",obs.shape,next_obs.shape)
-                states, next_states = self.model(obs), self.model(next_obs)
-
-                self.optimizer.zero_grad()
-                loss = criterion(states, next_states, diss, same,
-                                 is_ref_point_list, sim_pairs)
+                if self.model_type=="triplet_cnn":
+                    #print("fwd obs 1 :",obs.shape)
+                    st, p_st,  n_st = self.model(obs[:,:3:,:,:],obs[:,3:6,:,:],obs[:,6:,:,:]) 
+                    #print("fwd obs 2")
+                    next_st, next_p_st,  next_n_st =  self.model(next_obs[:,:3:,:,:],next_obs[:,3:6,:,:],next_obs[:,6:,:,:])
+                    #print("computing triplet loss")
+                    loss = criterion(st, p_st,  n_st, next_st, diss, same, is_ref_point_list, sim_pairs)
+                else:                    
+                    states, next_states = self.model(obs), self.model(next_obs)                
+                    loss = criterion(states, next_states, diss, same,\
+                        is_ref_point_list, sim_pairs)
+                        
                 # We have to call backward in both train/val
                 # to avoid memory error
                 loss.backward()
@@ -461,6 +568,24 @@ class SRL4robotics(BaseLearner):
         # return predicted states for training observations
         return loss_history, self.predStatesWithDataLoader(baxter_data_loader, restore_train=False)
 
+class SRL4roboticsTriplet(SRL4robotics):
+    def _predFn(self, observations, restore_train=True):
+        """
+        Predict states in test mode given observations
+        :param observations: (PyTorch Variable)
+        :param restore_train: (bool) whether to restore training mode after prediction
+        :return: (numpy tensor)
+        """
+        # Switch to test mode
+        self.model.eval()
+        states,_,_ = self.model(observations[:,:3:,:,:],observations[:,3:6,:,:],observations[:,6:,:,:])
+        if restore_train:
+            # Restore training mode
+            self.model.train()
+        if self.cuda:
+            # Move the tensor back to the cpu
+            return states.data.cpu().numpy()
+        return states.data.numpy()    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch SRL with robotic priors')
@@ -511,9 +636,15 @@ if __name__ == '__main__':
     images_path = ground_truth['images_path']
 
     print('Learning a state representation ... ')
-    srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
-                       log_folder=args.log_folder, learning_rate=args.learning_rate,
-                       l1_reg=args.l1_reg, cuda=args.cuda, multi_gpu=args.multi_gpu,multi_view=args.multi_view)
+    if args.multi_view:
+        srl = SRL4roboticsTriplet(args.state_dim, model_type=args.model_type, seed=args.seed,
+                           log_folder=args.log_folder, learning_rate=args.learning_rate,
+                           l1_reg=args.l1_reg, cuda=args.cuda, multi_gpu=args.multi_gpu,multi_view=args.multi_view)
+    else:
+        
+        srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
+                           log_folder=args.log_folder, learning_rate=args.learning_rate,
+                           l1_reg=args.l1_reg, cuda=args.cuda, multi_gpu=args.multi_gpu,multi_view=args.multi_view)
 
     is_ref_point_list = None
     if APPLY_5TH_PRIOR:

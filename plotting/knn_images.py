@@ -81,6 +81,8 @@ print('seed={}\n'.format(args.seed))
 # Sample random images
 images_indices = np.arange(len(images_path))
 n_samples = min(len(images_path), n_samples)
+print('paths:',images_path)
+#data = random.sample(zip(images_path, neighbors_indices, distances, images_indices), n_samples)
 data = random.sample(zip(images_path, neighbors_indices, distances, images_indices), n_samples)
 # Progressbar
 pbar = tqdm(total=n_samples)
@@ -102,7 +104,9 @@ for image_path, neigbour_indices, distance, image_idx in data:
         # subplot: (i, j, k) i rows, j columns, k^th plot | n_plots: i * j
 
         if args.multi_view:
-            image_path+='_1.jpg'
+            image_path+='_1'
+        image_path+='.jpg'
+        #print(image_path)
         ref_image = fig.add_subplot(n_lines + 1, 5, 3)
         img = Image.open("data/{}".format(image_path))
         plt.imshow(img)
@@ -123,7 +127,8 @@ for image_path, neigbour_indices, distance, image_idx in data:
             neighbor_record_folder = image_path.split("/")[1]
             neighbor_frame_name = image_path.split("/")[-1].split(".")[0]
             if args.multi_view:
-                image_path+='_1.jpg'
+                image_path+='_1'
+            image_path+='.jpg'
             img = Image.open("data/{}".format(image_path))
             plt.imshow(img)
 

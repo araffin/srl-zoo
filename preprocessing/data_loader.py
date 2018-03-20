@@ -4,6 +4,8 @@ import time
 import threading
 import multiprocessing as mp
 from collections import OrderedDict
+import os.path
+
 
 import cv2
 import numpy as np
@@ -12,15 +14,15 @@ from torch.autograd import Variable
 
 from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
-DUAL_CAM = True
 
-def imageWorker(image_queue, output_queue, exit_event):
+def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_margin=50):
     """
     Worker that preprocess images
     :param image_queue: (multiprocessing.Queue) queue with the path to the images
     :param output_queue: (multiprocessing.Queue) queue where the preprocessed image
                           will be added
     :param exit_event: (multiprocessing.Event) Event for exiting the loop
+    :param multi_view: (bool) enables dual camera mode
     """
     while not exit_event.is_set():
         idx, image_path = image_queue.get()
@@ -30,10 +32,11 @@ def imageWorker(image_queue, output_queue, exit_event):
             break
         #print("IM PATH:",image_path)
         
-        if DUAL_CAM:
-
+        if multi_view:
+            
             im1 = cv2.imread(image_path+"_1.jpg")
             # Resize
+            #print('type im :',type(im1))
             im1 = cv2.resize(im1, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
             # Convert BGR to RGB
             im1 = cv2.cvtColor(im1, cv2.COLOR_BGR2RGB)
@@ -49,18 +52,47 @@ def imageWorker(image_queue, output_queue, exit_event):
             # Normalize
             im2 = preprocessInput(im2.astype(np.float32), mode="image_net")
             
+            ####################
+            #negative observation
+            digits_path=[k for k in image_path.split("/")[-1]  if k.isdigit() ]
+            digits_path = int("".join(digits_path))
+            neg_path = str(digits_path-time_margin)
+            pos_path = str(digits_path+time_margin)
+            l_minus = len(neg_path)
+            l_plus = len(pos_path)
+            
+            if os.path.exists(image_path[:-l_plus]+pos_path+"_1.jpg"):
+                third_path=image_path[:-l_plus]+pos_path
+            elif (digits_path-time_margin)>0 and os.path.exists(image_path[:-l_minus]+str(digits_path-time_margin)+"_1.jpg"):
+                third_path=image_path[:-l_minus]+str(digits_path-time_margin)
+            else:
+                print('No neg_path')
+                
+            im3 = cv2.imread(third_path+"_1.jpg")
+            # Resize
+            im3 = cv2.resize(im3, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
+            # Convert BGR to RGB
+            im3 = cv2.cvtColor(im3, cv2.COLOR_BGR2RGB)
+            # Normalize
+            im3 = preprocessInput(im3.astype(np.float32), mode="image_net")
+            
             #print("shapes im 1",im1.shape)
             #stacking along channels
-            im = np.dstack((im1,im2))
+            
+            #im = np.dstack((im1,im2))
+            im = np.dstack((im1,im2,im3))
             
             #print("shapes im stack",im.shape)
         else:
-            im = cv2.imread(image_path+"_1.jpg")
+            #print('path : ',image_path)
+            im = cv2.imread(image_path+".jpg")
+            #print(im.shape)
             # Resize
             im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
             # Convert BGR to RGB
             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             # Normalize
+            im = preprocessInput(im.astype(np.float32), mode="image_net")
                     
         output_queue.put((idx, im))
         del im  # Free memory
@@ -79,6 +111,7 @@ class BaxterImageLoader(object):
     :param similar_pairs: [numpy matrix]
     :param test_batch_size: (int)
     :param cache_capacity: (int) number of images that can be cached
+    :param multi_view: (bool) enables dual camera mode
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
     [WARNING] Set to False, you MUST clean up the loader manually (by calling cleanUp() method)
@@ -88,7 +121,7 @@ class BaxterImageLoader(object):
     def __init__(self, minibatchlist, images_path, same_actions,
                  dissimilar, ref_point_pairs=None, similar_pairs=None,
                  test_batch_size=512, cache_capacity=5000,
-                 n_workers=5, auto_cleanup=True):
+                 n_workers=5, auto_cleanup=True,multi_view=False):
         super(BaxterImageLoader, self).__init__()
 
         self.n_minibatches = len(minibatchlist)
@@ -155,6 +188,7 @@ class BaxterImageLoader(object):
         # keep track of images that remain to be preprocessed
         self.n_sent, self.n_received = 0, 0
         self.shutdown = False
+        self.multi_view=multi_view
 
         if self.n_workers <= 0:
             raise ValueError("n_workers <= 0 in the data loader")
@@ -163,7 +197,7 @@ class BaxterImageLoader(object):
         # and a common output_queue
         self.workers = []
         for i in range(self.n_workers):
-            w = mp.Process(target=imageWorker, args=(self.image_queues[i], self.output_queue, self.exit_event))
+            w = mp.Process(target=imageWorker, args=(self.image_queues[i], self.output_queue, self.exit_event,self.multi_view))
             w.daemon = True  # ensure that the worker exits on process exit
             w.start()
             self.workers.append(w)
@@ -336,6 +370,7 @@ class BaxterImageLoader(object):
         """
         # Preprocessing loop, it fills workers queues
         for indices, key in zip(indices_list, obs_dict.keys()):
+                            
             obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS), dtype=np.float32)
             # Reset queues and received count
             self.resetQueues()
