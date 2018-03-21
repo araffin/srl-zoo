@@ -317,13 +317,31 @@ class CNNAutoEncoder(nn.Module):
             nn.ConvTranspose2d(64, 3, kernel_size=4, stride=2),  # 224x224x3
         )
 
-    def forward(self, x):
+    def encode(self, x):
+        """
+        :param x: (PyTorch Variable)
+        :return: (PyTorch Variable)
+        """
         encoded = self.encoder_conv(x)
         encoded = encoded.view(encoded.size(0), -1)
-        encoded = self.encoder_fc(encoded)
-        decoded = self.decoder_fc(encoded)
-        decoded = decoded.view(encoded.size(0), 64, 6, 6)
-        decoded = self.decoder_conv(decoded)
+        return self.encoder_fc(encoded)
+
+    def decode(self, x):
+        """
+        :param x: (PyTorch Variable)
+        :return: (PyTorch Variable)
+        """
+        decoded = self.decoder_fc(x)
+        decoded = decoded.view(x.size(0), 64, 6, 6)
+        return self.decoder_conv(decoded)
+
+    def forward(self, x):
+        """
+        :param x: (PyTorch Variable)
+        :return: (PyTorch Variable)
+        """
+        encoded = self.encode(x)
+        decoded = self.decode(encoded)
         return encoded, decoded
 
 

@@ -199,7 +199,7 @@ def saveConfig(exp_config, print_config=False):
     # Sort by keys
     exp_config = OrderedDict(sorted(exp_config.items()))
 
-    with open("{}/exp_config.json".format(exp_config['log_folder']), "wb") as f:
+    with open("{}/exp_config.json".format(exp_config['log_folder']), "w") as f:
         json.dump(exp_config, f)
     print("Saved config to log folder: {}".format(exp_config['log_folder']))
 

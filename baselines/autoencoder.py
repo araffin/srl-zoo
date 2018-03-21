@@ -71,7 +71,7 @@ class AutoEncoderLearning(BaseLearner):
         """
         # Switch to test mode
         self.model.eval()
-        states, _ = self.model(observations)
+        states = self.model.encode(observations)
         if restore_train:
             # Restore training mode
             self.model.train()

@@ -209,7 +209,7 @@ class BaxterImageLoader(object):
         n_to_delete = n_in_cache - self.cache_capacity + 1
         if n_to_delete > 0:
             # Delete first n_to_delete elements (oldest entries)
-            for key in self.cache.keys()[:n_to_delete]:
+            for key in list(self.cache.keys())[:n_to_delete]:
                 del self.cache[key]
 
     def cleanUp(self):
