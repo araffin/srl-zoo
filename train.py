@@ -144,7 +144,7 @@ class RoboticPriorsTripletLoss(nn.Module):
     # Override in the case of use of Time-Contrastive Triplet Loss 
     def forward(self, states, p_states, n_states, next_states, # , next_p_states, next_n_states,
                 dissimilar_pairs, same_actions_pairs, ref_point_pairs,
-                similar_pairs, alpha=0.2):
+                similar_pairs, alpha=0.2, no_priors=False):
         """
         :alpha : (Float) margin that is enforced between positive & neg observation (TCN Triplet Loss)
         :param states: (th Variable) states for the anchor obs
@@ -157,6 +157,7 @@ class RoboticPriorsTripletLoss(nn.Module):
         :param same_actions_pairs: (th tensor)
         :param ref_point_pairs: (th tensor)
         :param similar_pairs: (th tensor)
+        :param use_priors: (bool)
         :return: (th Variable)
         """
         state_diff = next_states - states
@@ -191,16 +192,19 @@ class RoboticPriorsTripletLoss(nn.Module):
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
         # Time-Constrastive Triplet Loss
+        #print(states.shape)
         distance_positive = (states - p_states).pow(2).sum(1)
         distance_negative = (states - n_states).pow(2).sum(1)
         tcn_trplet_loss = F.relu(distance_positive - distance_negative + alpha)
         tcn_trplet_loss = tcn_trplet_loss.mean()
         
-        total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
-                     + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
-                     + w_same_env * same_env_loss \
-                     + 1 * tcn_trplet_loss
-                     
+        total_loss = 1* tcn_trplet_loss + self.l1_coeff * l1_loss
+        
+        if not no_priors:
+            total_loss += 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
+                         + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss \
+                         + w_same_env * same_env_loss 
+                         
         if self.loss_history is not None:
             weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
             names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
@@ -229,7 +233,7 @@ class SRL4robotics(BaseLearner):
     """
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
-                 seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False, multi_gpu=False,multi_view=False):
+                 seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False, multi_gpu=False,multi_view=False, no_priors=False):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -258,6 +262,7 @@ class SRL4robotics(BaseLearner):
         self.l1_reg = l1_reg
         self.log_folder = log_folder
         self.model_type=model_type
+        self.no_priors=no_priors
 
     def learn(self, images_path, actions, rewards,
               episode_starts, is_ref_point_list=None,
@@ -505,7 +510,7 @@ class SRL4robotics(BaseLearner):
                     #print("fwd obs 2")
                     next_st, next_p_st,  next_n_st =  self.model(next_obs[:,:3:,:,:],next_obs[:,3:6,:,:],next_obs[:,6:,:,:])
                     #print("computing triplet loss")
-                    loss = criterion(st, p_st,  n_st, next_st, diss, same, is_ref_point_list, sim_pairs)
+                    loss = criterion(st, p_st,  n_st, next_st, diss, same, is_ref_point_list, sim_pairs, no_priors=self.no_priors)
                 else:                    
                     states, next_states = self.model(obs), self.model(next_obs)                
                     loss = criterion(states, next_states, diss, same,\
@@ -578,7 +583,7 @@ class SRL4roboticsTriplet(SRL4robotics):
         """
         # Switch to test mode
         self.model.eval()
-        states,_,_ = self.model(observations[:,:3:,:,:],observations[:,3:6,:,:],observations[:,6:,:,:])
+        states = self.model.module.get_embedding(observations[:,:3:,:,:])
         if restore_train:
             # Restore training mode
             self.model.train()
@@ -615,6 +620,9 @@ if __name__ == '__main__':
     
     parser.add_argument('--multi_view',action='store_true', default=False,
                         help='Enable use of multiple camera')
+    parser.add_argument('--no_priors',action='store_true', default=False,
+                        help='Disable use of priors - in case of triplet loss testing purpose')
+                        
                         
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -639,12 +647,12 @@ if __name__ == '__main__':
     if args.multi_view:
         srl = SRL4roboticsTriplet(args.state_dim, model_type=args.model_type, seed=args.seed,
                            log_folder=args.log_folder, learning_rate=args.learning_rate,
-                           l1_reg=args.l1_reg, cuda=args.cuda, multi_gpu=args.multi_gpu,multi_view=args.multi_view)
+                           l1_reg=args.l1_reg, cuda=args.cuda, multi_gpu=args.multi_gpu, multi_view=args.multi_view, no_priors=args.no_priors)
     else:
         
         srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                            log_folder=args.log_folder, learning_rate=args.learning_rate,
-                           l1_reg=args.l1_reg, cuda=args.cuda, multi_gpu=args.multi_gpu,multi_view=args.multi_view)
+                           l1_reg=args.l1_reg, cuda=args.cuda, multi_gpu=args.multi_gpu, multi_view=args.multi_view)
 
     is_ref_point_list = None
     if APPLY_5TH_PRIOR:

@@ -15,7 +15,7 @@ from torch.autograd import Variable
 from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
 
-def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_margin=50):
+def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_margin=100):
     """
     Worker that preprocess images
     :param image_queue: (multiprocessing.Queue) queue with the path to the images
@@ -54,6 +54,7 @@ def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_marg
             
             ####################
             #negative observation
+            time_margin = np.random.randint(100)
             digits_path=[k for k in image_path.split("/")[-1]  if k.isdigit() ]
             digits_path = int("".join(digits_path))
             neg_path = str(digits_path-time_margin)
@@ -67,6 +68,7 @@ def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_marg
                 third_path=image_path[:-l_minus]+str(digits_path-time_margin)
             else:
                 print('No neg_path')
+                break
                 
             im3 = cv2.imread(third_path+"_1.jpg")
             # Resize
