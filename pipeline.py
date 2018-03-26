@@ -33,9 +33,7 @@ def getLogFolderName(exp_config):
     :param exp_config: (dict)
     :return: (str, str)
     """
-    now = datetime.datetime.now()
-    date = "Y{}_M{:02d}_D{:02d}_H{:02d}M{:02d}S{:02d}".format(now.year, now.month, now.day, now.hour, now.minute,
-                                                              now.second)
+    date = datetime.datetime.now().strftime("%y-%m-%d_%Hh%M_%S")
     model_str = "_{}".format(exp_config['model_type'])
     srl_str = "{}_ST_DIM{}_SEED{}".format(priorsToString(exp_config['priors']), exp_config['state_dim'],
                                           exp_config['seed'])
@@ -47,7 +45,7 @@ def getLogFolderName(exp_config):
     else:
         continuous_str = ""
 
-    experiment_name = "model{}{}{}{}_{}".format(date, model_str, continuous_str, srl_str, exp_config['model_approach'])
+    experiment_name = "{}{}{}{}_{}".format(date, model_str, continuous_str, srl_str, exp_config['model_approach'])
 
     printBlue("\nExperiment: {}\n".format(experiment_name))
     log_folder = "logs/{}/{}".format(exp_config['data_folder'], experiment_name)
@@ -141,7 +139,7 @@ def baselineCall(exp_config, baseline="supervised"):
     config_args = ['epochs', 'seed', 'model_type',
                    'data_folder', 'training_set_size']
 
-    if baseline == "autoencoder":
+    if baseline in ["autoencoder", "vae"]:
         config_args += ['state_dim']
     elif baseline == "supervised" and exp_config['relative_pos']:
         args += ['--relative_pos']
@@ -201,7 +199,7 @@ def saveConfig(exp_config, print_config=False):
     # Sort by keys
     exp_config = OrderedDict(sorted(exp_config.items()))
 
-    with open("{}/exp_config.json".format(exp_config['log_folder']), "wb") as f:
+    with open("{}/exp_config.json".format(exp_config['log_folder']), "w") as f:
         json.dump(exp_config, f)
     print("Saved config to log folder: {}".format(exp_config['log_folder']))
 
@@ -211,7 +209,7 @@ def useRelativePosition(data_folder):
     :param data_folder: (str)
     :return: (bool)
     """
-    with open('data/{}/dataset_config.json'.format(data_folder), 'rb') as f:
+    with open('data/{}/dataset_config.json'.format(data_folder), 'r') as f:
         relative_pos = json.load(f).get('relative_pos', False)
     return relative_pos
 
@@ -229,7 +227,7 @@ def getBaseExpConfig(args):
     dataset_path = "data/{}".format(args.data_folder)
     assert os.path.isdir(dataset_path), "Path to dataset folder is not valid: {}".format(dataset_path)
 
-    with open(args.base_config, 'rb') as f:
+    with open(args.base_config, 'r') as f:
         exp_config = json.load(f)
     exp_config['data_folder'] = args.data_folder
     exp_config['relative_pos'] = useRelativePosition(args.data_folder)
@@ -290,16 +288,17 @@ if __name__ == '__main__':
                 baselineCall(exp_config, 'supervised')
                 evaluateBaseline(base_config)
 
-            # Autoencoder
+            # Autoencoder and VAE
             exp_config['model_type'] = "cnn"
-            for state_dim in [2, 3, 4, 5, 6]:
-                # Update config
-                exp_config['state_dim'] = state_dim
-                baselineCall(exp_config, 'autoencoder')
-                evaluateBaseline(base_config)
+            for baseline in ['autoencoder', 'vae']:
+                for state_dim in [3, 4, 5, 6]:
+                    # Update config
+                    exp_config['state_dim'] = state_dim
+                    baselineCall(exp_config, baseline)
+                    evaluateBaseline(base_config)
 
         # PCA
-        for state_dim in [2, 3, 4, 5, 6]:
+        for state_dim in [3, 4, 5, 6]:
             # Update config
             exp_config['state_dim'] = state_dim
             dimReductionCall(exp_config, 'pca')
@@ -314,7 +313,7 @@ if __name__ == '__main__':
 
     # Reproduce a previous experiment using "exp_config.json"
     elif args.exp_config != "":
-        with open(args.exp_config, 'rb') as f:
+        with open(args.exp_config, 'r') as f:
             exp_config = json.load(f)
 
         print("\n Pipeline using json config file: {} \n".format(args.exp_config))
@@ -350,7 +349,7 @@ if __name__ == '__main__':
         preprocessingCall(exp_config)
 
         # Grid search
-        for seed in [1]:
+        for seed in [0]:
             exp_config['seed'] = seed
             for state_dim in [3, 4, 6, 10]:
                 # Update config

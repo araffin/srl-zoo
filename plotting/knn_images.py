@@ -47,7 +47,7 @@ n_lines = (n_neighbors // N_NEIGHBORS_PER_LINE) + 1
 random.seed(args.seed)
 n_to_plot = args.n_to_plot
 
-with open("{}/exp_config.json".format(args.log_folder), 'rb') as f:
+with open("{}/exp_config.json".format(args.log_folder), 'r') as f:
     data_folder = json.load(f)['data_folder']
 
 # Load ground truth and images path
@@ -154,5 +154,5 @@ print("KNN MSE: {}".format(mean_error))
 
 result_dict = {'images': images_titles, 'knn_mse': round(mean_error, 5)}
 
-with open("{}/knn_mse.json".format(args.log_folder), 'wb') as f:
+with open("{}/knn_mse.json".format(args.log_folder), 'w') as f:
     json.dump(result_dict, f)

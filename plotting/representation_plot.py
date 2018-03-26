@@ -161,7 +161,7 @@ def plot_image(image, name='Observation Sample'):
     updateDisplayMode()
     fig = plt.figure(name)
     plt.imshow(image, interpolation='nearest')
-    plt.gca().invert_yaxis()
+    # plt.gca().invert_yaxis()
     plt.xticks([])
     plt.yticks([])
     pauseOrClose(fig)
@@ -295,7 +295,7 @@ if __name__ == '__main__':
         if args.plot_against:
             plot_against(true_states, rewards, cmap=cmap)
         else:
-            plot_representation(true_states, rewards, name, cmap=cmap)
+            plot_representation(true_states, rewards, name, fit_pca=False, cmap=cmap)
         input('\nPress any key to exit.')
 
     else:

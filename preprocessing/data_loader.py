@@ -15,6 +15,20 @@ from torch.autograd import Variable
 from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
 
+def preprocessImage(image):
+    """
+    :param image: (numpy matrix)
+    :return: (numpy matrix)
+    """
+    # Resize
+    im = cv2.resize(image, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
+    # Convert BGR to RGB
+    im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+    # Normalize
+    im = preprocessInput(im.astype(np.float32), mode="image_net")
+    return im
+
+
 def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_margin=100):
     """
     Worker that preprocess images
@@ -23,6 +37,7 @@ def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_marg
                           will be added
     :param exit_event: (multiprocessing.Event) Event for exiting the loop
     :param multi_view: (bool) enables dual camera mode
+    :param time_margin: (int) time margin for negativa obersation sampling (here is fixed)
     """
     while not exit_event.is_set():
         idx, image_path = image_queue.get()
@@ -30,7 +45,6 @@ def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_marg
         if idx is None:
             image_queue.put((None, None))
             break
-        #print("IM PATH:",image_path)
         
         if multi_view:
             
@@ -92,7 +106,6 @@ def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_marg
                     
         output_queue.put((idx, im))
         del im  # Free memory
-
 
 class BaxterImageLoader(object):
     """
@@ -260,7 +273,7 @@ class BaxterImageLoader(object):
         n_to_delete = n_in_cache - self.cache_capacity + 1
         if n_to_delete > 0:
             # Delete first n_to_delete elements (oldest entries)
-            for key in self.cache.keys()[:n_to_delete]:
+            for key in list(self.cache.keys())[:n_to_delete]:
                 del self.cache[key]
 
     def cleanUp(self):

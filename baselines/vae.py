@@ -5,7 +5,7 @@ import argparse
 
 import numpy as np
 import torch as th
-import torch.nn as nn
+from torch.nn import functional as F
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
@@ -15,7 +15,7 @@ from preprocessing.data_loader import AutoEncoderDataLoader
 from preprocessing.preprocess import INPUT_DIM
 from preprocessing.utils import deNormalize
 from models.base_learner import BaseLearner
-from models.models import LinearAutoEncoder, DenseAutoEncoder, CNNAutoEncoder
+from models.models import DenseVAE, CNNVAE
 from pipeline import saveConfig
 from plotting.representation_plot import plot_representation, plt, plot_image
 
@@ -28,14 +28,15 @@ except NameError:
 DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 32
-NOISE_FACTOR = 0.1
+NOISE_FACTOR = 0
 TEST_BATCH_SIZE = 512
 
 
-class AutoEncoderLearning(BaseLearner):
+class VAELearning(BaseLearner):
     """
     :param state_dim: (int)
     :param model_type: (str) one of "cnn" or "mlp"
+    :param log_folder: (str)
     :param seed: (int)
     :param learning_rate: (float)
     :param cuda: (bool)
@@ -44,13 +45,12 @@ class AutoEncoderLearning(BaseLearner):
     def __init__(self, state_dim, model_type="cnn", log_folder="logs/default",
                  seed=1, learning_rate=0.001, cuda=False):
 
-        super(AutoEncoderLearning, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
+        super(VAELearning, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
         if model_type == "cnn":
-            self.model = CNNAutoEncoder(self.state_dim)
+            self.model = CNNVAE(self.state_dim)
         elif model_type == "mlp":
-            self.model = DenseAutoEncoder(INPUT_DIM, self.state_dim)
-            # self.model = LinearAutoEncoder(INPUT_DIM, self.state_dim)
+            self.model = DenseVAE(INPUT_DIM, self.state_dim)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -71,7 +71,7 @@ class AutoEncoderLearning(BaseLearner):
         """
         # Switch to test mode
         self.model.eval()
-        states = self.model.encode(observations)
+        states, _ = self.model.encode(observations)
         if restore_train:
             # Restore training mode
             self.model.train()
@@ -79,6 +79,27 @@ class AutoEncoderLearning(BaseLearner):
             # Move the tensor back to the cpu
             return states.data.cpu().numpy()
         return states.data.numpy()
+
+
+    @staticmethod
+    def _lossFunction(decoded, obs, mu, logvar):
+        """
+        Reconstruction + KL divergence losses summed over all elements and batch
+        :param decoded: (Pytorch Variable)
+        :param obs: (Pytorch Variable)
+        :param mu: (Pytorch Variable)
+        :param logvar: (Pytorch Variable)
+        :return: (Pytorch Variable)
+        """
+        generation_loss = F.mse_loss(decoded, obs, size_average=False)
+
+        # see Appendix B from VAE paper:
+        # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
+        # https://arxiv.org/abs/1312.6114
+        # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+        kl_divergence = -0.5 * th.sum(1 + logvar - mu.pow(2) - logvar.exp())
+
+        return generation_loss + kl_divergence
 
     def learn(self, images_path, rewards):
         """
@@ -103,9 +124,8 @@ class AutoEncoderLearning(BaseLearner):
                                             no_targets=True, is_training=False)
 
         # TRAINING -----------------------------------------------------------------------------------------------------
-        criterion = nn.MSELoss(size_average=True)
         best_error = np.inf
-        best_model_path = "{}/srl_ae_model.pth".format(self.log_folder)
+        best_model_path = "{}/srl_vae_model.pth".format(self.log_folder)
         print("Training...")
         self.model.train()
         start_time = time.time()
@@ -118,9 +138,9 @@ class AutoEncoderLearning(BaseLearner):
                 if self.cuda:
                     noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
 
-                _, decoded = self.model(noisy_obs)
                 self.optimizer.zero_grad()
-                loss = criterion(decoded, obs)
+                decoded, mu, logvar = self.model(noisy_obs)
+                loss = VAELearning._lossFunction(decoded, obs, mu, logvar)
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.data[0]
@@ -136,8 +156,8 @@ class AutoEncoderLearning(BaseLearner):
                 if self.cuda:
                     noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
 
-                _, decoded = self.model(noisy_obs)
-                loss = criterion(decoded, obs)
+                decoded, mu, logvar = self.model(noisy_obs)
+                loss = VAELearning._lossFunction(decoded, obs, mu, logvar)
                 val_loss += loss.data[0]
 
             val_loss /= len(val_loader)
@@ -176,7 +196,7 @@ def getModelName(args):
     :param args: (parsed args object)
     :return: (str)
     """
-    name = "autoencoder_{}_ST_DIM{}_SEED{}_NOISE{}".format(args.model_type, args.state_dim,
+    name = "vae_{}_ST_DIM{}_SEED{}_NOISE{}".format(args.model_type, args.state_dim,
                                                            args.seed, args.noise_factor)
     name = name.replace(".", "_")  # replace decimal points by '_' for folder naming
     name += "_EPOCHS{}_BS{}".format(args.epochs, args.batch_size)
@@ -217,7 +237,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
-    parser.add_argument('--noise_factor', type=float, default=0.1, help='Noise factor for denoising autoencoder')
+    parser.add_argument('--noise_factor', type=float, default=0, help='Noise factor for denoising vae')
     parser.add_argument('--training_set_size', type=int, default=-1, help='Limit size of the training set (default: -1)')
 
     args = parser.parse_args()
@@ -231,7 +251,7 @@ if __name__ == '__main__':
 
     name = getModelName(args)
     log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
-    createFolder(log_folder, "autoencoder folder already exist")
+    createFolder(log_folder, "vae folder already exist")
     saveExpConfig(args, log_folder)
 
     folder_path = '{}/NearestNeighbors/'.format(log_folder)
@@ -249,13 +269,13 @@ if __name__ == '__main__':
         rewards = rewards[:limit]
 
     print('Learning a state representation ... ')
-    srl = AutoEncoderLearning(args.state_dim, model_type=args.model_type, seed=args.seed,
+    srl = VAELearning(args.state_dim, model_type=args.model_type, seed=args.seed,
                               log_folder=log_folder, learning_rate=args.learning_rate,
                               cuda=args.cuda)
     learned_states = srl.learn(images_path, rewards)
     srl.saveStates(learned_states, images_path, rewards, log_folder)
 
-    name = "Learned State Representation - {} \n Autoencoder state_dim={}".format(args.data_folder, args.state_dim)
+    name = "Learned State Representation - {} \n VAE state_dim={}".format(args.data_folder, args.state_dim)
     path = "{}/learned_states.png".format(log_folder)
     plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
 
