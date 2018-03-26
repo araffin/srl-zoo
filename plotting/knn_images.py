@@ -81,8 +81,6 @@ print('seed={}\n'.format(args.seed))
 # Sample random images
 images_indices = np.arange(len(images_path))
 n_samples = min(len(images_path), n_samples)
-print('paths:',images_path)
-#data = random.sample(zip(images_path, neighbors_indices, distances, images_indices), n_samples)
 data = random.sample(zip(images_path, neighbors_indices, distances, images_indices), n_samples)
 # Progressbar
 pbar = tqdm(total=n_samples)
@@ -106,7 +104,6 @@ for image_path, neigbour_indices, distance, image_idx in data:
         if args.multi_view:
             image_path+='_1'
         image_path+='.jpg'
-        #print(image_path)
         ref_image = fig.add_subplot(n_lines + 1, 5, 3)
         img = Image.open("data/{}".format(image_path))
         plt.imshow(img)

@@ -472,7 +472,6 @@ class SRL4robotics(BaseLearner):
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
                                                same_actions, dissimilar, ref_point_pairs,
                                                similar_pairs, cache_capacity=100,multi_view=self.multi_view) #default=5000
-        #print('Mini-batches dims : ',minibatchlist[0].shape,minibatchlist[0])
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
         if self.model_type == "triplet_cnn":
@@ -503,13 +502,9 @@ class SRL4robotics(BaseLearner):
                 
                 self.optimizer.zero_grad()
                 # Predict states given observations
-                #print("train.py - obs.shape :",obs.shape,next_obs.shape)
                 if self.model_type=="triplet_cnn":
-                    #print("fwd obs 1 :",obs.shape)
                     st, p_st,  n_st = self.model(obs[:,:3:,:,:],obs[:,3:6,:,:],obs[:,6:,:,:]) 
-                    #print("fwd obs 2")
                     next_st, next_p_st,  next_n_st =  self.model(next_obs[:,:3:,:,:],next_obs[:,3:6,:,:],next_obs[:,6:,:,:])
-                    #print("computing triplet loss")
                     loss = criterion(st, p_st,  n_st, next_st, diss, same, is_ref_point_list, sim_pairs, no_priors=self.no_priors)
                 else:                    
                     states, next_states = self.model(obs), self.model(next_obs)                

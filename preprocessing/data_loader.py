@@ -36,7 +36,6 @@ def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_marg
             
             im1 = cv2.imread(image_path+"_1.jpg")
             # Resize
-            #print('type im :',type(im1))
             im1 = cv2.resize(im1, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
             # Convert BGR to RGB
             im1 = cv2.cvtColor(im1, cv2.COLOR_BGR2RGB)
@@ -78,17 +77,12 @@ def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_marg
             # Normalize
             im3 = preprocessInput(im3.astype(np.float32), mode="image_net")
             
-            #print("shapes im 1",im1.shape)
             #stacking along channels
             
-            #im = np.dstack((im1,im2))
             im = np.dstack((im1,im2,im3))
             
-            #print("shapes im stack",im.shape)
         else:
-            #print('path : ',image_path)
             im = cv2.imread(image_path+".jpg")
-            #print(im.shape)
             # Resize
             im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
             # Convert BGR to RGB
