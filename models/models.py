@@ -130,7 +130,8 @@ class EmbeddingNet(nn.Module):
     Convolutional  Layers + Embedding FC layers
     input shape : 2 X 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
     :param state_dim: (int)
-    :param l2_normalize : (bool) 
+    :param l2_normalize: (bool) 
+    :embedding_size: (int) size of TCN embedding
     """    super(EmbeddingNet, self).__init__()
         # Inspired by ResNet:
         # conv3x3 followed by BatchNorm2d
