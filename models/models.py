@@ -57,8 +57,7 @@ class SRLDenseNetwork(nn.Module):
 
     def __init__(self, input_dim, state_dim=2, batch_size=256,
                  cuda=False, n_hidden=32, noise_std=1e-6):
-        super(SRLDenseNetwork, self).__init__()
-        input_dim = input_dim
+        super(SRLDenseNetwork, self).__init__()        
                 
         self.fc1 = nn.Linear(input_dim, n_hidden)
         self.fc2 = nn.Linear(n_hidden, state_dim)
