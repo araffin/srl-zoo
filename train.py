@@ -125,6 +125,7 @@ class RoboticPriorsLoss(nn.Module):
 
         return total_loss
 
+
 class RoboticPriorsTripletLoss(nn.Module):
     """
     :param model: (PyTorch model)
@@ -140,71 +141,94 @@ class RoboticPriorsTripletLoss(nn.Module):
         n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
         self.l1_coeff = (l1_reg / n_params)
         self.loss_history = loss_history
-   
+    
+    def priors_on_states(self, s, next_s, same_actions_pairs, ref_point_pairs ,similar_pairs, dissimilar_pairs):
+            
+            state_diff = next_s - s
+            state_diff_norm = state_diff.norm(2, dim=1)
+            similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
+            temp_coherence_loss = (state_diff_norm ** 2).mean()
+            causality_loss = similarity(s[dissimilar_pairs[:, 0]],
+                                        s[dissimilar_pairs[:, 1]]).mean()
+            proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
+                                     state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
+    
+            repeatability_loss = (
+                similarity(s[same_actions_pairs[:, 0]], s[same_actions_pairs[:, 1]]) *
+                (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
+    
+            w_fixed_point, fixed_ref_point_loss = 0, 0
+            w_same_env, same_env_loss = 0, 0
+            if len(ref_point_pairs) > 0:
+                # Apply reference point prior
+                # It assumes all sequences in the dataset share
+                # at least one same 3D pos input image of Baxter arm
+    
+                same_pos_states_diff = s[ref_point_pairs[:, 1]] - s[ref_point_pairs[:, 0]]
+                same_pos_states_diff_norm = same_pos_states_diff.norm(2, dim=1)
+                w_fixed_point = 1
+                fixed_ref_point_loss = (same_pos_states_diff_norm ** 2).mean()
+            elif len(similar_pairs) > 0:
+                # Same Env prior
+                w_same_env = 1
+                same_env_loss = ((s[similar_pairs[:, 1]] - s[similar_pairs[:, 0]]).norm(2, dim=1) ** 2).mean()
+            return temp_coherence_loss,causality_loss, proportionality_loss, repeatability_loss, same_env_loss, fixed_ref_point_loss, w_same_env, w_fixed_point
+            
+            
     # Override in the case of use of Time-Contrastive Triplet Loss 
-    def forward(self, states, p_states, n_states, next_states, # , next_p_states, next_n_states,
+    def forward(self, states, p_states, n_states, next_states, next_p_st,
                 dissimilar_pairs, same_actions_pairs, ref_point_pairs,
-                similar_pairs, alpha=0.2, no_priors=False):
+                similar_pairs, alpha=0.2, no_priors=False,no_triplets=False):
         """
         :alpha : (Float) margin that is enforced between positive & neg observation (TCN Triplet Loss)
         :param states: (th Variable) states for the anchor obs
         :param p_states (th Variable) states for the positive obs
         :param n_states (th Variable) states for the negative obs
-        :param next_states: (th Variable)        
-        :param next_p_states (th Variable) 
-        :param next_n_states (th Variable) 
+        :param next_states: (th Variable)  
+        :param next_p_states (th Variable) next states for the positive obs        
         :param dissimilar_pairs: (th tensor)
         :param same_actions_pairs: (th tensor)
         :param ref_point_pairs: (th tensor)
         :param similar_pairs: (th tensor)
-        :param use_priors: (bool)
+        :param alpha: (float) gap value in the triplet loss
+        :param no_priors: (bool) no use of priors in the loss/ Only triplets
         :return: (th Variable)
         """
-        state_diff = next_states - states
-        state_diff_norm = state_diff.norm(2, dim=1)
-        similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
-        temp_coherence_loss = (state_diff_norm ** 2).mean()
-        causality_loss = similarity(states[dissimilar_pairs[:, 0]],
-                                    states[dissimilar_pairs[:, 1]]).mean()
-        proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
-                                 state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
-
-        repeatability_loss = (
-            similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
-            (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2, dim=1) ** 2).mean()
-
-        w_fixed_point, fixed_ref_point_loss = 0, 0
-        w_same_env, same_env_loss = 0, 0
-        if len(ref_point_pairs) > 0:
-            # Apply reference point prior
-            # It assumes all sequences in the dataset share
-            # at least one same 3D pos input image of Baxter arm
-
-            same_pos_states_diff = states[ref_point_pairs[:, 1]] - states[ref_point_pairs[:, 0]]
-            same_pos_states_diff_norm = same_pos_states_diff.norm(2, dim=1)
-            w_fixed_point = 1
-            fixed_ref_point_loss = (same_pos_states_diff_norm ** 2).mean()
-        elif len(similar_pairs) > 0:
-            # Same Env prior
-            w_same_env = 1
-            same_env_loss = ((states[similar_pairs[:, 1]] - states[similar_pairs[:, 0]]).norm(2, dim=1) ** 2).mean()
-
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
+        total_loss =  self.l1_coeff * l1_loss
+        
+        
+        
+        # Applying the priors on the 1st view        
+        temp_coherence_loss,causality_loss, proportionality_loss, repeatability_loss, \
+            same_env_loss, fixed_ref_point_loss, w_same_env, w_fixed_point = self.priors_on_states(states, next_states, same_actions_pairs, ref_point_pairs ,similar_pairs, dissimilar_pairs)
 
-        # Time-Constrastive Triplet Loss
-        #print(states.shape)
+        # Applying the priors on the 2nd view            
+        temp_coherence_loss_2,causality_loss_2, proportionality_loss_2, repeatability_loss_2, \
+            same_env_loss_2, fixed_ref_point_loss_2, w_same_env_2, w_fixed_point_2 = self.priors_on_states(p_states, next_p_st , same_actions_pairs, ref_point_pairs ,similar_pairs, dissimilar_pairs)
+        
+        
+        temp_coherence_loss += temp_coherence_loss_2
+        causality_loss += causality_loss_2
+        proportionality_loss += proportionality_loss_2 
+        repeatability_loss += repeatability_loss_2        
+        same_env_loss += same_env_loss_2
+        fixed_ref_point_loss += fixed_ref_point_loss_2 
+        
+        if not no_priors:    
+            total_loss += 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
+                         + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss \
+                         + w_same_env * same_env_loss     
+                         
+        #if not no_triplets:
+        # Time-Contrastive Triplet Loss
         distance_positive = (states - p_states).pow(2).sum(1)
         distance_negative = (states - n_states).pow(2).sum(1)
         tcn_trplet_loss = F.relu(distance_positive - distance_negative + alpha)
         tcn_trplet_loss = tcn_trplet_loss.mean()
+        total_loss += 1 * tcn_trplet_loss      
         
-        total_loss = 1* tcn_trplet_loss + self.l1_coeff * l1_loss
-        
-        if not no_priors:
-            total_loss += 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
-                         + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss \
-                         + w_same_env * same_env_loss 
-                         
+                    
         if self.loss_history is not None:
             weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
             names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
@@ -219,6 +243,7 @@ class RoboticPriorsTripletLoss(nn.Module):
                         self.loss_history[name].append(w * loss.data[0])
 
         return total_loss
+
 
 class SRL4robotics(BaseLearner):
     """
@@ -258,6 +283,9 @@ class SRL4robotics(BaseLearner):
             self.model = nn.DataParallel(self.model)
             
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
+        if model_type=='triplet_cnn':
+            learning_rate=0.01
+            
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.l1_reg = l1_reg
         self.log_folder = log_folder
@@ -418,8 +446,6 @@ class SRL4robotics(BaseLearner):
         print("Number of pairs per action:")
         print(n_pairs_per_action)
         print("Pairs of {} unique actions".format(np.sum(n_pairs_per_action > 0)))
-
-
                 
         similar_pairs = []
         if apply_same_env_prior:
@@ -441,15 +467,10 @@ class SRL4robotics(BaseLearner):
                 np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch) if j > i],
                          dtype='int64') for minibatch in minibatchlist]
 
-#            for item in similar_pairs:
-#                if len(item) == 0:
-#                    print("No pairs found for one minibatch of similar pairs")
-#                    sys.exit(NO_PAIRS_ERROR)
-#       
             print('Dealing with minibatches missing sissimilar pairs...')
             for minibatch_id, d in enumerate(similar_pairs):
                 if len(d) == 0:
-                    #print('d',d)
+
                     print('empty item d:', minibatch_id)
                     for m_id, minibatch in enumerate(minibatchlist):
                         for i in range(self.batch_size):
@@ -469,13 +490,14 @@ class SRL4robotics(BaseLearner):
                 msg += "=> Consider increasing the batch_size or changing the seed"
                 printRed(msg)
                 sys.exit(NO_PAIRS_ERROR)
-
+        test_batch_size=  256 if (self.model_type=='custom_cnn' and self.multi_view) else 512
+        #print(test_batch_size)
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
                                                same_actions, dissimilar, ref_point_pairs,
-                                               similar_pairs, cache_capacity=100,multi_view=self.multi_view) #default=5000
+                                               similar_pairs, cache_capacity=100, multi_view=self.multi_view, triplets=(self.model_type=="triplet_cnn"), test_batch_size=test_batch_size) #default=5000
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
-        if self.model_type == "triplet_cnn":
+        if self.model_type == "triplet_cnn" :
             criterion = RoboticPriorsTripletLoss(self.model, self.l1_reg, loss_history)
         else:
             criterion = RoboticPriorsLoss(self.model, self.l1_reg, loss_history)
@@ -506,9 +528,19 @@ class SRL4robotics(BaseLearner):
                 if self.model_type=="triplet_cnn":
                     st, p_st,  n_st = self.model(obs[:,:3:,:,:],obs[:,3:6,:,:],obs[:,6:,:,:]) 
                     next_st, next_p_st,  next_n_st =  self.model(next_obs[:,:3:,:,:],next_obs[:,3:6,:,:],next_obs[:,6:,:,:])
-                    loss = criterion(st, p_st,  n_st, next_st, diss, same, is_ref_point_list, sim_pairs, no_priors=self.no_priors)
+                    loss = criterion(st, p_st,  n_st, next_st, next_p_st, diss, same, is_ref_point_list, sim_pairs, no_priors=self.no_priors)
+                    
+#                elif self.model_type == "custom_cnn" and self.multi_view :
+#                    res = self.model(obs)
+#                    st, p_st = res[:3], res(obs)[3:]
+#                    next_st, next_p_st = self.model(next_obs)[:3], self.model(next_obs)[3:]
+#                    #states, next_states = , self.model(next_obs)      
+#                    print('shapes :',res.shape, st.shape, next_st.shape)
+#                    loss = criterion(st, p_st,  None, next_st, next_p_st, diss, same, is_ref_point_list, sim_pairs, no_triplets=True)
+                    
                 else:                    
-                    states, next_states = self.model(obs), self.model(next_obs)                
+                    states, next_states = self.model(obs), self.model(next_obs) 
+                    #print('shapes :',states.shape, next_states.shape)
                     loss = criterion(states, next_states, diss, same,\
                         is_ref_point_list, sim_pairs)
                         
@@ -602,7 +634,7 @@ if __name__ == '__main__':
     parser.add_argument('--l1_reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
-    parser.add_argument('--model_type', type=str, default="custom_cnn", choices=['custom_cnn', 'resnet', 'mlp'],
+    parser.add_argument('--model_type', type=str, default="custom_cnn", choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn'],
                         help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log_folder', type=str, default='logs/default_folder',
@@ -641,7 +673,7 @@ if __name__ == '__main__':
     images_path = ground_truth['images_path']
 
     print('Learning a state representation ... ')
-    if args.multi_view:
+    if args.model_type == 'triplet_cnn':
         srl = SRL4roboticsTriplet(args.state_dim, model_type=args.model_type, seed=args.seed,
                            log_folder=args.log_folder, learning_rate=args.learning_rate,
                            l1_reg=args.l1_reg, cuda=args.cuda, multi_gpu=args.multi_gpu, multi_view=args.multi_view, no_priors=args.no_priors)

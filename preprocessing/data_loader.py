@@ -29,7 +29,7 @@ def preprocessImage(image):
     return im
 
 
-def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_margin=100):
+def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplets=False):
     """
     Worker that preprocess images
     :param image_queue: (multiprocessing.Queue) queue with the path to the images
@@ -47,7 +47,6 @@ def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_marg
             break
         
         if multi_view:
-            
             im1 = cv2.imread(image_path+"_1.jpg")
             # Resize
             im1 = cv2.resize(im1, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
@@ -67,33 +66,41 @@ def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_marg
             
             ####################
             #negative observation
-            time_margin = np.random.randint(100)
-            digits_path=[k for k in image_path.split("/")[-1]  if k.isdigit() ]
-            digits_path = int("".join(digits_path))
-            neg_path = str(digits_path-time_margin)
-            pos_path = str(digits_path+time_margin)
-            l_minus = len(neg_path)
-            l_plus = len(pos_path)
             
-            if os.path.exists(image_path[:-l_plus]+pos_path+"_1.jpg"):
-                third_path=image_path[:-l_plus]+pos_path
-            elif (digits_path-time_margin)>0 and os.path.exists(image_path[:-l_minus]+str(digits_path-time_margin)+"_1.jpg"):
-                third_path=image_path[:-l_minus]+str(digits_path-time_margin)
-            else:
-                print('No neg_path')
-                break
+            if triplets:
+                sample=True
+                while sample:
+                    time_margin = np.random.randint(100)            
+                    digits_path=[k for k in image_path.split("/")[-1]  if k.isdigit() ]
+                    digits_path = int("".join(digits_path))
+                    neg_path = str(digits_path-time_margin)
+                    pos_path = str(digits_path+time_margin)
+                    l_minus = len(neg_path)
+                    l_plus = len(pos_path)
+                    
+                    if os.path.exists(image_path[:-l_plus]+pos_path+"_1.jpg"):
+                        third_path=image_path[:-l_plus]+pos_path
+                        sample=False
+                        break
+                    elif (digits_path-time_margin)>0 and os.path.exists(image_path[:-l_minus]+str(digits_path-time_margin)+"_1.jpg"):
+                        third_path=image_path[:-l_minus]+str(digits_path-time_margin)
+                        sample=False
+                        break
+                    #print('No neg_path')
+                        
+                im3 = cv2.imread(third_path+"_1.jpg")
+                # Resize
+                im3 = cv2.resize(im3, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
+                # Convert BGR to RGB
+                im3 = cv2.cvtColor(im3, cv2.COLOR_BGR2RGB)
+                # Normalize
+                im3 = preprocessInput(im3.astype(np.float32), mode="image_net")
                 
-            im3 = cv2.imread(third_path+"_1.jpg")
-            # Resize
-            im3 = cv2.resize(im3, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
-            # Convert BGR to RGB
-            im3 = cv2.cvtColor(im3, cv2.COLOR_BGR2RGB)
-            # Normalize
-            im3 = preprocessInput(im3.astype(np.float32), mode="image_net")
-            
-            #stacking along channels
-            
-            im = np.dstack((im1,im2,im3))
+                #stacking along channels
+                
+                im = np.dstack((im1,im2,im3))
+            else:
+                im = np.dstack((im1,im2))
             
         else:
             im = cv2.imread(image_path+".jpg")
@@ -103,7 +110,7 @@ def imageWorker(image_queue, output_queue, exit_event,multi_view=False,time_marg
             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             # Normalize
             im = preprocessInput(im.astype(np.float32), mode="image_net")
-                    
+            #print('here')
         output_queue.put((idx, im))
         del im  # Free memory
 
@@ -130,7 +137,7 @@ class BaxterImageLoader(object):
     def __init__(self, minibatchlist, images_path, same_actions,
                  dissimilar, ref_point_pairs=None, similar_pairs=None,
                  test_batch_size=512, cache_capacity=5000,
-                 n_workers=5, auto_cleanup=True,multi_view=False):
+                 n_workers=5, auto_cleanup=True, multi_view=False, triplets=False):
         super(BaxterImageLoader, self).__init__()
 
         self.n_minibatches = len(minibatchlist)
@@ -198,6 +205,7 @@ class BaxterImageLoader(object):
         self.n_sent, self.n_received = 0, 0
         self.shutdown = False
         self.multi_view=multi_view
+        self.triplets=triplets
 
         if self.n_workers <= 0:
             raise ValueError("n_workers <= 0 in the data loader")
@@ -206,7 +214,7 @@ class BaxterImageLoader(object):
         # and a common output_queue
         self.workers = []
         for i in range(self.n_workers):
-            w = mp.Process(target=imageWorker, args=(self.image_queues[i], self.output_queue, self.exit_event,self.multi_view))
+            w = mp.Process(target=imageWorker, args=(self.image_queues[i], self.output_queue, self.exit_event, self.multi_view, self.triplets))
             w.daemon = True  # ensure that the worker exits on process exit
             w.start()
             self.workers.append(w)
