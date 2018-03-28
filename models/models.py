@@ -124,13 +124,14 @@ class ConvolutionalNetwork(nn.Module):
         return x
 
 class EmbeddingNet(nn.Module):
+    
+    def __init__(self, state_dim=2, l2_normalize=True, embedding_size=64):
     """
     Convolutional  Layers + Embedding FC layers
     input shape : 2 X 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
     :param state_dim: (int)
-    """
-    def __init__(self, state_dim=2, l2_normalize=True, embedding_size=64):
-        super(EmbeddingNet, self).__init__()
+    :param l2_normalize : (bool) 
+    """    super(EmbeddingNet, self).__init__()
         # Inspired by ResNet:
         # conv3x3 followed by BatchNorm2d
         self.l2_normalize=l2_normalize
@@ -162,7 +163,7 @@ class EmbeddingNet(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.fc(x)
         if self.l2_normalize:            
-            x /= x.pow(2).sum(1, keepdim=True).sqrt()
+            x /= x.norm(2)
         return x
 
 
