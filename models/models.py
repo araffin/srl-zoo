@@ -7,7 +7,7 @@ import torchvision.models as models
 from torch.autograd import Variable
 
 from .custom_layers import GaussianNoiseVariant
-from  preprocessing.preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
+from  preprocessing.preprocess import N_CHANNELS
 
 class SRLConvolutionalNetwork(nn.Module):
     """
@@ -124,15 +124,15 @@ class ConvolutionalNetwork(nn.Module):
         return x
 
 class EmbeddingNet(nn.Module):
-    
     def __init__(self, state_dim=2, l2_normalize=True, embedding_size=64):
-    """
-    Convolutional  Layers + Embedding FC layers
-    input shape : 2 X 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
-    :param state_dim: (int)
-    :param l2_normalize: (bool) 
-    :embedding_size: (int) size of TCN embedding
-    """    super(EmbeddingNet, self).__init__()
+        """
+        Convolutional  Layers + Embedding FC layers
+        input shape : 2 X 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
+        :param state_dim: (int)
+        :param l2_normalize: (bool)
+        :embedding_size: (int) size of TCN embedding
+        """
+        super(EmbeddingNet, self).__init__()
         # Inspired by ResNet:
         # conv3x3 followed by BatchNorm2d
         self.l2_normalize=l2_normalize
@@ -170,7 +170,7 @@ class EmbeddingNet(nn.Module):
 
 
 class TripletNet(nn.Module):
-    def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
+    def __init__(self, state_dim=2, cuda=False):
         super(TripletNet, self).__init__()
         self.embedding =  EmbeddingNet(state_dim)
         if cuda:

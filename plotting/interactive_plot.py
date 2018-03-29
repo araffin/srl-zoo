@@ -23,7 +23,7 @@ except NameError:
 sns.set()
 TITLE_MAX_LENGTH = 60
 
-def loadImage(path,view=0):
+def loadImage(path, view=0):
     """
     Load an image and convert it to matplotlib format
     :param path: (str)
@@ -42,7 +42,7 @@ def createInteractivePlot(fig, ax, states, rewards, images_path, view=0):
         name_img+="_"+str(view)
     fig2 = plt.figure(name_img)
     image_plot = plt.imshow(loadImage(images_path[0],view))
-    
+
     # Disable seaborn grid
     image_plot.axes.grid(False) 
     callback = ImageFinder(states, rewards, image_plot, ax, images_path,view)
@@ -82,13 +82,13 @@ def plot_3d_representation(states, rewards, images_path, name="Learned State Rep
     fig.tight_layout()
     if add_colorbar:
         fig.colorbar(im, label='Reward')
-    
+
     if multi_view:
         createInteractivePlot(fig, ax, states, rewards, images_path,view=1)
         createInteractivePlot(plt.figure(name), ax, states, rewards, images_path,view=2)
     else:
         createInteractivePlot(fig, ax, states, rewards, images_path)
-        
+
     plt.show()
 
 
@@ -128,7 +128,7 @@ class ImageFinder(object):
     xtol and ytol is identified.
     """
 
-    def __init__(self, states, rewards, image_plot, ax, images_path,view=0):
+    def __init__(self, states, rewards, image_plot, ax, images_path, view=0):
 
         self.image_plot = image_plot
         self.images_path = images_path
@@ -175,7 +175,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default="", required=True,
                         help='Path to a dataset folder, it will plot ground truth states')
     parser.add_argument('--multi_view',action='store_true', default=False,
-                        help='Enable use of multiple camera')                        
+                        help='Enable use of multiple camera')
     args = parser.parse_args()
 
     # Remove `data/` from the path if needed

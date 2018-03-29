@@ -185,7 +185,7 @@ class RoboticPriorsTripletLoss(nn.Module):
         :param p_states (th Variable) states for the positive obs
         :param n_states (th Variable) states for the negative obs
         :param next_states: (th Variable)  
-        :param next_p_states (th Variable) next states for the positive obs        
+        :param next_p_st (th Variable) next states for the positive obs
         :param dissimilar_pairs: (th tensor)
         :param same_actions_pairs: (th tensor)
         :param ref_point_pairs: (th tensor)
@@ -270,7 +270,7 @@ class SRL4robotics(BaseLearner):
             self.model = SRLCustomCNN(self.state_dim, cuda, noise_std=NOISE_STD)
         elif model_type == "triplet_cnn" : 
             print('chosen model : triplet_cnn')
-            self.model = TripletNet(self.state_dim, cuda, noise_std=NOISE_STD)            
+            self.model = TripletNet(self.state_dim, cuda)
         elif model_type == "mlp":
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         else:

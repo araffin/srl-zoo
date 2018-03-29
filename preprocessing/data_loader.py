@@ -37,7 +37,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                           will be added
     :param exit_event: (multiprocessing.Event) Event for exiting the loop
     :param multi_view: (bool) enables dual camera mode
-    :param time_margin: (int) time margin for negativa obersation sampling (here is fixed)
+    :param triplets: (bool) enables loading of negative example (third image)
     """
     while not exit_event.is_set():
         idx, image_path = image_queue.get()
@@ -45,7 +45,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
         if idx is None:
             image_queue.put((None, None))
             break
-        
+
         if multi_view:
             im1 = cv2.imread(image_path+"_1.jpg")
             # Resize
@@ -63,21 +63,21 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             im2 = cv2.cvtColor(im2, cv2.COLOR_BGR2RGB)
             # Normalize
             im2 = preprocessInput(im2.astype(np.float32), mode="image_net")
-            
+
             ####################
             #negative observation
-            
+
             if triplets:
                 sample=True
                 while sample:
-                    time_margin = np.random.randint(100)            
+                    time_margin = np.random.randint(100)
                     digits_path=[k for k in image_path.split("/")[-1]  if k.isdigit() ]
                     digits_path = int("".join(digits_path))
                     neg_path = str(digits_path-time_margin)
                     pos_path = str(digits_path+time_margin)
                     l_minus = len(neg_path)
                     l_plus = len(pos_path)
-                    
+
                     if os.path.exists(image_path[:-l_plus]+pos_path+"_1.jpg"):
                         third_path=image_path[:-l_plus]+pos_path
                         sample=False
@@ -87,7 +87,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                         sample=False
                         break
                     #print('No neg_path')
-                        
+
                 im3 = cv2.imread(third_path+"_1.jpg")
                 # Resize
                 im3 = cv2.resize(im3, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
