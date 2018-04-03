@@ -125,46 +125,32 @@ class ConvolutionalNetwork(nn.Module):
 
 
 class EmbeddingNet(nn.Module):
-    def __init__(self, state_dim=2, l2_normalize=True, embedding_size=64):
+    def __init__(self, state_dim=2, embedding_size=128):
         """
         Convolutional  Layers + Embedding FC layers
         input shape : 2 X 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
         :param state_dim: (int)
-        :param l2_normalize: (bool)
         :embedding_size: (int) size of TCN embedding
         """
         super(EmbeddingNet, self).__init__()
         # Inspired by ResNet:
         # conv3x3 followed by BatchNorm2d
-        self.l2_normalize=l2_normalize
-        self.conv_layers = nn.Sequential(
-            # 224x224x3 -> 112x112x64
-            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),  # 56x56x64
-
-            conv3x3(in_planes=64, out_planes=64, stride=1),  # 56x56x64
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2),  # 27x27x64
-
-            conv3x3(in_planes=64, out_planes=64, stride=2),  # 14x14x64
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
-        )        
-        self.fc = nn.Sequential(nn.Linear(64 * 6 * 6, embedding_size),
-                                nn.PReLU(),
+        self.conv_layers = models.resnet18(pretrained=True)
+        # Freeze params
+        for param in self.conv_layers.parameters():
+            param.requires_grad = False
+        # Replace the last fully-connected layer
+        n_units = self.conv_layers.fc.in_features
+        print("{} units in the last layer".format(n_units))
+        self.conv_layers.fc = nn.Linear(n_units, embedding_size)
+        self.fc = nn.Sequential(nn.PReLU(),
                                 nn.Linear(embedding_size, state_dim)
-                                )
+                                )        
 
     def forward(self, x):
         x = self.conv_layers(x)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
-        if self.l2_normalize:            
-            x /= x.norm(2)
         return x
 
 
@@ -192,6 +178,42 @@ class TripletNet(nn.Module):
     def get_embedding(self, x):
         return self.embedding(x)
 
+class CustomCNN_reduced(nn.Module):
+    """
+    Convolutional Neural Network
+    input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
+    :param state_dim: (int)
+    """
+
+    def __init__(self, state_dim=2):
+        super(CustomCNN, self).__init__()
+        # Inspired by ResNet:
+        # conv3x3 followed by BatchNorm2d
+        self.conv_layers = nn.Sequential(
+            # 224x224x3 -> 112x112x64
+            nn.Conv2d(N_CHANNELS, 16, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),  # 56x56x16
+
+            conv3x3(in_planes=16, out_planes=64, stride=1),  # 56x56x16
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),  # 27x27x64
+
+            conv3x3(in_planes=64, out_planes=64, stride=2),  # 14x14x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
+        ) 
+        self.fc = nn.Linear(6 * 6 * 64, state_dim)
+
+    def forward(self, x):
+        x = self.conv_layers(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+        
 
 class CustomCNN(nn.Module):
     """

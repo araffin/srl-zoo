@@ -49,26 +49,12 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
         if multi_view:
             im1 = cv2.imread(image_path+"_1.jpg")
             # preprocess
-            #im1 = preprocessImage(im1)
-
-            # Resize
-            im1 = cv2.resize(im1, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
-            # Convert BGR to RGB
-            im1 = cv2.cvtColor(im1, cv2.COLOR_BGR2RGB)
-            # Normalize
-            im1 = preprocessInput(im1.astype(np.float32), mode="image_net")
-
+            im1 = preprocessImage(im1)
+            
             #second cam
             im2 = cv2.imread(image_path+"_2.jpg")
             # preprocess
-            #im2 = preprocessImage(im2)
-
-            # Resize
-            im2 = cv2.resize(im2, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
-            # Convert BGR to RGB
-            im2 = cv2.cvtColor(im2, cv2.COLOR_BGR2RGB)
-            # Normalize
-            im2 = preprocessInput(im2.astype(np.float32), mode="image_net")
+            im2 = preprocessImage(im2)
 
             ####################
             #negative observation
@@ -95,15 +81,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                         break
 
                 im3 = cv2.imread(third_path+"_1.jpg")
-                #im3 = preprocessImage(im3)
-
-                # Resize
-                im3 = cv2.resize(im3, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
-                # Convert BGR to RGB
-                im3 = cv2.cvtColor(im3, cv2.COLOR_BGR2RGB)
-                # Normalize
-                im3 = preprocessInput(im3.astype(np.float32), mode="image_net")
-                
+                im3 = preprocessImage(im3)
                 #stacking along channels
                 
                 im = np.dstack((im1,im2,im3))
@@ -112,14 +90,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             
         else:
             im = cv2.imread(image_path+".jpg")
-            #im = preprocessImage(im1)
-
-            # Resize
-            im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
-            # Convert BGR to RGB
-            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-            # Normalize
-            im = preprocessInput(im.astype(np.float32), mode="image_net")
+            im = preprocessImage(im1)
 
         output_queue.put((idx, im))
         del im  # Free memory
