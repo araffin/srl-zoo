@@ -102,8 +102,8 @@ for image_path, neigbour_indices, distance, image_idx in data:
         # subplot: (i, j, k) i rows, j columns, k^th plot | n_plots: i * j
 
         if args.multi_view:
-            image_path+='_1'
-        image_path+='.jpg'
+            image_path += '_1'
+        image_path += '.jpg'
         ref_image = fig.add_subplot(n_lines + 1, 5, 3)
         img = Image.open("data/{}".format(image_path))
         plt.imshow(img)
@@ -124,8 +124,8 @@ for image_path, neigbour_indices, distance, image_idx in data:
             neighbor_record_folder = image_path.split("/")[1]
             neighbor_frame_name = image_path.split("/")[-1].split(".")[0]
             if args.multi_view:
-                image_path+='_1'
-            image_path+='.jpg'
+                image_path += '_1'
+            image_path += '.jpg'
             img = Image.open("data/{}".format(image_path))
             plt.imshow(img)
 

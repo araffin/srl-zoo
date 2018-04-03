@@ -29,9 +29,9 @@ def loadImage(path, view=0):
     :param path: (str)
     :param view: (int) : 0 for normal, 1/2 for multi_view
     """
-    if view>0:
-        path +="_"+str(view)
-    path+=".jpg"
+    if view > 0:
+        path += "_"+str(view)
+    path += ".jpg"
     bgr_img = cv2.imread('data/' + path)
     return cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB) / 255.
 
@@ -39,13 +39,13 @@ def loadImage(path, view=0):
 def createInteractivePlot(fig, ax, states, rewards, images_path, view=0):
     name_img="Image"
     if view > 0:
-        name_img+="_"+str(view)
+        name_img += "_"+str(view)
     fig2 = plt.figure(name_img)
-    image_plot = plt.imshow(loadImage(images_path[0],view))
+    image_plot = plt.imshow(loadImage(images_path[0], view))
 
     # Disable seaborn grid
     image_plot.axes.grid(False) 
-    callback = ImageFinder(states, rewards, image_plot, ax, images_path,view)
+    callback = ImageFinder(states, rewards, image_plot, ax, images_path, view)
     fig.canvas.mpl_connect('button_release_event', callback)
 
 
@@ -84,8 +84,8 @@ def plot_3d_representation(states, rewards, images_path, name="Learned State Rep
         fig.colorbar(im, label='Reward')
 
     if multi_view:
-        createInteractivePlot(fig, ax, states, rewards, images_path,view=1)
-        createInteractivePlot(plt.figure(name), ax, states, rewards, images_path,view=2)
+        createInteractivePlot(fig, ax, states, rewards, images_path, view=1)
+        createInteractivePlot(plt.figure(name), ax, states, rewards, images_path, view=2)
     else:
         createInteractivePlot(fig, ax, states, rewards, images_path)
 
@@ -137,7 +137,7 @@ class ImageFinder(object):
         self.ax = ax
         self.states = states
         self.rewards = rewards
-        self.view=view
+        self.view = view
 
     def __call__(self, event):
         if event.inaxes:
@@ -165,7 +165,7 @@ class ImageFinder(object):
             self.image_plot.axes.set_title(title)
             path = self.images_path[state_idx]
             # Load the image that corresponds to the clicked point in the space
-            self.image_plot.set_data(loadImage(path,self.view))
+            self.image_plot.set_data(loadImage(path, self.view))
 
 
 if __name__ == '__main__':

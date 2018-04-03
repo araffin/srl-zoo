@@ -48,6 +48,9 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
 
         if multi_view:
             im1 = cv2.imread(image_path+"_1.jpg")
+            # preprocess
+            #im1 = preprocessImage(im1)
+
             # Resize
             im1 = cv2.resize(im1, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
             # Convert BGR to RGB
@@ -57,6 +60,9 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
 
             #second cam
             im2 = cv2.imread(image_path+"_2.jpg")
+            # preprocess
+            #im2 = preprocessImage(im2)
+
             # Resize
             im2 = cv2.resize(im2, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
             # Convert BGR to RGB
@@ -68,10 +74,10 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             #negative observation
 
             if triplets:
-                sample=True
+                sample = True
                 while sample:
                     time_margin = np.random.randint(100)
-                    digits_path=[k for k in image_path.split("/")[-1]  if k.isdigit() ]
+                    digits_path = [k for k in image_path.split("/")[-1] if k.isdigit()]
                     digits_path = int("".join(digits_path))
                     neg_path = str(digits_path-time_margin)
                     pos_path = str(digits_path+time_margin)
@@ -79,16 +85,18 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                     l_plus = len(pos_path)
 
                     if os.path.exists(image_path[:-l_plus]+pos_path+"_1.jpg"):
-                        third_path=image_path[:-l_plus]+pos_path
-                        sample=False
+                        third_path = image_path[:-l_plus]+pos_path
+                        sample = False
                         break
-                    elif (digits_path-time_margin)>0 and os.path.exists(image_path[:-l_minus]+str(digits_path-time_margin)+"_1.jpg"):
-                        third_path=image_path[:-l_minus]+str(digits_path-time_margin)
-                        sample=False
+                    elif (digits_path-time_margin) > 0 and \
+                            os.path.exists(image_path[:-l_minus]+str(digits_path-time_margin)+"_1.jpg"):
+                        third_path = image_path[:-l_minus]+str(digits_path-time_margin)
+                        sample = False
                         break
-                    #print('No neg_path')
 
                 im3 = cv2.imread(third_path+"_1.jpg")
+                #im3 = preprocessImage(im3)
+
                 # Resize
                 im3 = cv2.resize(im3, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
                 # Convert BGR to RGB
@@ -104,15 +112,18 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             
         else:
             im = cv2.imread(image_path+".jpg")
+            #im = preprocessImage(im1)
+
             # Resize
             im = cv2.resize(im, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
             # Convert BGR to RGB
             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             # Normalize
             im = preprocessInput(im.astype(np.float32), mode="image_net")
-            #print('here')
+
         output_queue.put((idx, im))
         del im  # Free memory
+
 
 class BaxterImageLoader(object):
     """
@@ -128,6 +139,7 @@ class BaxterImageLoader(object):
     :param test_batch_size: (int)
     :param cache_capacity: (int) number of images that can be cached
     :param multi_view: (bool) enables dual camera mode
+    :param triplets: (bool) enables loading of negative observation
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
     [WARNING] Set to False, you MUST clean up the loader manually (by calling cleanUp() method)

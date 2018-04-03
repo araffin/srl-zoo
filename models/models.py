@@ -123,6 +123,7 @@ class ConvolutionalNetwork(nn.Module):
         x = self.resnet(x)
         return x
 
+
 class EmbeddingNet(nn.Module):
     def __init__(self, state_dim=2, l2_normalize=True, embedding_size=64):
         """
@@ -157,7 +158,6 @@ class EmbeddingNet(nn.Module):
                                 nn.PReLU(),
                                 nn.Linear(embedding_size, state_dim)
                                 )
-        
 
     def forward(self, x):
         x = self.conv_layers(x)
@@ -168,18 +168,17 @@ class EmbeddingNet(nn.Module):
         return x
 
 
-
 class TripletNet(nn.Module):
     def __init__(self, state_dim=2, cuda=False):
         super(TripletNet, self).__init__()
-        self.embedding =  EmbeddingNet(state_dim)
+        self.embedding = EmbeddingNet(state_dim)
         if cuda:
             self.embedding.cuda()
 
     def forward(self, anchor, positive, negative):
         """
         anchor : observation
-        positive : observatiobn
+        positive : observation
         negative : obsevation
         """
         output1 = self.embedding(anchor)
@@ -192,6 +191,7 @@ class TripletNet(nn.Module):
 
     def get_embedding(self, x):
         return self.embedding(x)
+
 
 class CustomCNN(nn.Module):
     """
