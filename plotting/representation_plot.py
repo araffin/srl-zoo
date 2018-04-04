@@ -69,7 +69,7 @@ def plot_tsne(states, rewards, name="T-SNE of Learned States", add_colorbar=True
 
 
 def plot_representation(states, rewards, name="Learned State Representation",
-                        add_colorbar=True, path=None, fit_pca=True, cmap='coolwarm'):
+                        add_colorbar=True, path=None, fit_pca=False, cmap='coolwarm'):
     """
     Plot learned state representation using rewards for coloring
     :param states: (numpy array)
