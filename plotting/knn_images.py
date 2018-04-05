@@ -38,7 +38,6 @@ parser.add_argument('--n_to_plot', type=int, default=5, help='Number of samples 
 parser.add_argument('--relative_pos', action='store_true', default=False, help='Use relative position as ground_truth')
 parser.add_argument('--multi_view', action='store_true', default=False, help='manager multi_view data paths')
 
-
 args = parser.parse_args()
 
 n_neighbors = args.n_neighbors
@@ -56,6 +55,9 @@ states = np.load('{}/states_rewards.npz'.format(args.log_folder))['states']
 
 true_states = ground_truth['arm_states']
 images_path = ground_truth['images_path']
+
+if args.ground_truth:
+    states = true_states.copy()
 
 if args.relative_pos:
     print("Using relative position")
