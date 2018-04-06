@@ -272,7 +272,7 @@ class SRL4robotics(BaseLearner):
         elif model_type == "custom_cnn":
             self.model = SRLCustomCNN(self.state_dim, cuda, noise_std=NOISE_STD)
         elif model_type == "triplet_cnn": 
-            self.model = TripletNet(self.state_dim, cuda)
+            self.model = TripletNet(self.state_dim)
         elif model_type == "mlp":
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         else:
@@ -333,7 +333,35 @@ class SRL4robotics(BaseLearner):
         val_indices = np.random.permutation(len(minibatchlist))[:n_val_batches]
         print("{} minibatches for validation, {} samples".format(n_val_batches, n_val_batches * BATCH_SIZE))
         assert n_val_batches > 0, "Not enough sample to create a validation set"
+        
+        def oversSampling(batch_size, m_list, pairs):
+            """
+            :param batch_size: (int)
+            :param m_list: (list) mini-batch list
+            :param pairs: similar / dissimilar pairs
+            :return: (list, list) pairs, mini-batch list modified
+            """
+            # For a each minibatch_id
 
+            for minibatch_id, d in enumerate(pairs):
+                do = True
+                # Do if it contains no similar pairs of samples
+                if len(d) == 0:
+                    print('Dealing with minibatch missing similar/dissimilar pairs...')
+                    # for every minibatch & obs of a mini-batch list
+                    for m_id, minibatch in enumerate(m_list):
+                        for i in range(batch_size):
+                            # Look for similar samples j in other minibatches m_id
+                            for j in findSimilar(i, m_list[minibatch_id], minibatch):
+                                # Swap samples - done once
+                                if (j != i) & (minibatch_id != m_id) and do:
+                                    tmp = minibatch[j]
+                                    minibatch[j] = m_list[minibatch_id][j]
+                                    m_list[minibatch_id][j] = tmp
+                                    pairs[minibatch_id] = np.array([[i, j]])
+                                    do = False
+            return pairs, m_list        
+        
         similar_pairs = []
         if apply_same_env_prior:
             print("Applying same env prior")
@@ -356,33 +384,7 @@ class SRL4robotics(BaseLearner):
                 np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch, minibatch) if j > i],
                          dtype='int64') for minibatch in minibatchlist]
 
-            def oversSampling(batch_size, m_list, pairs):
-                """
-                :param batch_size: (int)
-                :param m_list: (list) mini-batch list
-                :param pairs: similar / dissimilar pairs
-                :return: (list, list) pairs, mini-batch list modified
-                """
-                # For a each minibatch_id
 
-                for minibatch_id, d in enumerate(pairs):
-                    do = True
-                    # Do if it contains no similar pairs of samples
-                    if len(d) == 0:
-                        print('Dealing with minibatch missing similar/dissimilar pairs...')
-                        # for every minibatch & obs of a mini-batch list
-                        for m_id, minibatch in enumerate(m_list):
-                            for i in range(batch_size):
-                                # Look for similar samples j in other minibatches m_id
-                                for j in findSimilar(i, m_list[minibatch_id], minibatch):
-                                    # Swap samples - done once
-                                    if (j != i) & (minibatch_id != m_id) and do:
-                                        tmp = minibatch[j]
-                                        minibatch[j] = m_list[minibatch_id][j]
-                                        m_list[minibatch_id][j] = tmp
-                                        pairs[minibatch_id] = np.array([[i, j]])
-                                        do = False
-                return pairs, m_list
 
             similar_pairs, minibatchlist = oversSampling(self.batch_size, minibatchlist, similar_pairs)
             print(similar_pairs)
@@ -524,11 +526,12 @@ class SRL4robotics(BaseLearner):
                         sim_pairs = sim_pairs.cuda()
                 
                 self.optimizer.zero_grad()
-                # Predict states given observations
+                
+                # Predict states given observations : reffer to  Time Contrastive Network (Triplet Loss) [Sermanet et al.]
                 if self.model_type=="triplet_cnn":                    
-                    st, p_st,  n_st = self.model(obs[:, :3:, :, :], obs[:, 3:6, :, :], obs[:, 6:, :, :]) 
-                    next_st, next_p_st,  next_n_st =  self.model(next_obs[:, :3:, :, :], next_obs[:, 3:6, :, :], next_obs[:, 6:, :, :])
-                    loss = criterion(st, p_st, n_st, next_st, next_p_st, diss, same, is_ref_point_list, sim_pairs, no_priors=self.no_priors)
+                    states, positive_states,  negtive_states = self.model(obs[:, :3:, :, :], obs[:, 3:6, :, :], obs[:, 6:, :, :]) 
+                    next_states, next_positive_states,  next_negative_states =  self.model(next_obs[:, :3:, :, :], next_obs[:, 3:6, :, :], next_obs[:, 6:, :, :])
+                    loss = criterion(states, positive_states, negtive_states , next_states, next_positive_states, diss, same, is_ref_point_list, sim_pairs, no_priors=self.no_priors)
                     
                 else:                    
                     states, next_states = self.model(obs), self.model(next_obs) 
@@ -602,7 +605,6 @@ class SRL4roboticsTriplet(SRL4robotics):
         """
         # Switch to test mode
         self.model.eval()
-        print(observations[:, :, :, :].shape)
         states = self.model.get_embedding(observations[:, :3:, :, :])
         
         if restore_train:
