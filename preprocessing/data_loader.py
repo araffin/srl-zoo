@@ -15,6 +15,7 @@ from torch.autograd import Variable
 from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
 
+
 def preprocessImage(image):
     """
     :param image: (numpy matrix)
@@ -47,17 +48,17 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             break
 
         if multi_view:
-            im1 = cv2.imread(image_path+"_1.jpg")
+            im1 = cv2.imread(image_path + "_1.jpg")
             # preprocess
             im1 = preprocessImage(im1)
             
-            #second cam
-            im2 = cv2.imread(image_path+"_2.jpg")
+            # second cam
+            im2 = cv2.imread(image_path + "_2.jpg")
             # preprocess
             im2 = preprocessImage(im2)
 
             ####################
-            #negative observation
+            # negative observation
 
             if triplets:
                 sample = True
@@ -65,32 +66,31 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                     time_margin = np.random.randint(100)
                     digits_path = [k for k in image_path.split("/")[-1] if k.isdigit()]
                     digits_path = int("".join(digits_path))
-                    neg_path = str(digits_path-time_margin)
-                    pos_path = str(digits_path+time_margin)
+                    neg_path = str(digits_path - time_margin)
+                    pos_path = str(digits_path + time_margin)
                     l_minus = len(neg_path)
                     l_plus = len(pos_path)
 
-                    if os.path.exists(image_path[:-l_plus]+pos_path+"_1.jpg"):
-                        third_path = image_path[:-l_plus]+pos_path
+                    if os.path.exists(image_path[:-l_plus] + pos_path + "_1.jpg"):
+                        third_path = image_path[:-l_plus] + pos_path
                         sample = False
                         break
                     elif (digits_path-time_margin) > 0 and \
-                            os.path.exists(image_path[:-l_minus]+str(digits_path-time_margin)+"_1.jpg"):
-                        third_path = image_path[:-l_minus]+str(digits_path-time_margin)
+                            os.path.exists(image_path[:-l_minus] + str(digits_path - time_margin)+"_1.jpg"):
+                        third_path = image_path[:-l_minus] + str(digits_path - time_margin)
                         sample = False
                         break
 
-                im3 = cv2.imread(third_path+"_1.jpg")
+                im3 = cv2.imread(third_path + "_1.jpg")
                 im3 = preprocessImage(im3)
-                #stacking along channels
-                
-                im = np.dstack((im1,im2,im3))
+                # stacking along channels
+                im = np.dstack((im1, im2, im3))
             else:
-                im = np.dstack((im1,im2))
+                im = np.dstack((im1, im2))
             
         else:
-            im = cv2.imread(image_path+".jpg")
-            im = preprocessImage(im1)
+            im = cv2.imread(image_path + ".jpg")
+            im = preprocessImage(im)
 
         output_queue.put((idx, im))
         del im  # Free memory
@@ -187,8 +187,8 @@ class BaxterImageLoader(object):
         # keep track of images that remain to be preprocessed
         self.n_sent, self.n_received = 0, 0
         self.shutdown = False
-        self.multi_view=multi_view
-        self.triplets=triplets
+        self.multi_view = multi_view
+        self.triplets = triplets
 
         if self.n_workers <= 0:
             raise ValueError("n_workers <= 0 in the data loader")

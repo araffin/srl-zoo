@@ -36,7 +36,7 @@ parser.add_argument('-k', '--n_neighbors', type=int, default=5, help='Number of 
 parser.add_argument('-n', '--n_samples', type=int, default=5, help='Number of test samples (default: 5)')
 parser.add_argument('--n_to_plot', type=int, default=5, help='Number of samples to plot (default: 5)')
 parser.add_argument('--relative_pos', action='store_true', default=False, help='Use relative position as ground_truth')
-parser.add_argument('--multi_view', action='store_true', default=False, help='manager multi_view data paths')
+parser.add_argument('--multi_view', action='store_true', default=False, help='To deal with multi view data format')
 
 args = parser.parse_args()
 

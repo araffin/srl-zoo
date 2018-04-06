@@ -27,7 +27,7 @@ def loadImage(path, view=0):
     """
     Load an image and convert it to matplotlib format
     :param path: (str)
-    :param view: (int) : 0 for normal, 1/2 for multi_view
+    :param view: (int) : 0 for normal, {1, 2} for multi_view
     """
     if view > 0:
         path += "_"+str(view)

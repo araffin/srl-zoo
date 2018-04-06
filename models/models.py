@@ -155,30 +155,23 @@ class EmbeddingNet(nn.Module):
 
 
 class TripletNet(nn.Module):
-    def __init__(self, state_dim=2, cuda=False):
+    def __init__(self, state_dim=2):
         super(TripletNet, self).__init__()
         self.embedding = EmbeddingNet(state_dim)
-        if cuda:
-            self.embedding.cuda()
 
     def forward(self, anchor, positive, negative):
         """
         anchor : observation
         positive : observation
-        negative : obsevation
+        negative : observation
         """
-        output1 = self.embedding(anchor)
-        
-        output2 = self.embedding(positive)
-        
-        output3 = self.embedding(negative)
-        
-        return output1, output2, output3
+        return self.embedding(anchor), self.embedding(positive), self.embedding(negative)
 
     def get_embedding(self, x):
         return self.embedding(x)
 
-class CustomCNN_reduced(nn.Module):
+
+class CustomCNNReduced(nn.Module):
     """
     Convolutional Neural Network
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
