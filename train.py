@@ -496,7 +496,7 @@ class SRL4robotics(BaseLearner):
                 
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
                                                same_actions, dissimilar, ref_point_pairs,
-                                               similar_pairs, cache_capacity=100, multi_view=self.multi_view, triplets=(self.model_type=="triplet_cnn"), test_batch_size=32)
+                                               similar_pairs, cache_capacity=100, multi_view=self.multi_view, triplets=(self.model_type=="triplet_cnn"))
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
         if self.model_type == "triplet_cnn" :
