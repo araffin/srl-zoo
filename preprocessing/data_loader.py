@@ -5,7 +5,9 @@ import threading
 import multiprocessing as mp
 from collections import OrderedDict
 import os.path
-
+import glob
+import re
+import random
 
 import cv2
 import numpy as np
@@ -58,30 +60,24 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             im2 = preprocessImage(im2)
 
             ####################
-            # negative observation
+            # loading a negative observation
 
             if triplets:
-                sample = True
-                while sample:
-                    time_margin = np.random.randint(100)
-                    digits_path = [k for k in image_path.split("/")[-1] if k.isdigit()]
-                    digits_path = int("".join(digits_path))
-                    neg_path = str(digits_path - time_margin)
-                    pos_path = str(digits_path + time_margin)
-                    l_minus = len(neg_path)
-                    l_plus = len(pos_path)
+                digits_path = glob.glob(image_path[:-6] + '[0-9]*_1.jpg')
 
-                    if os.path.exists(image_path[:-l_plus] + pos_path + "_1.jpg"):
-                        third_path = image_path[:-l_plus] + pos_path
-                        sample = False
-                        break
-                    elif (digits_path-time_margin) > 0 and \
-                            os.path.exists(image_path[:-l_minus] + str(digits_path - time_margin)+"_1.jpg"):
-                        third_path = image_path[:-l_minus] + str(digits_path - time_margin)
-                        sample = False
-                        break
+                # getting the current & all frames' timesteps (for the same record)
+                current = int("".join(re.search("frame[0-9]{6}", image_path).group()[6:]))
+                all_frame_steps = [int("".join(re.search("frame[0-9]{6}", k).group()[6:])) for k in digits_path]
 
-                im3 = cv2.imread(third_path + "_1.jpg")
+                # removing current positive timestep from the list 
+                all_frame_steps.remove(current)
+
+                # negative timestep by random sampling
+                ln = len(all_frame_steps)
+                negative = all_frame_steps[random.randint(0, ln-1)]                
+                negative_path = image_path[:-6] + "0" * ( 6 - len(str(negative))) + str(negative)
+
+                im3 = cv2.imread(negative_path + "_1.jpg")
                 im3 = preprocessImage(im3)
                 # stacking along channels
                 im = np.dstack((im1, im2, im3))
