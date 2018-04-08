@@ -105,7 +105,9 @@ python train.py [-h] [--epochs N] [--seed S] [--state_dim STATE_DIM]
                         plots will be saved
   --ref_prior           Use Fixed Reference Point Prior (cannot be used at the same time as SameEnv prior)
   --same_env_prior      Enable same env prior (disables ref prior)
-
+  --multi_view          Enable use of multiple camera (two)
+  --no_priors           Disable use of priors - in case of triplet loss
+			  
 ```
 
 
@@ -113,6 +115,9 @@ Example:
 ```
 python train.py --data_folder data/path/to/dataset
 ```
+
+In case of `--multi_view` enabled make sure you set the global variable N_CHANNELS in file `preprocess.py` to 6
+if `--model_type` is custom_cnn ( 9 if `triplet_cnn`).
 
 ### Evaluation and Plotting
 
@@ -141,7 +146,7 @@ You can have an interactive plot of a learned representation using:
 ```
 python plotting/interactive_plot.py --data_folder path/to/datasetFolder/ -i path/to/states_rewards.npz
 ```
-When you click on a state in the representation plot (left click for 2D, **right click for 3D plots**!), it shows the corresponding image along with the reward and the coordinates in the space.
+When you click on a state in the representation plot (left click for 2D, **right click for 3D plots**!), it shows the corresponding image along with the reward and the coordinates in the space. Pass `--multi_view` as argument to visualize in case of multiple cameras.
 
 You can also plot ground truth states when you don't specify a npz file:
 ```
@@ -164,6 +169,7 @@ KNN plot and KNN MSE
                       Number of nearest neighbors (default: 5)
 -n N_SAMPLES, --n_samples N_SAMPLES
                       Number of test samples (default: 10)
+--multi_view          To deal with multi view data format
 
 ```
 

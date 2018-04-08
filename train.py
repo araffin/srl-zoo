@@ -641,7 +641,7 @@ if __name__ == '__main__':
     parser.add_argument('--multi_view',action='store_true', default=False,
                         help='Enable use of multiple camera')
     parser.add_argument('--no_priors',action='store_true', default=False,
-                        help='Disable use of priors - in case of triplet loss testing purpose')
+                        help='Disable use of priors - in case of triplet loss')
                         
                         
     args = parser.parse_args()
@@ -705,3 +705,4 @@ if __name__ == '__main__':
     # Do not close plot at the end of training
     if DISPLAY_PLOTS:
         input('\nPress any key to exit.')
+        
