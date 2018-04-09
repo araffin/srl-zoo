@@ -283,7 +283,7 @@ if __name__ == '__main__':
         for seed in [1]:
             exp_config['seed'] = seed
             # Supervised Learning
-            for model_type in ['resnet', 'custom_cnn']:
+            for model_type in ['resnet', 'custom_cnn', 'triplet_cnn']:
                 exp_config['model_type'] = model_type
                 baselineCall(exp_config, 'supervised')
                 evaluateBaseline(base_config)
