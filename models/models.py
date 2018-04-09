@@ -167,7 +167,7 @@ class TripletNet(nn.Module):
         """
         return self.embedding(anchor), self.embedding(positive), self.embedding(negative)
 
-    def get_embedding(self, x):
+    def encode(self, x):
         return self.embedding(x)
 
 

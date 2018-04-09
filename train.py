@@ -605,7 +605,7 @@ class SRL4roboticsTriplet(SRL4robotics):
         """
         # Switch to test mode
         self.model.eval()
-        states = self.model.get_embedding(observations[:, :3:, :, :])
+        states = self.model.encode(observations[:, :3:, :, :])
         
         if restore_train:
             # Restore training mode
