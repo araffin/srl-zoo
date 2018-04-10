@@ -127,14 +127,13 @@ class ConvolutionalNetwork(nn.Module):
 class EmbeddingNet(nn.Module):
     def __init__(self, state_dim=2, embedding_size=128):
         """
-        Convolutional  Layers + Embedding FC layers
+        Resnet18 + FC layer (Embedding to learn a metric)
         input shape : 2 X 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
         :param state_dim: (int)
         :embedding_size: (int) size of TCN embedding
         """
         super(EmbeddingNet, self).__init__()
-        # Inspired by ResNet:
-        # conv3x3 followed by BatchNorm2d
+        # ResNet 18
         self.conv_layers = models.resnet18(pretrained=True)
         # Freeze params
         for param in self.conv_layers.parameters():

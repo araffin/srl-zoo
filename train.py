@@ -181,13 +181,14 @@ class RoboticPriorsTripletLoss(nn.Module):
             # Same Env prior
             w_same_env = 1
             same_env_loss = ((s[similar_pairs[:, 1]] - s[similar_pairs[:, 0]]).norm(2, dim=1) ** 2).mean()
-        return temp_coherence_loss,causality_loss, proportionality_loss, repeatability_loss, same_env_loss, fixed_ref_point_loss, w_same_env, w_fixed_point
+        return temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss, same_env_loss, \
+               fixed_ref_point_loss, w_same_env, w_fixed_point
 
             
     # Override in the case of use of Time-Contrastive Triplet Loss 
     def forward(self, states, p_states, n_states, next_states, next_p_st,
                 dissimilar_pairs, same_actions_pairs, ref_point_pairs,
-                similar_pairs, alpha=0.2, no_priors=False ,no_triplets=False):
+                similar_pairs, alpha=0.2, no_priors=False, no_triplets=False):
         """
         :alpha : (Float) margin that is enforced between positive & neg observation (TCN Triplet Loss)
         :param states: (th Variable) states for the anchor obs
@@ -208,11 +209,11 @@ class RoboticPriorsTripletLoss(nn.Module):
 
         # Applying the priors on the 1st view
         temp_coherence_loss,causality_loss, proportionality_loss, repeatability_loss, \
-            same_env_loss, fixed_ref_point_loss, w_same_env, w_fixed_point = self.priors_on_states(states, next_states, same_actions_pairs, ref_point_pairs ,similar_pairs, dissimilar_pairs)
+            same_env_loss, fixed_ref_point_loss, w_same_env, w_fixed_point = self.priors_on_states(states, next_states, same_actions_pairs, ref_point_pairs, similar_pairs, dissimilar_pairs)
 
         # Applying the priors on the 2nd view            
         temp_coherence_loss_2,causality_loss_2, proportionality_loss_2, repeatability_loss_2, \
-            same_env_loss_2, fixed_ref_point_loss_2, w_same_env_2, w_fixed_point_2 = self.priors_on_states(p_states, next_p_st , same_actions_pairs, ref_point_pairs ,similar_pairs, dissimilar_pairs)
+            same_env_loss_2, fixed_ref_point_loss_2, w_same_env_2, w_fixed_point_2 = self.priors_on_states(p_states, next_p_st, same_actions_pairs, ref_point_pairs ,similar_pairs, dissimilar_pairs)
 
         temp_coherence_loss += temp_coherence_loss_2
         causality_loss += causality_loss_2
@@ -334,11 +335,12 @@ class SRL4robotics(BaseLearner):
         print("{} minibatches for validation, {} samples".format(n_val_batches, n_val_batches * BATCH_SIZE))
         assert n_val_batches > 0, "Not enough sample to create a validation set"
         
-        def oversSampling(batch_size, m_list, pairs):
+        def overSampling(batch_size, m_list, pairs, function_on_pairs):
             """
             :param batch_size: (int)
             :param m_list: (list) mini-batch list
             :param pairs: similar / dissimilar pairs
+            :param function_on_pairs: (function) either findSimilar/findDissimilar applied to pairs
             :return: (list, list) pairs, mini-batch list modified
             """
             # For a each minibatch_id
@@ -352,7 +354,7 @@ class SRL4robotics(BaseLearner):
                     for m_id, minibatch in enumerate(m_list):
                         for i in range(batch_size):
                             # Look for similar samples j in other minibatches m_id
-                            for j in findSimilar(i, m_list[minibatch_id], minibatch):
+                            for j in function_on_pairs(i, m_list[minibatch_id], minibatch):
                                 # Swap samples - done once
                                 if (j != i) & (minibatch_id != m_id) and do:
                                     tmp = minibatch[j]
@@ -384,10 +386,7 @@ class SRL4robotics(BaseLearner):
                 np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch, minibatch) if j > i],
                          dtype='int64') for minibatch in minibatchlist]
 
-
-
-            similar_pairs, minibatchlist = oversSampling(self.batch_size, minibatchlist, similar_pairs)
-            print(similar_pairs)
+            similar_pairs, minibatchlist = overSampling(self.batch_size, minibatchlist, similar_pairs, findSimilar)
 
         ref_point_pairs = []
         if len(is_ref_point_list) > 0:
@@ -437,7 +436,8 @@ class SRL4robotics(BaseLearner):
             check which samples should be dissimilar
             because they lead to different rewards after the same actions
             :param index: (int)
-            :param minibatch: (numpy array)
+            :param minibatch1: (numpy array)
+            :param minibatch2: (numpy array)
             :return: (dict, numpy array)
             """
             return np.where((actions[minibatch2] == actions[minibatch1[index]]) *
@@ -446,8 +446,8 @@ class SRL4robotics(BaseLearner):
         dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch, minibatch) if j > i],
                                dtype='int64') for minibatch in minibatchlist]
                                
-        #Swapping relevant pairs to have at least a pair of dissimilar obs in every minibatches
-        dissimilar, minibatchlist = oversSampling(self.batch_size, minibatchlist, dissimilar)
+        # Swapping relevant pairs to have at least a pair of dissimilar obs in every minibatches
+        dissimilar, minibatchlist = overSampling(self.batch_size, minibatchlist, dissimilar, findDissimilar)
                             
         def findSameActions(index, minibatch):
             """
@@ -496,7 +496,8 @@ class SRL4robotics(BaseLearner):
                 
         baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
                                                same_actions, dissimilar, ref_point_pairs,
-                                               similar_pairs, cache_capacity=100, multi_view=self.multi_view, triplets=(self.model_type=="triplet_cnn"))
+                                               similar_pairs, cache_capacity=100, multi_view=self.multi_view,
+                                               triplets=(self.model_type=="triplet_cnn"))
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
         if self.model_type == "triplet_cnn" :
@@ -529,9 +530,14 @@ class SRL4robotics(BaseLearner):
                 
                 # Predict states given observations : reffer to  Time Contrastive Network (Triplet Loss) [Sermanet et al.]
                 if self.model_type=="triplet_cnn":                    
-                    states, positive_states,  negtive_states = self.model(obs[:, :3:, :, :], obs[:, 3:6, :, :], obs[:, 6:, :, :]) 
-                    next_states, next_positive_states,  next_negative_states =  self.model(next_obs[:, :3:, :, :], next_obs[:, 3:6, :, :], next_obs[:, 6:, :, :])
-                    loss = criterion(states, positive_states, negtive_states , next_states, next_positive_states, diss, same, is_ref_point_list, sim_pairs, no_priors=self.no_priors)
+                    states, positive_states,  negtive_states = self.model(obs[:, :3:, :, :], obs[:, 3:6, :, :],
+                                                                          obs[:, 6:, :, :])
+
+                    next_states, next_positive_states,  next_negative_states = self.model(next_obs[:, :3:, :, :],
+                                                                                          next_obs[:, 3:6, :, :], next_obs[:, 6:, :, :])
+
+                    loss = criterion(states, positive_states, negtive_states, next_states, next_positive_states, diss,\
+                                     same, is_ref_point_list, sim_pairs, no_priors=self.no_priors)
                     
                 else:                    
                     states, next_states = self.model(obs), self.model(next_obs) 
@@ -605,6 +611,7 @@ class SRL4roboticsTriplet(SRL4robotics):
         """
         # Switch to test mode
         self.model.eval()
+        # For inference, the forward pass is done one the positive observation (first view)
         states = self.model.encode(observations[:, :3:, :, :])
         
         if restore_train:

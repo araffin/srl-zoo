@@ -63,18 +63,21 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             # loading a negative observation
 
             if triplets:
-                digits_path = glob.glob(image_path[:-6] + '[0-9]*_1.jpg')
+                # End of file format for positive & negative observations (camera 1) - length : 6 characters
+                extra_chars = '_1.jpg'
 
-                # getting the current & all frames' timesteps (for the same record)
-                current = int("".join(re.search("frame[0-9]{6}", image_path).group()[6:]))
-                all_frame_steps = [int("".join(re.search("frame[0-9]{6}", k).group()[6:])) for k in digits_path]
+                # getting path for all files of same record episode, e.g path_to_data/record_001/frame[0-9]{6}*
+                digits_path = glob.glob(image_path[:-6] + '[0-9]*' + extra_chars)
 
-                # removing current positive timestep from the list 
+                # getting the current & all frames' timesteps
+                current = int(image_path[-6:])
+                all_frame_steps = [int(k[:-len(extra_chars)][-6:]) for k in digits_path]
+                # removing current positive timestep from the list
                 all_frame_steps.remove(current)
 
                 # negative timestep by random sampling
-                ln = len(all_frame_steps)
-                negative = all_frame_steps[random.randint(0, ln-1)]                
+                length_set_steps = len(all_frame_steps)
+                negative = all_frame_steps[random.randint(0, length_set_steps-1)]
                 negative_path = image_path[:-6] + "0" * ( 6 - len(str(negative))) + str(negative)
 
                 im3 = cv2.imread(negative_path + "_1.jpg")
