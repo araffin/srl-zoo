@@ -1,7 +1,11 @@
 from __future__ import print_function, division
 
 import argparse
-import cPickle as pkl
+# Python 2/3 compatibility
+try:
+    import cPickle as pkl
+except ImportError:
+    import pickle as pkl
 
 import numpy as np
 from tqdm import tqdm
