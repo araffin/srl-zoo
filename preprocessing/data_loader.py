@@ -6,7 +6,6 @@ import multiprocessing as mp
 from collections import OrderedDict
 import os.path
 import glob
-import re
 import random
 
 import cv2
@@ -82,9 +81,8 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                 im3 = preprocessImage(im3)
                 # stacking along channels
                 images.append(im3)
-                im = np.dstack(images)
-            else:
-                im = np.dstack(images)
+
+            im = np.dstack(images)
             
         else:
             im = cv2.imread(image_path + ".jpg")

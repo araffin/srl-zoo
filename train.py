@@ -337,6 +337,10 @@ class SRL4robotics(BaseLearner):
         
         def overSampling(batch_size, m_list, pairs, function_on_pairs):
             """
+            Look for minibatches missing pairs of observations with the similar/dissimilar rewards (see params)
+            Sample for each of those minibatches an observation from another batch that satisfies the
+            similarity/dissimilarity with the 1rst observation.
+            return the new pairs & the modified minibatch list
             :param batch_size: (int)
             :param m_list: (list) mini-batch list
             :param pairs: similar / dissimilar pairs
@@ -345,14 +349,14 @@ class SRL4robotics(BaseLearner):
             """
             # For a each minibatch_id
             if function_on_pairs.__name__ == "findSimilar":
-                str = 'similar pairs'
+                pair_name = 'similar pairs'
             else:
-                str = 'dissimilar pairs'
+                pair_name = 'dissimilar pairs'
             for minibatch_id, d in enumerate(pairs):
                 do = True
                 # Do if it contains no similar pairs of samples
                 while do and len(d) == 0:
-                    print('Dealing with a minibatch missing ' + str)
+                    print('Dealing with a minibatch missing ' + pair_name)
                     # for every minibatch & obs of a mini-batch list
                     for m_id, minibatch in enumerate(m_list):
                         for i in range(batch_size):
@@ -389,7 +393,6 @@ class SRL4robotics(BaseLearner):
 
             # sampling relevant pairs to have at least a pair of similar obs in every minibatches
             similar_pairs, minibatchlist = overSampling(self.batch_size, minibatchlist, similar_pairs, findSimilar)
-        print('similar ', similar_pairs)
         ref_point_pairs = []
         if len(is_ref_point_list) > 0:
             def findRefPoint(index, minibatch):

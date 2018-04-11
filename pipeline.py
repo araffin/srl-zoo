@@ -276,6 +276,7 @@ if __name__ == '__main__':
     parser.add_argument('--base_config', type=str, default="configs/default.json",
                         help='Path to overall config file, it contains variables independent from datasets (default: '
                              '/configs/default.json)')
+
     args = parser.parse_args()
 
     # Grid Search on Baselines
@@ -291,8 +292,9 @@ if __name__ == '__main__':
         # Grid search for baselines
         for seed in [1]:
             exp_config['seed'] = seed
+
             # Supervised Learning
-            for model_type in ['resnet', 'custom_cnn', 'triplet_cnn']:
+            for model_type in ['resnet', 'custom_cnn']:
                 exp_config['model_type'] = model_type
 
                 baselineCall(exp_config, 'supervised')
@@ -347,6 +349,8 @@ if __name__ == '__main__':
 
 
     # Grid on State Representation Learning with Priors
+    # If using multi_view=true with custom_cnn : make sure you set N_CHANNELS to 6 in preprocess.py
+    # If using multi_view=true with triplet_cnn: set N_CHANNELS to 9. Also disable priors with no_priors=true
     elif args.data_folder != "":
         exp_config = getBaseExpConfig(args)
 

@@ -141,7 +141,7 @@ The negative example is an image from the same camera as the anchor but at a dif
 In our case the TCN-like architecture is made of a pre-trained ResNet with an extra fully connected layer (embedding).
 
 To use this functionality also enable `--multi_view`, preferably `--no_priors` (see usage of script train.py),
-and set the global variable N_CHANNELS in file `preprocess.py` to 9.
+and set the global variable N_CHANNELS in file `preprocess.py` to 9 for training (3 otherwise).
 
 Related papers:
 - "Time-Contrastive Networks: Self-Supervised Learning from Video" (P. Sermanet et al., 2017), paper: [https://arxiv.org/abs/1704.06888](https://arxiv.org/abs/1704.06888)
