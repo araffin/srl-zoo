@@ -170,43 +170,6 @@ class TripletNet(nn.Module):
         return self.embedding(x)
 
 
-class CustomCNNReduced(nn.Module):
-    """
-    Convolutional Neural Network
-    input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
-    :param state_dim: (int)
-    """
-
-    def __init__(self, state_dim=2):
-        super(CustomCNN, self).__init__()
-        # Inspired by ResNet:
-        # conv3x3 followed by BatchNorm2d
-        self.conv_layers = nn.Sequential(
-            # 224x224x3 -> 112x112x64
-            nn.Conv2d(N_CHANNELS, 16, kernel_size=7, stride=2, padding=3, bias=False),
-            nn.BatchNorm2d(16),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),  # 56x56x16
-
-            conv3x3(in_planes=16, out_planes=64, stride=1),  # 56x56x16
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2),  # 27x27x64
-
-            conv3x3(in_planes=64, out_planes=64, stride=2),  # 14x14x64
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
-        ) 
-        self.fc = nn.Linear(6 * 6 * 64, state_dim)
-
-    def forward(self, x):
-        x = self.conv_layers(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        return x
-        
-
 class CustomCNN(nn.Module):
     """
     Convolutional Neural Network

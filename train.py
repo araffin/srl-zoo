@@ -344,22 +344,23 @@ class SRL4robotics(BaseLearner):
             :return: (list, list) pairs, mini-batch list modified
             """
             # For a each minibatch_id
-
+            if function_on_pairs.__name__ == "findSimilar":
+                str = 'similar pairs'
+            else:
+                str = 'dissimilar pairs'
             for minibatch_id, d in enumerate(pairs):
                 do = True
                 # Do if it contains no similar pairs of samples
-                if len(d) == 0:
-                    print('Dealing with minibatch missing similar/dissimilar pairs...')
+                while do and len(d) == 0:
+                    print('Dealing with a minibatch missing ' + str)
                     # for every minibatch & obs of a mini-batch list
                     for m_id, minibatch in enumerate(m_list):
                         for i in range(batch_size):
                             # Look for similar samples j in other minibatches m_id
                             for j in function_on_pairs(i, m_list[minibatch_id], minibatch):
-                                # Swap samples - done once
+                                # Copy samples - done once
                                 if (j != i) & (minibatch_id != m_id) and do:
-                                    tmp = minibatch[j]
-                                    minibatch[j] = m_list[minibatch_id][j]
-                                    m_list[minibatch_id][j] = tmp
+                                    m_list[minibatch_id][j] = minibatch[j]
                                     pairs[minibatch_id] = np.array([[i, j]])
                                     do = False
             return pairs, m_list        
@@ -386,8 +387,9 @@ class SRL4robotics(BaseLearner):
                 np.array([[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch, minibatch) if j > i],
                          dtype='int64') for minibatch in minibatchlist]
 
+            # sampling relevant pairs to have at least a pair of similar obs in every minibatches
             similar_pairs, minibatchlist = overSampling(self.batch_size, minibatchlist, similar_pairs, findSimilar)
-
+        print('similar ', similar_pairs)
         ref_point_pairs = []
         if len(is_ref_point_list) > 0:
             def findRefPoint(index, minibatch):
@@ -446,7 +448,7 @@ class SRL4robotics(BaseLearner):
         dissimilar = [np.array([[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch, minibatch) if j > i],
                                dtype='int64') for minibatch in minibatchlist]
                                
-        # Swapping relevant pairs to have at least a pair of dissimilar obs in every minibatches
+        # sampling relevant pairs to have at least a pair of dissimilar obs in every minibatches
         dissimilar, minibatchlist = overSampling(self.batch_size, minibatchlist, dissimilar, findDissimilar)
                             
         def findSameActions(index, minibatch):

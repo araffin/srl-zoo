@@ -50,14 +50,11 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             break
 
         if multi_view:
-            im1 = cv2.imread(image_path + "_1.jpg")
-            # preprocess
-            im1 = preprocessImage(im1)
-            
-            # second cam
-            im2 = cv2.imread(image_path + "_2.jpg")
-            # preprocess
-            im2 = preprocessImage(im2)
+
+            images = []
+            for idx in range(2):
+                im = cv2.imread("{}_{}.jpg".format(image_path, idx + 1))
+                images.append(preprocessImage(im))
 
             ####################
             # loading a negative observation
@@ -71,6 +68,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
 
                 # getting the current & all frames' timesteps
                 current = int(image_path[-6:])
+                # For all others extract last 6 digits (timestep) after removing the extra chars
                 all_frame_steps = [int(k[:-len(extra_chars)][-6:]) for k in digits_path]
                 # removing current positive timestep from the list
                 all_frame_steps.remove(current)
@@ -78,14 +76,15 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                 # negative timestep by random sampling
                 length_set_steps = len(all_frame_steps)
                 negative = all_frame_steps[random.randint(0, length_set_steps-1)]
-                negative_path = image_path[:-6] + "0" * ( 6 - len(str(negative))) + str(negative)
+                negative_path = image_path[:-6] + "0" * (6 - len(str(negative))) + str(negative)
 
                 im3 = cv2.imread(negative_path + "_1.jpg")
                 im3 = preprocessImage(im3)
                 # stacking along channels
-                im = np.dstack((im1, im2, im3))
+                images.append(im3)
+                im = np.dstack(images)
             else:
-                im = np.dstack((im1, im2))
+                im = np.dstack(images)
             
         else:
             im = cv2.imread(image_path + ".jpg")
