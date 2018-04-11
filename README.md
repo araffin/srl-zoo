@@ -129,16 +129,16 @@ Using the `custom_cnn` architecture, it is possible to pass pairs of images from
 To use this functionality to perform state representation learning with priors, enable `--multi_view` (see usage of script train.py),
 and set the global variable N_CHANNELS in file `preprocess.py` to 6.
 
-#### Triplets of observations
 
+#### Triplets of observations
 
 Using the `triplet_cnn` architecture, it is possible to learn representation of states using a dataset of triplets, i.e tuples made of an anchor, a positive and a negative observation.
 
-The anchor and the positive observation are views of the scene and at the same timestep, but from different cameras.
+The anchor and the positive observation are views of the scene at the same time step, but from different cameras.
 
-The negative example is an image from the same camera as the anchor but at a different timestep selected randomly among images in the same record.
+The negative example is an image from the same camera as the anchor but at a different time step selected randomly among images in the same record.
 
-In our case the TCN-like architecture is made of a pretrained Resnet with an extra fully connected layer (embedding).
+In our case the TCN-like architecture is made of a pre-trained ResNet with an extra fully connected layer (embedding).
 
 To use this functionality also enable `--multi_view`, preferably `--no_priors` (see usage of script train.py),
 and set the global variable N_CHANNELS in file `preprocess.py` to 9.

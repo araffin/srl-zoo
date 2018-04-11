@@ -100,6 +100,11 @@ def stateRepresentationLearningCall(exp_config):
     if "SameEnv" in exp_config["priors"]:
         args.extend(['--same_env_prior'])
 
+    if exp_config["multi_view"]:
+        args.extend(['--multi_view'])
+    if exp_config["no_priors"]:
+        args.extend(['--no_priors'])
+
     # TODO: Remove as soon as possible (only here for backward compatibility)
     if 'training_set_size' not in exp_config.keys():
         exp_config['training_set_size'] = -1
@@ -107,6 +112,7 @@ def stateRepresentationLearningCall(exp_config):
     for arg in ['learning_rate', 'l1_reg', 'batch_size',
                 'state_dim', 'epochs', 'seed', 'model_type',
                 'log_folder', 'data_folder', 'training_set_size']:
+
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
     ok = subprocess.call(['python', 'train.py'] + args)
@@ -180,6 +186,9 @@ def knnCall(exp_config):
     printGreen("\nEvaluating the state representation with KNN")
 
     args = ['--seed', str(exp_config['knn_seed']), '--n_samples', str(exp_config['knn_samples'])]
+
+    if exp_config["multi_view"]:
+        args.extend(['--multi_view'])
 
     for arg in ['log_folder', 'n_neighbors', 'n_to_plot']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
@@ -285,6 +294,7 @@ if __name__ == '__main__':
             # Supervised Learning
             for model_type in ['resnet', 'custom_cnn', 'triplet_cnn']:
                 exp_config['model_type'] = model_type
+
                 baselineCall(exp_config, 'supervised')
                 evaluateBaseline(base_config)
 
@@ -317,7 +327,6 @@ if __name__ == '__main__':
             exp_config = json.load(f)
 
         print("\n Pipeline using json config file: {} \n".format(args.exp_config))
-
         experiment_name = exp_config['experiment_name']
         data_folder = exp_config['data_folder']
         printGreen("\nDataset folder: {}".format(data_folder))
@@ -335,6 +344,7 @@ if __name__ == '__main__':
         if ok:
             # Evaluate the representation with kNN
             knnCall(exp_config)
+
 
     # Grid on State Representation Learning with Priors
     elif args.data_folder != "":
