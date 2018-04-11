@@ -244,7 +244,7 @@ def evaluateBaseline(base_config):
     log_folder = "logs/{}/baselines/".format(base_config['data_folder'])
     # Get Latest edited folder
     path = max([log_folder + d for d in os.listdir(log_folder)], key=os.path.getmtime)
-    with open("{}/exp_config.json".format(path), "rb") as f:
+    with open("{}/exp_config.json".format(path), "r") as f:
         exp_config = json.load(f)
 
     # Update exp config params (knn evaluation)
@@ -252,7 +252,7 @@ def evaluateBaseline(base_config):
         exp_config[param] = base_config[param]
 
     # Save knn params
-    with open("{}/exp_config.json".format(path), "wb") as f:
+    with open("{}/exp_config.json".format(path), "w") as f:
         json.dump(exp_config, f)
 
     knnCall(exp_config)
@@ -291,25 +291,25 @@ if __name__ == '__main__':
             # Autoencoder and VAE
             exp_config['model_type'] = "cnn"
             for baseline in ['autoencoder', 'vae']:
-                for state_dim in [3, 4, 5, 6]:
+                for state_dim in [3, 6, 12, 32]:
                     # Update config
                     exp_config['state_dim'] = state_dim
                     baselineCall(exp_config, baseline)
                     evaluateBaseline(base_config)
 
         # PCA
-        for state_dim in [3, 4, 5, 6]:
+        for state_dim in [3, 6, 10]:
             # Update config
             exp_config['state_dim'] = state_dim
             dimReductionCall(exp_config, 'pca')
             evaluateBaseline(base_config)
 
-        # t-SNE
-        for state_dim in [2, 3]:
-            # Update config
-            exp_config['state_dim'] = state_dim
-            dimReductionCall(exp_config, 'tsne')
-            evaluateBaseline(base_config)
+        # # t-SNE
+        # for state_dim in [2, 3]:
+        #     # Update config
+        #     exp_config['state_dim'] = state_dim
+        #     dimReductionCall(exp_config, 'tsne')
+        #     evaluateBaseline(base_config)
 
     # Reproduce a previous experiment using "exp_config.json"
     elif args.exp_config != "":

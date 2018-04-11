@@ -16,7 +16,7 @@ def plotLosses(loss_history, path=None):
     :param loss_history: (dict)
     :param path: (str)
     """
-    keys = loss_history.keys()
+    keys = list(loss_history.keys())
     keys.sort()
 
     x = np.arange(1, len(loss_history[keys[0]]) + 1)
