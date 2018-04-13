@@ -298,7 +298,7 @@ if __name__ == '__main__':
                     evaluateBaseline(base_config)
 
         # PCA
-        for state_dim in [3, 6, 10]:
+        for state_dim in [6, 12, 32]:
             # Update config
             exp_config['state_dim'] = state_dim
             dimReductionCall(exp_config, 'pca')
