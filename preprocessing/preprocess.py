@@ -177,7 +177,6 @@ if __name__ == '__main__':
     assert len(all_rewards) == len(all_images_path), "n_rewards != n_images: {} != {}".format(len(all_rewards),
                                                                                               len(all_images_path))
 
-
     ground_truth = {
         'button_positions': button_positions,
         'arm_states': all_arm_states,

@@ -188,7 +188,7 @@ def plot_against(states, rewards, title="Representation", fit_pca=False, cmap='c
     State dimensions are plotted one against the other (it creates a matrix of 2d representation)
     using rewards for coloring
     :param states: (numpy tensor)
-    :param reward: (numpy array)
+    :param rewards: (numpy array)
     :param title: (str)
     :param fit_pca: (bool)
     :param cmap: (str)

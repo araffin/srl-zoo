@@ -35,8 +35,11 @@ def getLogFolderName(exp_config):
     """
     date = datetime.datetime.now().strftime("%y-%m-%d_%Hh%M_%S")
     model_str = "_{}".format(exp_config['model_type'])
-    srl_str = "{}_ST_DIM{}_SEED{}".format(priorsToString(exp_config['priors']), exp_config['state_dim'],
-                                          exp_config['seed'])
+
+    srl_str = "ST_DIM{}_SEED{}".format(exp_config['state_dim'],
+                                       exp_config['seed'])
+    if len(exp_config["priors"]) > 0:
+        srl_str = priorsToString(exp_config['priors']) + "_" + srl_str
 
     if exp_config['use_continuous']:
         raise NotImplementedError("Continous actions not supported yet")
@@ -94,11 +97,18 @@ def stateRepresentationLearningCall(exp_config):
     printGreen("\nLearning a state representation...")
 
     args = ['--no-plots']
-    if "Reference" in exp_config["priors"]:
-        args.extend(['--ref_prior'])
 
-    if "SameEnv" in exp_config["priors"]:
-        args.extend(['--same_env_prior'])
+    if exp_config["multi_view"]:
+        args.extend(['--multi_view'])
+
+    if len(exp_config["priors"]) == 0:
+        args.extend(['--no_priors'])
+    else:
+        if "Reference" in exp_config["priors"]:
+            args.extend(['--ref_prior'])
+
+        if "SameEnv" in exp_config["priors"]:
+            args.extend(['--same_env_prior'])
 
     # TODO: Remove as soon as possible (only here for backward compatibility)
     if 'training_set_size' not in exp_config.keys():
@@ -180,6 +190,9 @@ def knnCall(exp_config):
     printGreen("\nEvaluating the state representation with KNN")
 
     args = ['--seed', str(exp_config['knn_seed']), '--n_samples', str(exp_config['knn_samples'])]
+
+    if exp_config["multi_view"]:
+        args.extend(['--multi_view'])
 
     for arg in ['log_folder', 'n_neighbors', 'n_to_plot']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
@@ -267,6 +280,7 @@ if __name__ == '__main__':
     parser.add_argument('--base_config', type=str, default="configs/default.json",
                         help='Path to overall config file, it contains variables independent from datasets (default: '
                              '/configs/default.json)')
+
     args = parser.parse_args()
 
     # Grid Search on Baselines
@@ -282,9 +296,11 @@ if __name__ == '__main__':
         # Grid search for baselines
         for seed in [1]:
             exp_config['seed'] = seed
+
             # Supervised Learning
             for model_type in ['resnet', 'custom_cnn']:
                 exp_config['model_type'] = model_type
+
                 baselineCall(exp_config, 'supervised')
                 evaluateBaseline(base_config)
 
@@ -317,7 +333,6 @@ if __name__ == '__main__':
             exp_config = json.load(f)
 
         print("\n Pipeline using json config file: {} \n".format(args.exp_config))
-
         experiment_name = exp_config['experiment_name']
         data_folder = exp_config['data_folder']
         printGreen("\nDataset folder: {}".format(data_folder))
@@ -336,7 +351,10 @@ if __name__ == '__main__':
             # Evaluate the representation with kNN
             knnCall(exp_config)
 
+
     # Grid on State Representation Learning with Priors
+    # If using multi_view=true with custom_cnn : make sure you set N_CHANNELS to 6 in preprocess.py
+    # If using multi_view=true with triplet_cnn: set N_CHANNELS to 9. Also disable priors with no_priors=true
     elif args.data_folder != "":
         exp_config = getBaseExpConfig(args)
 
