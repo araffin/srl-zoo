@@ -4,7 +4,6 @@ import time
 import threading
 import multiprocessing as mp
 from collections import OrderedDict
-import os.path
 import glob
 import random
 
@@ -75,7 +74,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                 # negative timestep by random sampling
                 length_set_steps = len(all_frame_steps)
                 negative = all_frame_steps[random.randint(0, length_set_steps-1)]
-                negative_path = image_path[:-6] + "0" * (6 - len(str(negative))) + str(negative)
+                negative_path = '{}_{:06d}'.format(image_path[:-6], negative)
 
                 im3 = cv2.imread(negative_path + "_1.jpg")
                 im3 = preprocessImage(im3)
@@ -83,7 +82,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                 images.append(im3)
 
             im = np.dstack(images)
-            
+
         else:
             im = cv2.imread(image_path + ".jpg")
             im = preprocessImage(im)
@@ -366,7 +365,7 @@ class BaxterImageLoader(object):
         """
         # Preprocessing loop, it fills workers queues
         for indices, key in zip(indices_list, obs_dict.keys()):
-                            
+
             obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS), dtype=np.float32)
             # Reset queues and received count
             self.resetQueues()

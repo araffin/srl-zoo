@@ -117,7 +117,6 @@ def stateRepresentationLearningCall(exp_config):
     for arg in ['learning_rate', 'l1_reg', 'batch_size',
                 'state_dim', 'epochs', 'seed', 'model_type',
                 'log_folder', 'data_folder', 'training_set_size']:
-
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
     ok = subprocess.call(['python', 'train.py'] + args)

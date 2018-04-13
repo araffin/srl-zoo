@@ -12,7 +12,6 @@ from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
-
 # Python 2/3 compatibility
 try:
     input = raw_input
@@ -23,6 +22,7 @@ except NameError:
 sns.set()
 TITLE_MAX_LENGTH = 60
 
+
 def loadImage(path, view=0):
     """
     Load an image and convert it to matplotlib format
@@ -30,21 +30,21 @@ def loadImage(path, view=0):
     :param view: (int) : 0 for normal, {1, 2} for multi_view
     """
     if view > 0:
-        path += "_"+str(view)
+        path += "_" + str(view)
     path += ".jpg"
     bgr_img = cv2.imread('data/' + path)
     return cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB) / 255.
 
 
 def createInteractivePlot(fig, ax, states, rewards, images_path, view=0):
-    name_img="Image"
+    name_img = "Image"
     if view > 0:
-        name_img += "_"+str(view)
-    fig2 = plt.figure(name_img)
+        name_img += "_" + str(view)
+    plt.figure(name_img)
     image_plot = plt.imshow(loadImage(images_path[0], view))
 
     # Disable seaborn grid
-    image_plot.axes.grid(False) 
+    image_plot.axes.grid(False)
     callback = ImageFinder(states, rewards, image_plot, ax, images_path, view)
     fig.canvas.mpl_connect('button_release_event', callback)
 
@@ -169,12 +169,13 @@ class ImageFinder(object):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Interactive plot of representation (left click for 2D, right click for 3D)')
+    parser = argparse.ArgumentParser(
+        description='Interactive plot of representation (left click for 2D, right click for 3D)')
     parser.add_argument('-i', '--input_file', type=str, default="",
                         help='Path to a npz file containing states and rewards')
     parser.add_argument('--data_folder', type=str, default="", required=True,
                         help='Path to a dataset folder, it will plot ground truth states')
-    parser.add_argument('--multi_view',action='store_true', default=False,
+    parser.add_argument('--multi_view', action='store_true', default=False,
                         help='Enable use of multiple camera')
     args = parser.parse_args()
 
@@ -186,7 +187,8 @@ if __name__ == '__main__':
         print("Loading {}...".format(args.input_file))
         states_rewards = np.load(args.input_file)
         images_path = np.load('data/{}/ground_truth.npz'.format(args.data_folder))['images_path']
-        plot_representation(states_rewards['states'], states_rewards['rewards'], images_path, multi_view=args.multi_view)
+        plot_representation(states_rewards['states'], states_rewards['rewards'], images_path,
+                            multi_view=args.multi_view)
 
         input('\nPress any key to exit.')
 
