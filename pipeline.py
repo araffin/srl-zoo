@@ -98,7 +98,7 @@ def stateRepresentationLearningCall(exp_config):
 
     args = ['--no-plots']
 
-    if exp_config["multi_view"]:
+    if exp_config.get("multi_view", False):
         args.extend(['--multi_view'])
 
     if len(exp_config["priors"]) == 0:
@@ -191,7 +191,7 @@ def knnCall(exp_config):
 
     args = ['--seed', str(exp_config['knn_seed']), '--n_samples', str(exp_config['knn_samples'])]
 
-    if exp_config["multi_view"]:
+    if exp_config.get("multi_view", False):
         args.extend(['--multi_view'])
 
     for arg in ['log_folder', 'n_neighbors', 'n_to_plot']:
