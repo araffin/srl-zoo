@@ -7,7 +7,11 @@ import torchvision.models as models
 from torch.autograd import Variable
 
 from .custom_layers import GaussianNoiseVariant
-from  preprocessing.preprocess import N_CHANNELS
+try:
+    from preprocessing.preprocess import N_CHANNELS
+except ImportError:
+    from ..preprocessing.preprocess import N_CHANNELS
+
 
 class SRLConvolutionalNetwork(nn.Module):
     """
