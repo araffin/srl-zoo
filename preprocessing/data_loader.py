@@ -42,6 +42,8 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
     """
     while not exit_event.is_set():
         idx, image_path = image_queue.get()
+        # Remove trailing .jpg if present
+        image_path = image_path.split('.jpg')[0]
 
         if idx is None:
             image_queue.put((None, None))
