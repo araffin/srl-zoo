@@ -233,7 +233,7 @@ Example:
 python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3 --noise_factor 0.1
 ```
 
-#### VAE 
+#### VAE
 
 Example:
 ```
@@ -266,16 +266,28 @@ This feature is currently experimental. It will launch a server that will learn 
 python server.py
 ```
 
-### Dependencies
+### Running tests
+
+Download test dataset [here](https://drive.google.com/open?id=154qMJHgUnzk0J_Hxmr2jCnV1ipS7o1D5) and put it in `data/` folder.
+```
+./run_tests.sh
+```
+
+### Installation: Dependencies
 
 Recommended configuration: Ubuntu 16.04 with python 2.7 or 3.6
-(should work with python3 though it was only thoroughly tested with python2)
 
 #### Recommended Method: Use saved conda environment
 
 [WARNING] There is one dependency that cannot be installed with a package manager (for now):
 [https://github.com/DmitryUlyanov/Multicore-TSNE](https://github.com/DmitryUlyanov/Multicore-TSNE)
 You have to clone the repo and run `pip install .`.
+
+### Python 3
+Please see `environment.yml` file from [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl)
+(Instructions are in the README)
+
+### Python 2
 
 Create the new environment `srl` from `environment.yml` file:
 ```

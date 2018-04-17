@@ -25,6 +25,7 @@ pycparser==2.18
 Pygments==2.2.0
 pyparsing==2.2.0
 python-dateutil==2.6.1
+pytest==3.5.0
 pytz==2017.3
 pyzmq==16.0.2
 scandir==1.6

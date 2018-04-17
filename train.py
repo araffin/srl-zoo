@@ -653,6 +653,7 @@ if __name__ == '__main__':
                         help='random seed (default: 1)')
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('-bs', '--batch_size', type=int, default=256, help='batch_size (default: 256)')
+    parser.add_argument('--val-size', type=float, default=0.2, help='Validation set size (default: 0.2)')
     parser.add_argument('--training_set_size', type=int, default=-1,
                         help='Limit size of the training set (default: -1)')
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
@@ -680,6 +681,7 @@ if __name__ == '__main__':
     DISPLAY_PLOTS = not args.no_plots
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
+    VALIDATION_SIZE = args.val_size
     APPLY_5TH_PRIOR = args.ref_prior and not args.same_env_prior
     plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
 

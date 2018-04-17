@@ -52,13 +52,14 @@ with open("{}/exp_config.json".format(args.log_folder), 'r') as f:
 
 # Load ground truth and images path
 ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
-states = np.load('{}/states_rewards.npz'.format(args.log_folder))['states']
 
 true_states = ground_truth['arm_states']
 images_path = ground_truth['images_path']
 
 if args.ground_truth:
     states = true_states.copy()
+else:
+    states = np.load('{}/states_rewards.npz'.format(args.log_folder))['states']
 
 if args.relative_pos:
     print("Using relative position")
