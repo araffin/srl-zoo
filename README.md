@@ -116,6 +116,12 @@ python train.py --data_folder data/path/to/dataset
 
 ### Evaluation and Plotting
 
+### VAE & autoencoder visualization
+
+To view the learn state of a VAE or autoencoder, you may use:
+```bash
+python -m enjoy.enjoy_autoencoders --log-dir logs/nameOfTheDataset/nameOfTheModel
+```
 
 #### Create a report
 After a report you can create a csv report file using:
