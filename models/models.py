@@ -469,6 +469,12 @@ class CNNVAE(nn.Module):
         x = x.view(x.size(0), -1)
         return self.encoder_fc1(x), self.encoder_fc2(x)
 
+    def decode(self, mu, logvar):
+        x = self.reparameterize(mu, logvar)
+        x = self.decoder_fc(x)
+        x = x.view(x.size(0), 64, 6, 6)
+        return self.decoder_conv(x)
+
     def reparameterize(self, mu, logvar):
         """
         Reparameterize for the backpropagation of z instead of q.
