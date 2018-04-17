@@ -201,7 +201,7 @@ def getModelName(args):
     name = "vae_{}_ST_DIM{}_SEED{}_NOISE{}".format(args.model_type, args.state_dim,
                                                            args.seed, args.noise_factor)
     if args.beta != 1.0:
-        name += "_BETA{:.2f}".format()
+        name += "_BETA{:.2f}".format(args.beta)
     name = name.replace(".", "_")  # replace decimal points by '_' for folder naming
     name += "_EPOCHS{}_BS{}".format(args.epochs, args.batch_size)
     return name
