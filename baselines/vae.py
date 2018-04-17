@@ -81,7 +81,6 @@ class VAELearning(BaseLearner):
             return states.data.cpu().numpy()
         return states.data.numpy()
 
-
     @staticmethod
     def _lossFunction(decoded, obs, mu, logvar, beta=1):
         """
@@ -101,7 +100,7 @@ class VAELearning(BaseLearner):
         # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
         kl_divergence = -0.5 * th.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
-        return generation_loss + beta*kl_divergence
+        return generation_loss + beta * kl_divergence
 
     def learn(self, images_path, rewards):
         """
@@ -199,7 +198,7 @@ def getModelName(args):
     :return: (str)
     """
     name = "vae_{}_ST_DIM{}_SEED{}_NOISE{}".format(args.model_type, args.state_dim,
-                                                           args.seed, args.noise_factor)
+                                                   args.seed, args.noise_factor)
     if args.beta != 1.0:
         name += "_BETA{:.2f}".format(args.beta)
     name = name.replace(".", "_")  # replace decimal points by '_' for folder naming
@@ -242,8 +241,9 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('--noise_factor', type=float, default=0, help='Noise factor for denoising vae')
-    parser.add_argument('--training_set_size', type=int, default=-1, help='Limit size of the training set (default: -1)')
-    parser.add_argument('--beta', type=float, default=1.0, 
+    parser.add_argument('--training_set_size', type=int, default=-1,
+                        help='Limit size of the training set (default: -1)')
+    parser.add_argument('--beta', type=float, default=1.0,
                         help='the Beta factor on the KL divergence, higher value means more disentangling.')
 
     args = parser.parse_args()
@@ -276,8 +276,8 @@ if __name__ == '__main__':
 
     print('Learning a state representation ... ')
     srl = VAELearning(args.state_dim, model_type=args.model_type, seed=args.seed,
-                              log_folder=log_folder, learning_rate=args.learning_rate,
-                              cuda=args.cuda, beta=args.beta)
+                      log_folder=log_folder, learning_rate=args.learning_rate,
+                      cuda=args.cuda, beta=args.beta)
     learned_states = srl.learn(images_path, rewards)
     srl.saveStates(learned_states, images_path, rewards, log_folder)
 

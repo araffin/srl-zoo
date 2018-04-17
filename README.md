@@ -118,7 +118,7 @@ python train.py --data_folder data/path/to/dataset
 
 ### VAE & autoencoder visualization
 
-To view the learn state of a VAE or autoencoder, you may use:
+To view the learned state and play with the latent space of a VAE or autoencoder, you may use:
 ```bash
 python -m enjoy.enjoy_autoencoders --log-dir logs/nameOfTheDataset/nameOfTheModel
 ```

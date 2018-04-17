@@ -9,6 +9,7 @@ import cv2
 import torch
 from torch.autograd import Variable
 
+from preprocessing.utils import deNormalize
 from models import CNNAutoEncoder, CNNVAE
 
 VALID_MODEL = ['vae', 'autoencoder']
@@ -33,14 +34,7 @@ def getImage(srl_model, mu, cuda=True):
         net_out = net_out.cpu()
     img = net_out.data.numpy()[0].T
 
-    # Undo scale
-    img[..., 0] *= 0.229
-    img[..., 1] *= 0.224
-    img[..., 2] *= 0.225
-    # Undo Zero-center
-    img[..., 0] += 0.485
-    img[..., 1] += 0.456
-    img[..., 2] += 0.406
+    img = deNormalize(img)
     return img[:, :, ::-1]
 
 
@@ -88,7 +82,10 @@ def main():
     cv2.namedWindow(srl_model_type, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(srl_model_type, 500, 500)
     cv2.namedWindow('sliders')
+    # add a slider for each component of the latent space
     for i in range(state_dim):
+        # the sliders MUST be between 0 and max, so we placed max at 100, and start at 50
+        # So that when we substract 50 and divide 10 we get [-5,5] for each component
         cv2.createTrackbar(str(i), 'sliders', 50, 100, (lambda a: None))
 
     # run the param through the network
