@@ -43,9 +43,10 @@ class VAELearning(BaseLearner):
     """
 
     def __init__(self, state_dim, model_type="cnn", log_folder="logs/default",
-                 seed=1, learning_rate=0.001, cuda=False):
+                 seed=1, learning_rate=0.001, cuda=False, beta=1):
 
         super(VAELearning, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
+        self.beta = beta
 
         if model_type == "cnn":
             self.model = CNNVAE(self.state_dim)
@@ -80,15 +81,15 @@ class VAELearning(BaseLearner):
             return states.data.cpu().numpy()
         return states.data.numpy()
 
-
     @staticmethod
-    def _lossFunction(decoded, obs, mu, logvar):
+    def _lossFunction(decoded, obs, mu, logvar, beta=1):
         """
         Reconstruction + KL divergence losses summed over all elements and batch
         :param decoded: (Pytorch Variable)
         :param obs: (Pytorch Variable)
         :param mu: (Pytorch Variable)
         :param logvar: (Pytorch Variable)
+        :param beta: (float) used to weight the KL divergence for disentangling
         :return: (Pytorch Variable)
         """
         generation_loss = F.mse_loss(decoded, obs, size_average=False)
@@ -99,7 +100,7 @@ class VAELearning(BaseLearner):
         # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
         kl_divergence = -0.5 * th.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
-        return generation_loss + kl_divergence
+        return generation_loss + beta * kl_divergence
 
     def learn(self, images_path, rewards):
         """
@@ -140,7 +141,7 @@ class VAELearning(BaseLearner):
 
                 self.optimizer.zero_grad()
                 decoded, mu, logvar = self.model(noisy_obs)
-                loss = VAELearning._lossFunction(decoded, obs, mu, logvar)
+                loss = VAELearning._lossFunction(decoded, obs, mu, logvar, self.beta)
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.data[0]
@@ -157,7 +158,7 @@ class VAELearning(BaseLearner):
                     noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
 
                 decoded, mu, logvar = self.model(noisy_obs)
-                loss = VAELearning._lossFunction(decoded, obs, mu, logvar)
+                loss = VAELearning._lossFunction(decoded, obs, mu, logvar, self.beta)
                 val_loss += loss.data[0]
 
             val_loss /= len(val_loader)
@@ -197,7 +198,9 @@ def getModelName(args):
     :return: (str)
     """
     name = "vae_{}_ST_DIM{}_SEED{}_NOISE{}".format(args.model_type, args.state_dim,
-                                                           args.seed, args.noise_factor)
+                                                   args.seed, args.noise_factor)
+    if args.beta != 1.0:
+        name += "_BETA{:.2f}".format(args.beta)
     name = name.replace(".", "_")  # replace decimal points by '_' for folder naming
     name += "_EPOCHS{}_BS{}".format(args.epochs, args.batch_size)
     return name
@@ -238,7 +241,10 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('--noise_factor', type=float, default=0, help='Noise factor for denoising vae')
-    parser.add_argument('--training_set_size', type=int, default=-1, help='Limit size of the training set (default: -1)')
+    parser.add_argument('--training_set_size', type=int, default=-1,
+                        help='Limit size of the training set (default: -1)')
+    parser.add_argument('--beta', type=float, default=1.0,
+                        help='the Beta factor on the KL divergence, higher value means more disentangling.')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -270,8 +276,8 @@ if __name__ == '__main__':
 
     print('Learning a state representation ... ')
     srl = VAELearning(args.state_dim, model_type=args.model_type, seed=args.seed,
-                              log_folder=log_folder, learning_rate=args.learning_rate,
-                              cuda=args.cuda)
+                      log_folder=log_folder, learning_rate=args.learning_rate,
+                      cuda=args.cuda, beta=args.beta)
     learned_states = srl.learn(images_path, rewards)
     srl.saveStates(learned_states, images_path, rewards, log_folder)
 

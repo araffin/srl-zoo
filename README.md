@@ -148,6 +148,12 @@ Related papers:
 
 ### Evaluation and Plotting
 
+### VAE & autoencoder visualization
+
+To view the learned state and play with the latent space of a VAE or autoencoder, you may use:
+```bash
+python -m enjoy.enjoy_autoencoders --log-dir logs/nameOfTheDataset/nameOfTheModel
+```
 
 #### Create a report
 After a report you can create a csv report file using:
@@ -225,6 +231,18 @@ Gaussian noise is added to the input with a factor `0.1`.
 Example:
 ```
 python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3 --noise_factor 0.1
+```
+
+#### VAE 
+
+Example:
+```
+python -m baselines.vae --data_folder path/to/data/folder --state_dim 3
+```
+
+You can also designate the beta weight for the KL divergence:
+```
+python -m baselines.vae --data_folder path/to/data/folder --state_dim 3 --beta 1.0
 ```
 
 #### PCA and t-SNE
