@@ -469,11 +469,10 @@ class CNNVAE(nn.Module):
         x = x.view(x.size(0), -1)
         return self.encoder_fc1(x), self.encoder_fc2(x)
 
-    def decode(self, mu, logvar):
-        x = self.reparameterize(mu, logvar)
-        x = self.decoder_fc(x)
-        x = x.view(x.size(0), 64, 6, 6)
-        return self.decoder_conv(x)
+    def decode(self, z):
+        z = self.decoder_fc(z)
+        z = z.view(z.size(0), 64, 6, 6)
+        return self.decoder_conv(z)
 
     def reparameterize(self, mu, logvar):
         """
@@ -496,7 +495,5 @@ class CNNVAE(nn.Module):
     def forward(self, x):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
-        decoded = self.decoder_fc(z)
-        decoded = decoded.view(x.size(0), 64, 6, 6)
-        decoded = self.decoder_conv(decoded)
+        decoded = self.decode(z)
         return decoded, mu, logvar

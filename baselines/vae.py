@@ -90,6 +90,7 @@ class VAELearning(BaseLearner):
         :param obs: (Pytorch Variable)
         :param mu: (Pytorch Variable)
         :param logvar: (Pytorch Variable)
+        :param beta: (float) used to weight the KL divergence for disentangling
         :return: (Pytorch Variable)
         """
         generation_loss = F.mse_loss(decoded, obs, size_average=False)
@@ -158,7 +159,7 @@ class VAELearning(BaseLearner):
                     noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
 
                 decoded, mu, logvar = self.model(noisy_obs)
-                loss = VAELearning._lossFunction(decoded, obs, mu, logvar)
+                loss = VAELearning._lossFunction(decoded, obs, mu, logvar, self.beta)
                 val_loss += loss.data[0]
 
             val_loss /= len(val_loader)
@@ -199,6 +200,8 @@ def getModelName(args):
     """
     name = "vae_{}_ST_DIM{}_SEED{}_NOISE{}".format(args.model_type, args.state_dim,
                                                            args.seed, args.noise_factor)
+    if args.beta != 1.0:
+        name += "_BETA{:.2f}".format()
     name = name.replace(".", "_")  # replace decimal points by '_' for folder naming
     name += "_EPOCHS{}_BS{}".format(args.epochs, args.batch_size)
     return name
