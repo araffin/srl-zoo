@@ -7,6 +7,10 @@ import torchvision.models as models
 from torch.autograd import Variable
 
 from .custom_layers import GaussianNoiseVariant
+try:
+    from preprocessing.preprocess import N_CHANNELS
+except ImportError:
+    from ..preprocessing.preprocess import N_CHANNELS
 
 
 class SRLConvolutionalNetwork(nn.Module):
@@ -57,7 +61,8 @@ class SRLDenseNetwork(nn.Module):
 
     def __init__(self, input_dim, state_dim=2, batch_size=256,
                  cuda=False, n_hidden=32, noise_std=1e-6):
-        super(SRLDenseNetwork, self).__init__()
+        super(SRLDenseNetwork, self).__init__()        
+                
         self.fc1 = nn.Linear(input_dim, n_hidden)
         self.fc2 = nn.Linear(n_hidden, state_dim)
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
@@ -123,6 +128,52 @@ class ConvolutionalNetwork(nn.Module):
         return x
 
 
+class EmbeddingNet(nn.Module):
+    def __init__(self, state_dim=2, embedding_size=128):
+        """
+        Resnet18 + FC layer (Embedding to learn a metric)
+        input shape : 2 X 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
+        :param state_dim: (int)
+        :embedding_size: (int) size of TCN embedding
+        """
+        super(EmbeddingNet, self).__init__()
+        # ResNet 18
+        self.conv_layers = models.resnet18(pretrained=True)
+        # Freeze params
+        for param in self.conv_layers.parameters():
+            param.requires_grad = False
+        # Replace the last fully-connected layer
+        n_units = self.conv_layers.fc.in_features
+        print("{} units in the last layer".format(n_units))
+        self.conv_layers.fc = nn.Linear(n_units, embedding_size)
+        self.fc = nn.Sequential(nn.PReLU(),
+                                nn.Linear(embedding_size, state_dim)
+                                )        
+
+    def forward(self, x):
+        x = self.conv_layers(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+
+
+class TripletNet(nn.Module):
+    def __init__(self, state_dim=2):
+        super(TripletNet, self).__init__()
+        self.embedding = EmbeddingNet(state_dim)
+
+    def forward(self, anchor, positive, negative):
+        """
+        anchor : observation
+        positive : observation
+        negative : observation
+        """
+        return self.embedding(anchor), self.embedding(positive), self.embedding(negative)
+
+    def encode(self, x):
+        return self.embedding(x)
+
+
 class CustomCNN(nn.Module):
     """
     Convolutional Neural Network
@@ -136,7 +187,7 @@ class CustomCNN(nn.Module):
         # conv3x3 followed by BatchNorm2d
         self.conv_layers = nn.Sequential(
             # 224x224x3 -> 112x112x64
-            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.Conv2d(N_CHANNELS, 64, kernel_size=7, stride=2, padding=3, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),  # 56x56x64
@@ -274,7 +325,7 @@ class CNNAutoEncoder(nn.Module):
         # TODO: implement residual connection
         self.encoder_conv = nn.Sequential(
             # 224x224x3 -> 112x112x64
-            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.Conv2d(N_CHANNELS, 64, kernel_size=7, stride=2, padding=3, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),  # 56x56x64

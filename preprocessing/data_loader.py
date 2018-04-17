@@ -4,6 +4,8 @@ import time
 import threading
 import multiprocessing as mp
 from collections import OrderedDict
+import glob
+import random
 
 import cv2
 import numpy as np
@@ -12,6 +14,7 @@ from torch.autograd import Variable
 
 from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
+
 
 def preprocessImage(image):
     """
@@ -27,13 +30,15 @@ def preprocessImage(image):
     return im
 
 
-def imageWorker(image_queue, output_queue, exit_event):
+def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplets=False):
     """
     Worker that preprocess images
     :param image_queue: (multiprocessing.Queue) queue with the path to the images
     :param output_queue: (multiprocessing.Queue) queue where the preprocessed image
                           will be added
     :param exit_event: (multiprocessing.Event) Event for exiting the loop
+    :param multi_view: (bool) enables dual camera mode
+    :param triplets: (bool) enables loading of negative example (third image)
     """
     while not exit_event.is_set():
         idx, image_path = image_queue.get()
@@ -41,8 +46,51 @@ def imageWorker(image_queue, output_queue, exit_event):
         if idx is None:
             image_queue.put((None, None))
             break
+        # Remove trailing .jpg if present
+        image_path = image_path.split('.jpg')[0]
 
-        output_queue.put((idx, preprocessImage(cv2.imread(image_path))))
+        if multi_view:
+
+            images = []
+            for idx in range(2):
+                im = cv2.imread("{}_{}.jpg".format(image_path, idx + 1))
+                images.append(preprocessImage(im))
+
+            ####################
+            # loading a negative observation
+
+            if triplets:
+                # End of file format for positive & negative observations (camera 1) - length : 6 characters
+                extra_chars = '_1.jpg'
+
+                # getting path for all files of same record episode, e.g path_to_data/record_001/frame[0-9]{6}*
+                digits_path = glob.glob(image_path[:-6] + '[0-9]*' + extra_chars)
+
+                # getting the current & all frames' timesteps
+                current = int(image_path[-6:])
+                # For all others extract last 6 digits (timestep) after removing the extra chars
+                all_frame_steps = [int(k[:-len(extra_chars)][-6:]) for k in digits_path]
+                # removing current positive timestep from the list
+                all_frame_steps.remove(current)
+
+                # negative timestep by random sampling
+                length_set_steps = len(all_frame_steps)
+                negative = all_frame_steps[random.randint(0, length_set_steps-1)]
+                negative_path = '{}_{:06d}'.format(image_path[:-6], negative)
+
+                im3 = cv2.imread(negative_path + "_1.jpg")
+                im3 = preprocessImage(im3)
+                # stacking along channels
+                images.append(im3)
+
+            im = np.dstack(images)
+
+        else:
+            im = cv2.imread(image_path + ".jpg")
+            im = preprocessImage(im)
+
+        output_queue.put((idx, im))
+        del im  # Free memory
 
 
 class BaxterImageLoader(object):
@@ -58,6 +106,8 @@ class BaxterImageLoader(object):
     :param similar_pairs: [numpy matrix]
     :param test_batch_size: (int)
     :param cache_capacity: (int) number of images that can be cached
+    :param multi_view: (bool) enables dual camera mode
+    :param triplets: (bool) enables loading of negative observation
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
     [WARNING] Set to False, you MUST clean up the loader manually (by calling cleanUp() method)
@@ -67,7 +117,7 @@ class BaxterImageLoader(object):
     def __init__(self, minibatchlist, images_path, same_actions,
                  dissimilar, ref_point_pairs=None, similar_pairs=None,
                  test_batch_size=512, cache_capacity=5000,
-                 n_workers=5, auto_cleanup=True):
+                 n_workers=5, auto_cleanup=True, multi_view=False, triplets=False):
         super(BaxterImageLoader, self).__init__()
 
         self.n_minibatches = len(minibatchlist)
@@ -134,6 +184,8 @@ class BaxterImageLoader(object):
         # keep track of images that remain to be preprocessed
         self.n_sent, self.n_received = 0, 0
         self.shutdown = False
+        self.multi_view = multi_view
+        self.triplets = triplets
 
         if self.n_workers <= 0:
             raise ValueError("n_workers <= 0 in the data loader")
@@ -142,7 +194,7 @@ class BaxterImageLoader(object):
         # and a common output_queue
         self.workers = []
         for i in range(self.n_workers):
-            w = mp.Process(target=imageWorker, args=(self.image_queues[i], self.output_queue, self.exit_event))
+            w = mp.Process(target=imageWorker, args=(self.image_queues[i], self.output_queue, self.exit_event, self.multi_view, self.triplets))
             w.daemon = True  # ensure that the worker exits on process exit
             w.start()
             self.workers.append(w)
@@ -315,6 +367,7 @@ class BaxterImageLoader(object):
         """
         # Preprocessing loop, it fills workers queues
         for indices, key in zip(indices_list, obs_dict.keys()):
+
             obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS), dtype=np.float32)
             # Reset queues and received count
             self.resetQueues()

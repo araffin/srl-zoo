@@ -1,0 +1,23 @@
+{
+  "batch_size": 64,
+  "epochs": 1,
+  "knn_samples": 200,
+  "knn_seed": 1,
+  "l1_reg": 0,
+  "training_set_size": 600,
+  "learning_rate": 0.001,
+  "model_approach": "priors",
+  "model_type": "custom_cnn",
+  "n_neighbors": 5,
+  "n_to_plot": 5,
+  "priors": [
+    "Proportionality",
+    "Temporal",
+    "Causality",
+    "Repeatability",
+    "SameEnv"
+  ],
+  "multi_view": true,
+  "use_continuous": false,
+  "_comment": "You can add or remove 'Reference|SameEnv' to the list of priors"
+}

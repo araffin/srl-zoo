@@ -105,6 +105,8 @@ python train.py [-h] [--epochs N] [--seed S] [--state_dim STATE_DIM]
                         plots will be saved
   --ref_prior           Use Fixed Reference Point Prior (cannot be used at the same time as SameEnv prior)
   --same_env_prior      Enable same env prior (disables ref prior)
+  --multi_view          Enable use of multiple camera (two)
+  --no_priors           Disable use of priors - in case of triplet loss
 
 ```
 
@@ -113,6 +115,36 @@ Example:
 ```
 python train.py --data_folder data/path/to/dataset
 ```
+
+In case of `--multi_view` enabled make sure you set the global variable N_CHANNELS in file `preprocess.py` to 6
+if `--model_type` is custom_cnn ( 9 if `triplet_cnn`).
+
+
+### Multiple Cameras
+
+#### Stacked observations
+
+Using the `custom_cnn` architecture, it is possible to pass pairs of images from different views stacked along the channels' dimension i.e of dim (224,224,6).
+
+To use this functionality to perform state representation learning with priors, enable `--multi_view` (see usage of script train.py),
+and set the global variable N_CHANNELS in file `preprocess.py` to 6.
+
+
+#### Triplets of observations
+
+Using the `triplet_cnn` architecture, it is possible to learn representation of states using a dataset of triplets, i.e tuples made of an anchor, a positive and a negative observation.
+
+The anchor and the positive observation are views of the scene at the same time step, but from different cameras.
+
+The negative example is an image from the same camera as the anchor but at a different time step selected randomly among images in the same record.
+
+In our case the TCN-like architecture is made of a pre-trained ResNet with an extra fully connected layer (embedding).
+
+To use this functionality also enable `--multi_view`, preferably `--no_priors` (see usage of script train.py),
+and set the global variable N_CHANNELS in file `preprocess.py` to 9 for training (3 otherwise).
+
+Related papers:
+- "Time-Contrastive Networks: Self-Supervised Learning from Video" (P. Sermanet et al., 2017), paper: [https://arxiv.org/abs/1704.06888](https://arxiv.org/abs/1704.06888)
 
 ### Evaluation and Plotting
 
@@ -149,6 +181,8 @@ python plotting/interactive_plot.py --data_folder path/to/datasetFolder/ -i path
 ```
 When you click on a state in the representation plot (left click for 2D, **right click for 3D plots**!), it shows the corresponding image along with the reward and the coordinates in the space.
 
+Pass `--multi_view` as argument to visualize in case of multiple cameras.
+
 You can also plot ground truth states when you don't specify a npz file:
 ```
 python plotting/interactive_plot.py --data_folder path/to/datasetFolder/
@@ -170,6 +204,7 @@ KNN plot and KNN MSE
                       Number of nearest neighbors (default: 5)
 -n N_SAMPLES, --n_samples N_SAMPLES
                       Number of test samples (default: 10)
+--multi_view          To deal with multi view data format
 
 ```
 
