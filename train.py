@@ -196,7 +196,7 @@ class RoboticPriorsTripletLoss(nn.Module):
         :param states: (th Variable) states for the anchor obs
         :param p_states: (th Variable) states for the positive obs
         :param n_states: (th Variable) states for the negative obs
-        :param next_states: (th Variable)  
+        :param next_states: (th Variable)
         :param next_p_st: (th Variable) next states for the positive obs
         :param dissimilar_pairs: (th Tensor)
         :param same_actions_pairs: (th Tensor)
@@ -217,7 +217,7 @@ class RoboticPriorsTripletLoss(nn.Module):
                                                                                              similar_pairs,
                                                                                              dissimilar_pairs)
 
-        # Applying the priors on the 2nd view            
+        # Applying the priors on the 2nd view
         temp_coherence_loss_2, causality_loss_2, proportionality_loss_2, repeatability_loss_2, \
         same_env_loss_2, fixed_ref_point_loss_2, w_same_env_2, w_fixed_point_2 = self.priorsOnStates(p_states,
                                                                                                      next_p_st,
@@ -363,11 +363,13 @@ class SRL4robotics(BaseLearner):
                 pair_name = 'similar pairs'
             else:
                 pair_name = 'dissimilar pairs'
+            counter = 0
             for minibatch_id, d in enumerate(pairs):
                 do = True
+                if len(d) == 0:
+                    counter += 1
                 # Do if it contains no similar pairs of samples
                 while do and len(d) == 0:
-                    print('Dealing with a minibatch missing ' + pair_name)
                     # for every minibatch & obs of a mini-batch list
                     for m_id, minibatch in enumerate(m_list):
                         for i in range(batch_size):
@@ -378,6 +380,7 @@ class SRL4robotics(BaseLearner):
                                     m_list[minibatch_id][j] = minibatch[j]
                                     pairs[minibatch_id] = np.array([[i, j]])
                                     do = False
+            print('Dealt with {} minibatches - {}'.format(counter, pair_name))
             return pairs, m_list
 
         similar_pairs = []
