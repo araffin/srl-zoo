@@ -198,6 +198,18 @@ Example:
 python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3 --noise_factor 0.1
 ```
 
+#### VAE 
+
+Example:
+```
+python -m baselines.vae --data_folder path/to/data/folder --state_dim 3
+```
+
+You can also designate the beta weight for the KL divergence:
+```
+python -m baselines.vae --data_folder path/to/data/folder --state_dim 3 --beta 1.0
+```
+
 #### PCA and t-SNE
 
 NOTE: before applying t-SNE, a dimension reduction with `n_components=50` is applied for computational reasons.
