@@ -26,10 +26,10 @@ def createFolders():
 
 def testPriorTrain():
     createFolders()
-    args = ['--no-plots', '--data_folder', TEST_DATA_FOLDER,
-            '--epochs', NUM_EPOCHS, '--training_set_size', TRAINING_SET_SIZE,
-            '--seed', SEED, '--val-size', 0.1, '--log_folder', LOG_FOLDER,
-            '--state_dim', STATE_DIM, '--model_type', MODEL_TYPE]
+    args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
+            '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
+            '--seed', SEED, '--val-size', 0.1, '--log-folder', LOG_FOLDER,
+            '--state-dim', STATE_DIM, '--model-type', MODEL_TYPE]
     args = list(map(str, args))
 
     ok = subprocess.call(['python', 'train.py'] + args)
@@ -38,9 +38,9 @@ def testPriorTrain():
 def testbaselineTrain():
     createFolders()
     for baseline in ['vae', 'autoencoder']:
-        args = ['--no-plots', '--data_folder', TEST_DATA_FOLDER,
-                '--epochs', NUM_EPOCHS, '--training_set_size', TRAINING_SET_SIZE,
-                '--seed', SEED, '--state_dim', STATE_DIM, '--model_type', MODEL_TYPE]
+        args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
+                '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
+                '--seed', SEED, '--state-dim', STATE_DIM, '--model-type', MODEL_TYPE]
         args = list(map(str, args))
 
         ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
@@ -49,9 +49,9 @@ def testbaselineTrain():
 
 def testKnnMSE():
     createFolders()
-    args = ['--seed', SEED, '--n_samples', KNN_SAMPLES,
-            '--log_folder', LOG_FOLDER,
-            '--n_neighbors', 5, '--n_to_plot', 1,
+    args = ['--seed', SEED, '--n-samples', KNN_SAMPLES,
+            '--log-folder', LOG_FOLDER,
+            '--n-neighbors', 5, '--n-to-plot', 1,
             '--ground_truth']
     args = list(map(str, args))
     ok = subprocess.call(['python', '-m', 'plotting.knn_images'] + args)

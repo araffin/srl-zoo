@@ -38,11 +38,11 @@ def saveExpConfig(args, log_folder):
     :param log_folder: (str)
     """
     exp_config = {
-        "batch_size": args.batch_size,
-        "data_folder": args.data_folder,
-        "training_set_size": args.training_set_size,
-        "log_folder": log_folder,
-        "state_dim": args.state_dim,
+        "batch-size": args.batch_size,
+        "data-folder": args.data_folder,
+        "training-set-size": args.training_set_size,
+        "log-folder": log_folder,
+        "state-dim": args.state_dim,
     }
 
     saveConfig(exp_config, print_config=True)
@@ -57,12 +57,12 @@ def toNumpyMatrix(obs_var):
     return obs_tensor.reshape(-1, n_features)
 
 parser = argparse.ArgumentParser(description='Dimension Reduction using PCA or TSNE')
-parser.add_argument('-bs', '--batch_size', type=int, default=16, help='batch_size for IncrementalPCA (default: 16)')
+parser.add_argument('-bs', '--batch-size', type=int, default=16, help='batch_size for IncrementalPCA (default: 16)')
 parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
 parser.add_argument('--method', type=str, default="pca", help='one of "pca" or "tsne"')
-parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
-parser.add_argument('--training_set_size', type=int, default=-1, help='Limit size of the training set (default: -1)')
-parser.add_argument('--state_dim', type=int, default=3, help='State dimension')
+parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
+parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
+parser.add_argument('--state-dim', type=int, default=3, help='State dimension')
 
 args = parser.parse_args()
 DISPLAY_PLOTS = not args.no_plots

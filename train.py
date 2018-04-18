@@ -651,28 +651,28 @@ if __name__ == '__main__':
                         help='number of epochs to train (default: 50)')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
-    parser.add_argument('-bs', '--batch_size', type=int, default=256, help='batch_size (default: 256)')
+    parser.add_argument('--state-dim', type=int, default=2, help='state dimension (default: 2)')
+    parser.add_argument('-bs', '--batch-size', type=int, default=256, help='batch_size (default: 256)')
     parser.add_argument('--val-size', type=float, default=0.2, help='Validation set size (default: 0.2)')
-    parser.add_argument('--training_set_size', type=int, default=-1,
+    parser.add_argument('--training-set-size', type=int, default=-1,
                         help='Limit size of the training set (default: -1)')
-    parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
-    parser.add_argument('--l1_reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
+    parser.add_argument('-lr', '--learning-rate', type=float, default=0.005, help='learning rate (default: 0.005)')
+    parser.add_argument('--l1-reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
-    parser.add_argument('--model_type', type=str, default="custom_cnn",
+    parser.add_argument('--model-type', type=str, default="custom_cnn",
                         choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn'],
                         help='Model architecture (default: "custom_cnn")')
-    parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
-    parser.add_argument('--log_folder', type=str, default='logs/default_folder',
+    parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
+    parser.add_argument('--log-folder', type=str, default='logs/default_folder',
                         help='Folder within logs/ where the experiment model and plots will be saved')
-    parser.add_argument('--ref_prior', action='store_true', default=False,
+    parser.add_argument('--ref-prior', action='store_true', default=False,
                         help='Use Fixed Reference Point Prior (cannot be used at the same time as SameEnv prior)')
-    parser.add_argument('--same_env_prior', action='store_true', default=False,
+    parser.add_argument('--same-env-prior', action='store_true', default=False,
                         help='Enable same env prior (disables ref prior)')
-    parser.add_argument('--multi_view', action='store_true', default=False,
+    parser.add_argument('--multi-view', action='store_true', default=False,
                         help='Enable use of multiple camera')
-    parser.add_argument('--no_priors', action='store_true', default=False,
+    parser.add_argument('--no-priors', action='store_true', default=False,
                         help='Disable use of priors - in case of triplet loss')
 
     args = parser.parse_args()

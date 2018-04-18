@@ -1,16 +1,16 @@
 {
-  "batch_size": 256,
-  "data_folder": "staticButtonSimplest",
+  "batch-size": 256,
+  "data-folder": "staticButtonSimplest",
   "epochs": 1,
-  "experiment_name": "modelY2017_M11_D09_H11M28S32_resnet_ProTemCauRep_ST_DIM4_SEED1_priors",
-  "knn_samples": 5,
-  "knn_seed": 1,
-  "l1_reg": 0,
-  "learning_rate": 0.001,
-  "log_folder": "logs/staticButtonSimplest/modelY2017_M11_D09_H11M28S32_resnet_ProTemCauRep_ST_DIM4_SEED1_priors",
-  "model_approach": "priors",
-  "model_type": "resnet",
-  "n_neighbors": 5,
+  "experiment-name": "modelY2017-M11-D09-H11M28S32-resnet-ProTemCauRep-ST-DIM4-SEED1-priors",
+  "knn-samples": 5,
+  "knn-seed": 1,
+  "l1-reg": 0,
+  "learning-rate": 0.001,
+  "log-folder": "logs/staticButtonSimplest/modelY2017-M11-D09-H11M28S32-resnet-ProTemCauRep-ST-DIM4-SEED1-priors",
+  "model-approach": "priors",
+  "model-type": "resnet",
+  "n-neighbors": 5,
   "priors": [
     "Proportionality",
     "Temporal",
@@ -18,7 +18,7 @@
     "Repeatability"
   ],
   "seed": 1,
-  "state_dim": 4,
-  "training_set_size": -1,
-  "use_continuous": false
+  "state-dim": 4,
+  "training-set-size": -1,
+  "use-continuous": false
 }

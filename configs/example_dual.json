@@ -1,15 +1,15 @@
 {
-  "batch_size": 64,
+  "batch-size": 64,
   "epochs": 1,
-  "knn_samples": 200,
-  "knn_seed": 1,
-  "l1_reg": 0,
-  "training_set_size": 600,
-  "learning_rate": 0.001,
-  "model_approach": "priors",
-  "model_type": "custom_cnn",
-  "n_neighbors": 5,
-  "n_to_plot": 5,
+  "knn-samples": 200,
+  "knn-seed": 1,
+  "l1-reg": 0,
+  "training-set-size": 600,
+  "learning-rate": 0.001,
+  "model-approach": "priors",
+  "model-type": "custom_cnn",
+  "n-neighbors": 5,
+  "n-to-plot": 5,
   "priors": [
     "Proportionality",
     "Temporal",
@@ -17,7 +17,7 @@
     "Repeatability",
     "SameEnv"
   ],
-  "multi_view": true,
-  "use_continuous": false,
-  "_comment": "You can add or remove 'Reference|SameEnv' to the list of priors"
+  "multi-view": true,
+  "use-continuous": false,
+  "-comment": "You can add or remove 'Reference|SameEnv' to the list of priors"
 }

@@ -189,16 +189,16 @@ def saveExpConfig(args, log_folder):
     :param log_folder: (str)
     """
     exp_config = {
-        "batch_size": args.batch_size,
-        "data_folder": args.data_folder,
+        "batch-size": args.batch_size,
+        "data-folder": args.data_folder,
         "epochs": args.epochs,
-        "learning_rate": args.learning_rate,
-        "training_set_size": args.training_set_size,
-        "log_folder": log_folder,
-        "noise_factor": args.noise_factor,
-        "model_type": args.model_type,
+        "learning-rate": args.learning_rate,
+        "training-set-size": args.training_set_size,
+        "log-folder": log_folder,
+        "noise-factor": args.noise_factor,
+        "model-type": args.model_type,
         "seed": args.seed,
-        "state_dim": args.state_dim,
+        "state-dim": args.state_dim,
     }
 
     saveConfig(exp_config, print_config=True)
@@ -210,15 +210,15 @@ if __name__ == '__main__':
                         help='number of epochs to train (default: 25)')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('-bs', '--batch_size', type=int, default=32, help='batch_size (default: 32)')
-    parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, help='learning rate (default: 0.001)')
+    parser.add_argument('-bs', '--batch-size', type=int, default=32, help='batch_size (default: 32)')
+    parser.add_argument('-lr', '--learning-rate', type=float, default=0.001, help='learning rate (default: 0.001)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
-    parser.add_argument('--model_type', type=str, default="cnn", help='Model architecture (default: "cnn")')
-    parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
-    parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
+    parser.add_argument('--model-type', type=str, default="cnn", help='Model architecture (default: "cnn")')
+    parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
+    parser.add_argument('--state-dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('--noise_factor', type=float, default=0.1, help='Noise factor for denoising autoencoder')
-    parser.add_argument('--training_set_size', type=int, default=-1, help='Limit size of the training set (default: -1)')
+    parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
