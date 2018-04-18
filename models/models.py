@@ -61,8 +61,8 @@ class SRLDenseNetwork(nn.Module):
 
     def __init__(self, input_dim, state_dim=2, batch_size=256,
                  cuda=False, n_hidden=32, noise_std=1e-6):
-        super(SRLDenseNetwork, self).__init__()        
-                
+        super(SRLDenseNetwork, self).__init__()
+
         self.fc1 = nn.Linear(input_dim, n_hidden)
         self.fc2 = nn.Linear(n_hidden, state_dim)
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
@@ -148,7 +148,7 @@ class EmbeddingNet(nn.Module):
         self.conv_layers.fc = nn.Linear(n_units, embedding_size)
         self.fc = nn.Sequential(nn.PReLU(),
                                 nn.Linear(embedding_size, state_dim)
-                                )        
+                                )
 
     def forward(self, x):
         x = self.conv_layers(x)
@@ -288,14 +288,31 @@ class DenseAutoEncoder(nn.Module):
             nn.Linear(50, input_dim),
         )
 
-    def forward(self, x):
-        input_shape = x.size()
+    def encode(self, x):
+        """
+        :param x: (PyTorch Variable)
+        :return: (PyTorch Variable)
+        """
         # Flatten input
         x = x.view(x.size(0), -1)
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
+        return self.encoder(x)
+
+    def decode(self, x):
+        """
+        :param x: (PyTorch Variable)
+        :return: (PyTorch Variable)
+        """
+        decoded = self.decode(x)
         # Transform to a 4D tensor
-        decoded = decoded.view(input_shape)
+        return decoded.view(x.size(0), 3, 224, 224)
+
+    def forward(self, x):
+        """
+        :param x: (PyTorch Variable)
+        :return: (PyTorch Variable, PyTorch Variable)
+        """
+        encoded = self.encode(x)
+        decoded = self.decoder(encoded)
         return encoded, decoded
 
 

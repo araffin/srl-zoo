@@ -11,6 +11,7 @@ STATE_DIM = 2
 TRAINING_SET_SIZE = 2000
 KNN_SAMPLES = 1000
 SEED = 0
+MODEL_TYPE = 'mlp'
 
 def assertEq(left, right):
     assert left == right, "{} != {}".format(left, right)
@@ -28,7 +29,7 @@ def testPriorTrain():
     args = ['--no-plots', '--data_folder', TEST_DATA_FOLDER,
             '--epochs', NUM_EPOCHS, '--training_set_size', TRAINING_SET_SIZE,
             '--seed', SEED, '--val-size', 0.1, '--log_folder', LOG_FOLDER,
-            '--state_dim', STATE_DIM]
+            '--state_dim', STATE_DIM, '--model_type', MODEL_TYPE]
     args = list(map(str, args))
 
     ok = subprocess.call(['python', 'train.py'] + args)
@@ -39,7 +40,7 @@ def testbaselineTrain():
     for baseline in ['vae', 'autoencoder']:
         args = ['--no-plots', '--data_folder', TEST_DATA_FOLDER,
                 '--epochs', NUM_EPOCHS, '--training_set_size', TRAINING_SET_SIZE,
-                '--seed', SEED, '--state_dim', STATE_DIM]
+                '--seed', SEED, '--state_dim', STATE_DIM, '--model_type', MODEL_TYPE]
         args = list(map(str, args))
 
         ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
