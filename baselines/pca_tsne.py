@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 
 import argparse
+
 # Python 2/3 compatibility
 try:
     import cPickle as pkl
@@ -18,11 +19,13 @@ import plotting.representation_plot as plot_script
 from plotting.representation_plot import plot_representation
 from preprocessing.data_loader import AutoEncoderDataLoader
 from utils import parseDataFolder, createFolder
+
 # Python 2/3 compatibility
 try:
     input = raw_input
 except NameError:
     pass
+
 
 def getModelName(args):
     """
@@ -47,6 +50,7 @@ def saveExpConfig(args, log_folder):
 
     saveConfig(exp_config, print_config=True)
 
+
 def toNumpyMatrix(obs_var):
     """
     :param obs_var: (PyTorch Variable)
@@ -55,6 +59,7 @@ def toNumpyMatrix(obs_var):
     obs_tensor = obs_var.data.numpy()
     n_features = np.prod(obs_tensor.shape[1:])
     return obs_tensor.reshape(-1, n_features)
+
 
 parser = argparse.ArgumentParser(description='Dimension Reduction using PCA or TSNE')
 parser.add_argument('-bs', '--batch-size', type=int, default=16, help='batch_size for IncrementalPCA (default: 16)')
@@ -99,7 +104,6 @@ print("batch_size = {}".format(batch_size))
 # Create data loader
 data_loader = AutoEncoderDataLoader(x_indices, images_path, batch_size=batch_size,
                                     no_targets=True, is_training=False)
-
 
 print("Fitting PCA with n_components={}".format(n_components))
 ipca = IncrementalPCA(n_components=n_components)

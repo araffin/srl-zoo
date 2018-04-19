@@ -2,7 +2,8 @@ from __future__ import print_function, division, absolute_import
 
 from .models import *
 
-class DenseNetwork(nn.Module):
+
+class DenseNetwork(BaseModelSRL):
     """
     Dense Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W) (to be consistent with CNN network)
@@ -18,13 +19,6 @@ class DenseNetwork(nn.Module):
         self.fc2 = nn.Linear(n_hidden, state_dim)
         self.drop_p = drop_p
 
-    def getState(self, x):
-        """
-        :param x: (PyTorch Variable)
-        :return: (PyTorch Variable)
-        """
-        return self.forward(x)
-
     def forward(self, x):
         # Flatten input
         x = x.view(x.size(0), -1)
@@ -34,7 +28,7 @@ class DenseNetwork(nn.Module):
         return x
 
 
-class ConvolutionalNetwork(nn.Module):
+class ConvolutionalNetwork(BaseModelSRL):
     """
     Convolutional Neural Network using pretrained ResNet
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
@@ -54,13 +48,6 @@ class ConvolutionalNetwork(nn.Module):
         self.resnet.fc = nn.Linear(n_units, state_dim)
         if cuda:
             self.resnet.cuda()
-
-    def getState(self, x):
-        """
-        :param x: (PyTorch Variable)
-        :return: (PyTorch Variable)
-        """
-        return self.forward(x)
 
     def forward(self, x):
         x = self.resnet(x)

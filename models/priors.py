@@ -3,7 +3,7 @@ from __future__ import print_function, division, absolute_import
 from .models import *
 
 
-class SRLConvolutionalNetwork(nn.Module):
+class SRLConvolutionalNetwork(BaseModelSRL):
     """
     Convolutional Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
@@ -31,13 +31,6 @@ class SRLConvolutionalNetwork(nn.Module):
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
         # self.noise = GaussianNoise(batch_size, state_dim, noise_std, cuda=cuda)
 
-    def getState(self, x):
-        """
-        :param x: (PyTorch Variable)
-        :return: (PyTorch Variable)
-        """
-        return self.forward(x)
-
     def forward(self, x):
         x = self.resnet(x)
         if self.training:
@@ -45,8 +38,7 @@ class SRLConvolutionalNetwork(nn.Module):
         return x
 
 
-
-class SRLCustomCNN(nn.Module):
+class SRLCustomCNN(BaseModelSRL):
     """
     Convolutional Neural Network for State Representation Learning
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
@@ -62,13 +54,6 @@ class SRLCustomCNN(nn.Module):
             self.cnn.cuda()
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
 
-    def getState(self, x):
-        """
-        :param x: (PyTorch Variable)
-        :return: (PyTorch Variable)
-        """
-        return self.forward(x)
-
     def forward(self, x):
         x = self.cnn(x)
         if self.training:
@@ -76,8 +61,7 @@ class SRLCustomCNN(nn.Module):
         return x
 
 
-
-class SRLDenseNetwork(nn.Module):
+class SRLDenseNetwork(BaseModelSRL):
     """
     Dense Neural Net for State Representation Learning (SRL)
     input shape : 3-channel RGB images of shape (3 x H x W) (to be consistent with CNN network)
@@ -97,13 +81,6 @@ class SRLDenseNetwork(nn.Module):
         self.fc2 = nn.Linear(n_hidden, state_dim)
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
         # self.noise = GaussianNoise(batch_size, state_dim, noise_std, cuda=cuda)
-
-    def getState(self, x):
-        """
-        :param x: (PyTorch Variable)
-        :return: (PyTorch Variable)
-        """
-        return self.forward(x)
 
     def forward(self, x):
         # Flatten input

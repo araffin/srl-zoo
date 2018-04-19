@@ -2,6 +2,7 @@ from __future__ import print_function, division, absolute_import
 
 from .models import *
 
+
 class EmbeddingNet(nn.Module):
     def __init__(self, state_dim=2, embedding_size=128):
         """
@@ -31,7 +32,7 @@ class EmbeddingNet(nn.Module):
         return x
 
 
-class TripletNet(nn.Module):
+class TripletNet(BaseModelSRL):
     def __init__(self, state_dim=2):
         super(TripletNet, self).__init__()
         self.embedding = EmbeddingNet(state_dim)
