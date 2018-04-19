@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
-from models.models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet
+from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet
 from plotting.representation_plot import plot_representation, plt
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import BaxterImageLoader

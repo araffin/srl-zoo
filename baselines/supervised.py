@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
-from models.models import ConvolutionalNetwork, DenseNetwork, CustomCNN
+from models import ConvolutionalNetwork, DenseNetwork, CustomCNN
 from pipeline import saveConfig
 from plotting.representation_plot import plot_representation, plt
 from preprocessing.data_loader import SupervisedDataLoader

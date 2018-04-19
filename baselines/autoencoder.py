@@ -15,7 +15,7 @@ from preprocessing.data_loader import AutoEncoderDataLoader
 from preprocessing.preprocess import INPUT_DIM
 from preprocessing.utils import deNormalize
 from models.base_learner import BaseLearner
-from models.models import LinearAutoEncoder, DenseAutoEncoder, CNNAutoEncoder
+from models import LinearAutoEncoder, DenseAutoEncoder, CNNAutoEncoder
 from pipeline import saveConfig
 from plotting.representation_plot import plot_representation, plt, plot_image
 
