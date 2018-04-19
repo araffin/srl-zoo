@@ -37,12 +37,13 @@ class TripletNet(BaseModelSRL):
         super(TripletNet, self).__init__()
         self.embedding = EmbeddingNet(state_dim)
 
-    def getState(self, x):
+    def getStates(self, observations):
         """
-        :param x: (PyTorch Variable)
+        :param observations: (PyTorch Variable)
         :return: (PyTorch Variable)
         """
-        return self.encode(x)
+        # For inference, the forward pass is done one the positive observation (first view)
+        return self.encode(observations[:, :3:, :, :])
 
     def forward(self, anchor, positive, negative):
         """

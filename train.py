@@ -623,28 +623,6 @@ class SRL4robotics(BaseLearner):
         return loss_history, self.predStatesWithDataLoader(baxter_data_loader, restore_train=False)
 
 
-class SRL4roboticsTriplet(SRL4robotics):
-    def _predFn(self, observations, restore_train=True):
-        """
-        Predict states in test mode given observations
-        :param observations: (PyTorch Variable)
-        :param restore_train: (bool) whether to restore training mode after prediction
-        :return: (numpy tensor)
-        """
-        # Switch to test mode
-        self.model.eval()
-        # For inference, the forward pass is done one the positive observation (first view)
-        states = self.model.encode(observations[:, :3:, :, :])
-
-        if restore_train:
-            # Restore training mode
-            self.model.train()
-        if self.cuda:
-            # Move the tensor back to the cpu
-            return states.data.cpu().numpy()
-        return states.data.numpy()
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch SRL with robotic priors')
     parser.add_argument('--epochs', type=int, default=50, metavar='N',
@@ -696,16 +674,10 @@ if __name__ == '__main__':
     images_path = ground_truth['images_path']
 
     print('Learning a state representation ... ')
-    if args.model_type == 'triplet_cnn':
-        srl = SRL4roboticsTriplet(args.state_dim, model_type=args.model_type, seed=args.seed,
-                                  log_folder=args.log_folder, learning_rate=args.learning_rate,
-                                  l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
-                                  no_priors=args.no_priors)
-    else:
-
-        srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
-                           log_folder=args.log_folder, learning_rate=args.learning_rate,
-                           l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view)
+    srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
+                       log_folder=args.log_folder, learning_rate=args.learning_rate,
+                       l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
+                       no_priors=args.no_priors)
 
     is_ref_point_list = None
     if APPLY_5TH_PRIOR:

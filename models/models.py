@@ -17,18 +17,18 @@ except ImportError:
 class BaseModelSRL(nn.Module):
     """
     Base Class for a SRL network
-    It implements a getState method to retrieve a state from an observation
+    It implements a getState method to retrieve a state from observations
     """
 
     def __init__(self):
         super(BaseModelSRL, self).__init__()
 
-    def getState(self, observation):
+    def getStates(self, observations):
         """
-        :param observation: (PyTorch Variable)
+        :param observations: (PyTorch Variable)
         :return: (PyTorch Variable)
         """
-        return self.forward(observation)
+        return self.forward(observations)
 
     def forward(self, x):
         raise NotImplementedError
@@ -37,7 +37,7 @@ class BaseModelSRL(nn.Module):
 class BaseModelAutoEncoder(BaseModelSRL):
     """
     Base Class for a SRL network (autoencoder family)
-    It implements a getState method to retrieve a state from an observation
+    It implements a getState method to retrieve a state from observations
     """
 
     def __init__(self):
@@ -84,12 +84,12 @@ class BaseModelAutoEncoder(BaseModelSRL):
             nn.ConvTranspose2d(64, 3, kernel_size=4, stride=2),  # 224x224x3
         )
 
-    def getState(self, observation):
+    def getStates(self, observations):
         """
-        :param observation: (PyTorch Variable)
+        :param observations: (PyTorch Variable)
         :return: (PyTorch Variable)
         """
-        return self.encode(observation)
+        return self.encode(observations)
 
     def encode(self, x):
         """
@@ -119,18 +119,18 @@ class BaseModelAutoEncoder(BaseModelSRL):
 class BaseModelVAE(BaseModelAutoEncoder):
     """
     Base Class for a SRL network (VAE family)
-    It implements a getState method to retrieve a state from an observation
+    It implements a getState method to retrieve a state from observations
     """
 
     def __init__(self):
         super(BaseModelVAE, self).__init__()
 
-    def getState(self, observation):
+    def getStates(self, observations):
         """
-        :param observation: (PyTorch Variable)
+        :param observations: (PyTorch Variable)
         :return: (PyTorch Variable)
         """
-        return self.encode(observation)[0]
+        return self.encode(observations)[0]
 
     def encode(self, x):
         """

@@ -63,24 +63,6 @@ class VAELearning(BaseLearner):
 
         self.log_folder = log_folder
 
-    def _predFn(self, observations, restore_train=True):
-        """
-        Predict states in test mode given observations
-        :param observations: (PyTorch Variable)
-        :param restore_train: (bool) whether to restore training mode after prediction
-        :return: (numpy tensor)
-        """
-        # Switch to test mode
-        self.model.eval()
-        states, _ = self.model.encode(observations)
-        if restore_train:
-            # Restore training mode
-            self.model.train()
-        if self.cuda:
-            # Move the tensor back to the cpu
-            return states.data.cpu().numpy()
-        return states.data.numpy()
-
     @staticmethod
     def _lossFunction(decoded, obs, mu, logvar, beta=1):
         """
