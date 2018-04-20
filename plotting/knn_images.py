@@ -30,14 +30,14 @@ def formatStateStr(state):
 sns.set()
 
 parser = argparse.ArgumentParser(description='KNN plot and KNN MSE')
-parser.add_argument('--log_folder', type=str, default="", required=True, help='Path to a log folder')
+parser.add_argument('--log-folder', type=str, default="", required=True, help='Path to a log folder')
 parser.add_argument('--seed', type=int, default=1, help='random seed (default: 1)')
-parser.add_argument('-k', '--n_neighbors', type=int, default=5, help='Number of nearest neighbors (default: 5)')
-parser.add_argument('-n', '--n_samples', type=int, default=5, help='Number of test samples (default: 5)')
-parser.add_argument('--n_to_plot', type=int, default=5, help='Number of samples to plot (default: 5)')
-parser.add_argument('--relative_pos', action='store_true', default=False, help='Use relative position as ground_truth')
+parser.add_argument('-k', '--n-neighbors', type=int, default=5, help='Number of nearest neighbors (default: 5)')
+parser.add_argument('-n', '--n-samples', type=int, default=5, help='Number of test samples (default: 5)')
+parser.add_argument('--n-to-plot', type=int, default=5, help='Number of samples to plot (default: 5)')
+parser.add_argument('--relative-pos', action='store_true', default=False, help='Use relative position as ground_truth')
 parser.add_argument('--ground_truth', action='store_true', default=False, help='Compute KNN-MSE for ground truth')
-parser.add_argument('--multi_view', action='store_true', default=False, help='To deal with multi view data format')
+parser.add_argument('--multi-view', action='store_true', default=False, help='To deal with multi view data format')
 
 args = parser.parse_args()
 
@@ -48,17 +48,18 @@ random.seed(args.seed)
 n_to_plot = args.n_to_plot
 
 with open("{}/exp_config.json".format(args.log_folder), 'r') as f:
-    data_folder = json.load(f)['data_folder']
+    data_folder = json.load(f)['data-folder']
 
 # Load ground truth and images path
 ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
-states = np.load('{}/states_rewards.npz'.format(args.log_folder))['states']
 
 true_states = ground_truth['arm_states']
 images_path = ground_truth['images_path']
 
 if args.ground_truth:
     states = true_states.copy()
+else:
+    states = np.load('{}/states_rewards.npz'.format(args.log_folder))['states']
 
 if args.relative_pos:
     print("Using relative position")

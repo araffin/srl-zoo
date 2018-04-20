@@ -56,7 +56,7 @@ def isInBound(coordinate):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Preprocess extracted ros bags')
-    parser.add_argument('--data_folder', type=str, default="", help='Dataset folder name', required=True)
+    parser.add_argument('--data-folder', type=str, default="", help='Dataset folder name', required=True)
     parser.add_argument('--mode', type=str, default="image_net", help='Preprocessing mode: One of "image_net", "tf".')
     parser.add_argument('--no-warnings', action='store_true', default=False,
                         help='disables warnings')
