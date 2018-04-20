@@ -212,6 +212,31 @@ class CustomCNN(nn.Module):
         return x
 
 
+class SRLCustomForward(nn.Module):
+    def __init__(self, state_dim=2, action_dim=1, cuda=False, noise_std=1e-6):
+        super(SRLCustomForward, self).__init__()
+        self.cnn = CustomCNN(state_dim)
+        self.forward_l1 = nn.Linear(state_dim, state_dim)
+        self.forward_l2 = nn.Linear(action_dim, state_dim)
+        if cuda:
+            self.cnn.cuda()
+            self.forward_l1.cuda()
+            self.forward_l2.cuda()
+        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
+
+    def forward(self, x):
+        x = self.cnn(x)
+        return self.noise(x)
+
+    def forward_extra(self, s_t, a_t):
+        """
+        :param s_t: s(t)
+        :param a_t: a(t)
+        :return: s(t+1)
+        """
+        #print("data shapes: ", s_t.shape , a_t.shape, a_t.view( 64,1).shape)
+        return self.forward_l1(s_t.float()) + self.forward_l2(a_t.float())
+
 class SRLCustomCNN(nn.Module):
     """
     Convolutional Neural Network for State Representation Learning

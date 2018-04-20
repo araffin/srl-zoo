@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
-from models.models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet
+from models.models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet, SRLCustomForward
 from plotting.representation_plot import plot_representation, plt
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import BaxterImageLoader
@@ -66,7 +66,7 @@ class RoboticPriorsLoss(nn.Module):
 
     def forward(self, states, next_states,
                 dissimilar_pairs, same_actions_pairs, ref_point_pairs,
-                similar_pairs):
+                similar_pairs, next_states_pred=None):
         """
         :param states: (th Variable)
         :param next_states: (th Variable)
@@ -74,8 +74,10 @@ class RoboticPriorsLoss(nn.Module):
         :param same_actions_pairs: (th tensor)
         :param ref_point_pairs: (th tensor)
         :param similar_pairs: (th tensor)
+        :param next_states_pred: (th tensor)
         :return: (th Variable)
         """
+
         state_diff = next_states - states
         state_diff_norm = state_diff.norm(2, dim=1)
         similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
@@ -111,6 +113,14 @@ class RoboticPriorsLoss(nn.Module):
         total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
                      + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
                      + w_same_env * same_env_loss
+
+        # Forward model's loss:
+        if (actions is not None) and (next_states_pred is not None):
+            #print("shapes: ", next_states_pred.shape, next_states.shape)
+            forward_loss = next_states_pred - next_states
+            forward_loss = forward_loss.norm(2, dim=1).mean()
+            #print("forward loss: ", forward_loss)
+            total_loss +=forward_loss
 
         if self.loss_history is not None:
             weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
@@ -287,6 +297,8 @@ class SRL4robotics(BaseLearner):
             self.model = TripletNet(self.state_dim)
         elif model_type == "mlp":
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
+        elif model_type == "forward_model":
+            self.model = SRLCustomForward(state_dim=self.state_dim, cuda=cuda, noise_std=NOISE_STD)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -522,6 +534,8 @@ class SRL4robotics(BaseLearner):
         loss_history = defaultdict(list)
         if self.model_type == "triplet_cnn":
             criterion = RoboticPriorsTripletLoss(self.model, self.l1_reg, loss_history)
+        #elif self.model_type == "forward_model":
+        #    pass
         else:
             criterion = RoboticPriorsLoss(self.model, self.l1_reg, loss_history)
         best_error = np.inf
@@ -560,6 +574,17 @@ class SRL4robotics(BaseLearner):
                     loss = criterion(states, positive_states, negtive_states, next_states, next_positive_states, diss,
                                      same, is_ref_point_list, sim_pairs, no_priors=self.no_priors)
 
+                elif self.model_type == "forward_model":
+                    states_t, states_t2 = self.model(obs), self.model(next_obs)
+                    #print("dim states_t: ", states_t.shape)
+                    actions_st = actions[minibatchlist[minibatch_idx]]
+                    b_size = actions_st.shape[0]
+                    actions_st = th.autograd.Variable(th.from_numpy(actions_st).cuda()).view(b_size, 1)
+                    #print("types: ", states_t, actions_st, states_t.long())
+                    states_t1 = self.model.forward_extra(states_t, actions_st)
+                    loss = criterion(states_t, states_t2, diss, same,
+                                     is_ref_point_list, sim_pairs, next_states_pred=states_t1)
+                    pass
                 else:
                     states, next_states = self.model(obs), self.model(next_obs)
                     loss = criterion(states, next_states, diss, same,
@@ -660,7 +685,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model_type', type=str, default="custom_cnn",
-                        choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn'],
+                        choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn', 'forward_model'],
                         help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log_folder', type=str, default='logs/default_folder',
