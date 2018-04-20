@@ -213,15 +213,28 @@ class CustomCNN(nn.Module):
 
 
 class SRLCustomForward(nn.Module):
-    def __init__(self, state_dim=2, action_dim=1, cuda=False, noise_std=1e-6):
+    def __init__(self, state_dim=2, action_dim=1, cuda=False, noise_std=1e-6, type='linear'):
+        """
+        :param state_dim:
+        :param action_dim:
+        :param cuda:
+        :param noise_std:
+        :param type:
+        """
         super(SRLCustomForward, self).__init__()
         self.cnn = CustomCNN(state_dim)
+
         self.forward_l1 = nn.Linear(state_dim, state_dim)
         self.forward_l2 = nn.Linear(action_dim, state_dim)
         if cuda:
             self.cnn.cuda()
             self.forward_l1.cuda()
             self.forward_l2.cuda()
+
+        if type == 'gaussian':
+            self.mu = None
+            self.sigma = None
+
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
 
     def forward(self, x):
@@ -230,6 +243,7 @@ class SRLCustomForward(nn.Module):
 
     def forward_extra(self, s_t, a_t):
         """
+        #TODO: add bias to for
         :param s_t: s(t)
         :param a_t: a(t)
         :return: s(t+1)
