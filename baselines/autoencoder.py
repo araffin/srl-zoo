@@ -199,7 +199,7 @@ if __name__ == '__main__':
     parser.add_argument('--model-type', type=str, default="cnn", help='Model architecture (default: "cnn")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--state-dim', type=int, default=2, help='state dimension (default: 2)')
-    parser.add_argument('--noise_factor', type=float, default=0.1, help='Noise factor for denoising autoencoder')
+    parser.add_argument('--noise-factor', type=float, default=0.1, help='Noise factor for denoising autoencoder')
     parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
 
     args = parser.parse_args()

@@ -230,7 +230,7 @@ Gaussian noise is added to the input with a factor `0.1`.
 
 Example:
 ```
-python -m baselines.autoencoder --data-folder path/to/data/folder --state-dim 3 --noise_factor 0.1
+python -m baselines.autoencoder --data-folder path/to/data/folder --state-dim 3 --noise-factor 0.1
 ```
 
 #### VAE
