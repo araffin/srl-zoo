@@ -173,9 +173,9 @@ if __name__ == '__main__':
         description='Interactive plot of representation (left click for 2D, right click for 3D)')
     parser.add_argument('-i', '--input_file', type=str, default="",
                         help='Path to a npz file containing states and rewards')
-    parser.add_argument('--data_folder', type=str, default="", required=True,
+    parser.add_argument('--data-folder', type=str, default="", required=True,
                         help='Path to a dataset folder, it will plot ground truth states')
-    parser.add_argument('--multi_view', action='store_true', default=False,
+    parser.add_argument('--multi-view', action='store_true', default=False,
                         help='Enable use of multiple camera')
     args = parser.parse_args()
 

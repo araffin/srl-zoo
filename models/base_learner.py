@@ -58,7 +58,7 @@ class BaseLearner(object):
         """
         # Switch to test mode
         self.model.eval()
-        states = self.model(observations)
+        states = self.model.getStates(observations)
         if restore_train:
             # Restore training mode
             self.model.train()

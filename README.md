@@ -31,11 +31,11 @@ It preprocess data, learn a state representation and evaluate it using knn.
 Baxter data used in the paper are not public yet. However you can generate new data using [Baxter Simulator](https://github.com/araffin/arm_scenario_simulator) and [Baxter Experiments](https://github.com/NataliaDiaz/arm_scenario_experiments)
 
 ```
-python pipeline.py [-h] [-c EXP_CONFIG] [--data_folder DATA_FOLDER]
+python pipeline.py [-h] [-c EXP_CONFIG] [--data-folder DATA_FOLDER]
                    [--base_config BASE_CONFIG]
--c EXP_CONFIG, --exp_config EXP_CONFIG
+-c EXP_CONFIG, --exp-config EXP_CONFIG
                      Path to an experiment config file
---data_folder DATA_FOLDER
+--data-folder DATA_FOLDER
                      Path to a dataset folder
 --base_config BASE_CONFIG
                      Path to overall config file, it contains variables
@@ -47,7 +47,7 @@ python pipeline.py [-h] [-c EXP_CONFIG] [--data_folder DATA_FOLDER]
 
 Grid search:
 ```
-python pipeline.py --data_folder data/staticButtonSimplest/
+python pipeline.py --data-folder data/staticButtonSimplest/
 ```
 
 Reproducing an experiment:
@@ -59,9 +59,9 @@ python pipeline.py -c path/to/exp_config.json
 ### Preprocessing
 
 ```
-python -m preprocessing.preprocess [--data_folder DATA_FOLDER] [--mode MODE] [--no-warnings]
+python -m preprocessing.preprocess [--data-folder DATA_FOLDER] [--mode MODE] [--no-warnings]
 
---data_folder DATA_FOLDER
+--data-folder DATA_FOLDER
                       Dataset folder name
 --mode MODE           Preprocessing mode: One of "image_net", "tf".
 --no-warnings         disables warnings
@@ -69,55 +69,55 @@ python -m preprocessing.preprocess [--data_folder DATA_FOLDER] [--mode MODE] [--
 
 e.g.
 ```
-python -m preprocessing.preprocess --data_folder staticButtonSimplest
+python -m preprocessing.preprocess --data-folder staticButtonSimplest
 ```
 
 ### Learn a state representation
 
 Usage:
 ```
-python train.py [-h] [--epochs N] [--seed S] [--state_dim STATE_DIM]
-                [-bs BATCH_SIZE] [--training_set_size TRAINING_SET_SIZE]
-                [-lr LEARNING_RATE] [--l1_reg L1_REG] [--no-cuda] [--no-plots]
-                [--model_type MODEL_TYPE] --data_folder DATA_FOLDER
-                [--log_folder LOG_FOLDER] [--ref_prior] [--same_env_prior]
+python train.py [-h] [--epochs N] [--seed S] [--state-dim STATE_DIM]
+                [-bs BATCH_SIZE] [--training-set-size TRAINING_SET_SIZE]
+                [-lr LEARNING_RATE] [--l1-reg L1_REG] [--no-cuda] [--no-plots]
+                [--model-type MODEL_TYPE] --data-folder DATA_FOLDER
+                [--log-folder LOG_FOLDER] [--ref-prior] [--same-env-prior]
 
   -h, --help            show this help message and exit
   --epochs N            number of epochs to train (default: 50)
   --seed S              random seed (default: 1)
-  --state_dim STATE_DIM
+  --state-dim STATE_DIM
                         state dimension (default: 2)
-  -bs BATCH_SIZE, --batch_size BATCH_SIZE
+  -bs BATCH_SIZE, --batch-size BATCH_SIZE
                         batch_size (default: 256)
-  --training_set_size TRAINING_SET_SIZE
+  --training-set-size TRAINING_SET_SIZE
                         Limit size of the training set (default: -1)
-  -lr LEARNING_RATE, --learning_rate LEARNING_RATE
+  -lr LEARNING_RATE, --learning-rate LEARNING_RATE
                         learning rate (default: 0.005)
-  --l1_reg L1_REG       L1 regularization coeff (default: 0.0)
+  --l1-reg L1_REG       L1 regularization coeff (default: 0.0)
   --no-cuda             disables CUDA training
   --no-plots            disables plots
-  --model_type MODEL_TYPE
+  --model-type MODEL_TYPE
                         Model architecture (default: "resnet")
-  --data_folder DATA_FOLDER
+  --data-folder DATA_FOLDER
                         Dataset folder
-  --log_folder LOG_FOLDER
+  --log-folder LOG_FOLDER
                         Folder within logs/ where the experiment model and
                         plots will be saved
-  --ref_prior           Use Fixed Reference Point Prior (cannot be used at the same time as SameEnv prior)
-  --same_env_prior      Enable same env prior (disables ref prior)
-  --multi_view          Enable use of multiple camera (two)
-  --no_priors           Disable use of priors - in case of triplet loss
+  --ref-prior           Use Fixed Reference Point Prior (cannot be used at the same time as SameEnv prior)
+  --same-env-prior      Enable same env prior (disables ref prior)
+  --multi-view          Enable use of multiple camera (two)
+  --no-priors           Disable use of priors - in case of triplet loss
 
 ```
 
 
 Example:
 ```
-python train.py --data_folder data/path/to/dataset
+python train.py --data-folder data/path/to/dataset
 ```
 
-In case of `--multi_view` enabled make sure you set the global variable N_CHANNELS in file `preprocess.py` to 6
-if `--model_type` is custom_cnn ( 9 if `triplet_cnn`).
+In case of `--multi-view` enabled make sure you set the global variable N_CHANNELS in file `preprocess.py` to 6
+if `--model-type` is custom_cnn ( 9 if `triplet_cnn`).
 
 
 ### Multiple Cameras
@@ -126,7 +126,7 @@ if `--model_type` is custom_cnn ( 9 if `triplet_cnn`).
 
 Using the `custom_cnn` architecture, it is possible to pass pairs of images from different views stacked along the channels' dimension i.e of dim (224,224,6).
 
-To use this functionality to perform state representation learning with priors, enable `--multi_view` (see usage of script train.py),
+To use this functionality to perform state representation learning with priors, enable `--multi-view` (see usage of script train.py),
 and set the global variable N_CHANNELS in file `preprocess.py` to 6.
 
 
@@ -140,7 +140,7 @@ The negative example is an image from the same camera as the anchor but at a dif
 
 In our case the TCN-like architecture is made of a pre-trained ResNet with an extra fully connected layer (embedding).
 
-To use this functionality also enable `--multi_view`, preferably `--no_priors` (see usage of script train.py),
+To use this functionality also enable `--multi-view`, preferably `--no-priors` (see usage of script train.py),
 and set the global variable N_CHANNELS in file `preprocess.py` to 9 for training (3 otherwise).
 
 Related papers:
@@ -168,49 +168,49 @@ python plotting/representation_plot.py -i path/to/states_rewards.npz
 
 You can also plot ground truth states with:
 ```
-python plotting/representation_plot.py --data_folder path/to/datasetFolder/
+python plotting/representation_plot.py --data-folder path/to/datasetFolder/
 ```
 
-To have a different color per episode, you have to pass `--data_folder` argument along with `--color-episode`.
+To have a different color per episode, you have to pass `--data-folder` argument along with `--color-episode`.
 
 #### Interactive Plot
 
 You can have an interactive plot of a learned representation using:
 ```
-python plotting/interactive_plot.py --data_folder path/to/datasetFolder/ -i path/to/states_rewards.npz
+python plotting/interactive_plot.py --data-folder path/to/datasetFolder/ -i path/to/states_rewards.npz
 ```
 When you click on a state in the representation plot (left click for 2D, **right click for 3D plots**!), it shows the corresponding image along with the reward and the coordinates in the space.
 
-Pass `--multi_view` as argument to visualize in case of multiple cameras.
+Pass `--multi-view` as argument to visualize in case of multiple cameras.
 
 You can also plot ground truth states when you don't specify a npz file:
 ```
-python plotting/interactive_plot.py --data_folder path/to/datasetFolder/
+python plotting/interactive_plot.py --data-folder path/to/datasetFolder/
 ```
 
 #### Create a knn plot and compute KNN-MSE
 
 Usage:
 ```
-python plotting/knn_images.py [-h] --log_folder LOG_FOLDER
+python plotting/knn_images.py [-h] --log-folder LOG_FOLDER
                      [--seed SEED] [-k N_NEIGHBORS] [-n N_SAMPLES]
 
 KNN plot and KNN MSE
 
---log_folder LOG_FOLDER
+--log-folder LOG_FOLDER
                       Path to a log folder
 --seed SEED           random seed (default: 1)
--k N_NEIGHBORS, --n_neighbors N_NEIGHBORS
+-k N_NEIGHBORS, --n-neighbors N_NEIGHBORS
                       Number of nearest neighbors (default: 5)
--n N_SAMPLES, --n_samples N_SAMPLES
+-n N_SAMPLES, --n-samples N_SAMPLES
                       Number of test samples (default: 10)
---multi_view          To deal with multi view data format
+--multi-view          To deal with multi view data format
 
 ```
 
 Example:
 ```
-python plotting/knn_images.py --log_folder path/to/an/experiment/log/folder
+python plotting/knn_images.py --log-folder path/to/an/experiment/log/folder
 ```
 
 ### Baselines
@@ -221,7 +221,7 @@ Baseline models are saved in `logs/nameOfTheDataset/baselines/` folder.
 
 Example:
 ```
-python -m baselines.supervised --data_folder path/to/data/folder
+python -m baselines.supervised --data-folder path/to/data/folder
 ```
 
 #### Autoencoder
@@ -230,19 +230,19 @@ Gaussian noise is added to the input with a factor `0.1`.
 
 Example:
 ```
-python -m baselines.autoencoder --data_folder path/to/data/folder --state_dim 3 --noise_factor 0.1
+python -m baselines.autoencoder --data-folder path/to/data/folder --state-dim 3 --noise-factor 0.1
 ```
 
-#### VAE 
+#### VAE
 
 Example:
 ```
-python -m baselines.vae --data_folder path/to/data/folder --state_dim 3
+python -m baselines.vae --data-folder path/to/data/folder --state-dim 3
 ```
 
 You can also designate the beta weight for the KL divergence:
 ```
-python -m baselines.vae --data_folder path/to/data/folder --state_dim 3 --beta 1.0
+python -m baselines.vae --data-folder path/to/data/folder --state-dim 3 --beta 1.0
 ```
 
 #### PCA and t-SNE
@@ -251,12 +251,12 @@ NOTE: before applying t-SNE, a dimension reduction with `n_components=50` is app
 
 PCA:
 ```
-python -m baselines.pca_tsne --data_folder path/to/data/folder --state_dim 3 --method pca
+python -m baselines.pca_tsne --data-folder path/to/data/folder --state-dim 3 --method pca
 ```
 
 t-SNE:
 ```
-python -m baselines.pca_tsne --data_folder path/to/data/folder --state_dim 3 --method tsne
+python -m baselines.pca_tsne --data-folder path/to/data/folder --state-dim 3 --method tsne
 ```
 
 ### SRL Server for Reinforcement Learning
@@ -266,16 +266,28 @@ This feature is currently experimental. It will launch a server that will learn 
 python server.py
 ```
 
-### Dependencies
+### Running tests
+
+Download test dataset [here](https://drive.google.com/open?id=154qMJHgUnzk0J_Hxmr2jCnV1ipS7o1D5) and put it in `data/` folder.
+```
+./run_tests.sh
+```
+
+### Installation: Dependencies
 
 Recommended configuration: Ubuntu 16.04 with python 2.7 or 3.6
-(should work with python3 though it was only thoroughly tested with python2)
 
 #### Recommended Method: Use saved conda environment
 
 [WARNING] There is one dependency that cannot be installed with a package manager (for now):
 [https://github.com/DmitryUlyanov/Multicore-TSNE](https://github.com/DmitryUlyanov/Multicore-TSNE)
 You have to clone the repo and run `pip install .`.
+
+### Python 3
+Please see `environment.yml` file from [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl)
+(Instructions are in the README)
+
+### Python 2
 
 Create the new environment `srl` from `environment.yml` file:
 ```
@@ -335,7 +347,7 @@ python main.py --path data/slot_car_task_train.npz
 
 ### CUDA out of memory error
 
-1.  python train.py --data_folder data/staticButtonSimplest
+1.  python train.py --data-folder data/staticButtonSimplest
 ```
 RuntimeError: cuda runtime error (2) : out of memory at /b/wheel/pytorch-src/torch/lib/THC/generic/THCStorage.cu:66
 ```
@@ -349,7 +361,7 @@ NOTE: Do not set a device id superior to the number of GPU you have, or it will 
 SOLUTION 2: Decrease the batch size, e.g. 32-64 in GPUs with little memory. Warning: computing the priors might not work
 
 SOLUTION 3: Use simple 2-layers neural network model
-python train.py --data_folder data/staticButtonSimplest --model_type mlp
+python train.py --data-folder data/staticButtonSimplest --model-type mlp
 
 
 ### Links
