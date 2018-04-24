@@ -49,18 +49,13 @@ def main():
     # making sure you chose the right folder
     assert os.path.exists(args.log_dir), "Error: folder '{}' does not exist".format(args.log_dir)
 
-    if os.path.exists(args.log_dir + 'srl_model.pth'):
-        srl_model_type = 'priors'
-        model_path = args.log_dir + 'srl_model.pth'
-    elif os.path.exists(args.log_dir + 'srl_vae_model.pth'):
-        srl_model_type = 'vae'
-        model_path = args.log_dir + 'srl_vae_model.pth'
-    elif os.path.exists(args.log_dir + 'srl_ae_model.pth'):
-        srl_model_type = 'autoencoder'
-        model_path = args.log_dir + 'srl_ae_model.pth'
-    else:
-        assert False, "Error: the folder did not containe any \"srl_model.pth\", could not determine model type."
+    srl_model_type = None
+    for name, file in [('priors','srl_model.pth'), ('vae','srl_vae_model.pth'), ('autoencoder','srl_ae_model.pth')]:
+        if os.path.exists(args.log_dir + file):
+            srl_model_type = name
+            model_path = args.log_dir + file
 
+    assert srl_model_type is not None, "Error: the folder did not containe any \"srl_model.pth\", could not determine model type."
     print("Found srl model type: " + srl_model_type)
 
     # is this a valid model
