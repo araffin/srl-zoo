@@ -22,10 +22,10 @@ def getKnnMse(path):
 
 
 parser = argparse.ArgumentParser(description='Create a report file for a given dataset')
-parser.add_argument('-d', '--data_log_folder', type=str, default="", required=True, help='Path to a dataset log folder')
+parser.add_argument('-d', '--data-log-folder', type=str, default="", required=True, help='Path to a dataset log folder')
 args = parser.parse_args()
 
-assert os.path.isdir(args.data_log_folder), "--data_log_folder must be a path to a valid folder"
+assert os.path.isdir(args.data_log_folder), "--data-log-folder must be a path to a valid folder"
 
 dataset_logfolder = args.data_log_folder
 experiments = []
@@ -37,7 +37,7 @@ print("Found {} experiments".format(len(experiments)))
 
 knn_mse = []
 # Add here keys from exp_config.json that should be saved in the csv report file
-exp_configs = {'model_type': [], 'state_dim': [], 'epochs': [], 'batch_size': [], 'learning_rate': []}
+exp_configs = {'model-type': [], 'state-dim': [], 'epochs': [], 'batch-size': [], 'learning-rate': []}
 
 for experiment in experiments:
 

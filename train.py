@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
-from models.models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet
+from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet
 from plotting.representation_plot import plot_representation, plt
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import BaxterImageLoader
@@ -623,55 +623,34 @@ class SRL4robotics(BaseLearner):
         return loss_history, self.predStatesWithDataLoader(baxter_data_loader, restore_train=False)
 
 
-class SRL4roboticsTriplet(SRL4robotics):
-    def _predFn(self, observations, restore_train=True):
-        """
-        Predict states in test mode given observations
-        :param observations: (PyTorch Variable)
-        :param restore_train: (bool) whether to restore training mode after prediction
-        :return: (numpy tensor)
-        """
-        # Switch to test mode
-        self.model.eval()
-        # For inference, the forward pass is done one the positive observation (first view)
-        states = self.model.encode(observations[:, :3:, :, :])
-
-        if restore_train:
-            # Restore training mode
-            self.model.train()
-        if self.cuda:
-            # Move the tensor back to the cpu
-            return states.data.cpu().numpy()
-        return states.data.numpy()
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch SRL with robotic priors')
     parser.add_argument('--epochs', type=int, default=50, metavar='N',
                         help='number of epochs to train (default: 50)')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--state_dim', type=int, default=2, help='state dimension (default: 2)')
-    parser.add_argument('-bs', '--batch_size', type=int, default=256, help='batch_size (default: 256)')
-    parser.add_argument('--training_set_size', type=int, default=-1,
+    parser.add_argument('--state-dim', type=int, default=2, help='state dimension (default: 2)')
+    parser.add_argument('-bs', '--batch-size', type=int, default=256, help='batch_size (default: 256)')
+    parser.add_argument('--val-size', type=float, default=0.2, help='Validation set size (default: 0.2)')
+    parser.add_argument('--training-set-size', type=int, default=-1,
                         help='Limit size of the training set (default: -1)')
-    parser.add_argument('-lr', '--learning_rate', type=float, default=0.005, help='learning rate (default: 0.005)')
-    parser.add_argument('--l1_reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
+    parser.add_argument('-lr', '--learning-rate', type=float, default=0.005, help='learning rate (default: 0.005)')
+    parser.add_argument('--l1-reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
-    parser.add_argument('--model_type', type=str, default="custom_cnn",
+    parser.add_argument('--model-type', type=str, default="custom_cnn",
                         choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn'],
                         help='Model architecture (default: "custom_cnn")')
-    parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
-    parser.add_argument('--log_folder', type=str, default='logs/default_folder',
+    parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
+    parser.add_argument('--log-folder', type=str, default='logs/default_folder',
                         help='Folder within logs/ where the experiment model and plots will be saved')
-    parser.add_argument('--ref_prior', action='store_true', default=False,
+    parser.add_argument('--ref-prior', action='store_true', default=False,
                         help='Use Fixed Reference Point Prior (cannot be used at the same time as SameEnv prior)')
-    parser.add_argument('--same_env_prior', action='store_true', default=False,
+    parser.add_argument('--same-env-prior', action='store_true', default=False,
                         help='Enable same env prior (disables ref prior)')
-    parser.add_argument('--multi_view', action='store_true', default=False,
+    parser.add_argument('--multi-view', action='store_true', default=False,
                         help='Enable use of multiple camera')
-    parser.add_argument('--no_priors', action='store_true', default=False,
+    parser.add_argument('--no-priors', action='store_true', default=False,
                         help='Disable use of priors - in case of triplet loss')
 
     args = parser.parse_args()
@@ -680,6 +659,7 @@ if __name__ == '__main__':
     DISPLAY_PLOTS = not args.no_plots
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
+    VALIDATION_SIZE = args.val_size
     APPLY_5TH_PRIOR = args.ref_prior and not args.same_env_prior
     plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
 
@@ -694,16 +674,10 @@ if __name__ == '__main__':
     images_path = ground_truth['images_path']
 
     print('Learning a state representation ... ')
-    if args.model_type == 'triplet_cnn':
-        srl = SRL4roboticsTriplet(args.state_dim, model_type=args.model_type, seed=args.seed,
-                                  log_folder=args.log_folder, learning_rate=args.learning_rate,
-                                  l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
-                                  no_priors=args.no_priors)
-    else:
-
-        srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
-                           log_folder=args.log_folder, learning_rate=args.learning_rate,
-                           l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view)
+    srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
+                       log_folder=args.log_folder, learning_rate=args.learning_rate,
+                       l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
+                       no_priors=args.no_priors)
 
     is_ref_point_list = None
     if APPLY_5TH_PRIOR:

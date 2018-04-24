@@ -1,20 +1,20 @@
 {
-  "batch_size": 16,
+  "batch-size": 16,
   "epochs": 1,
-  "knn_samples": 2000,
-  "knn_seed": 1,
-  "l1_reg": 0,
-  "training_set_size": 6000,
-  "learning_rate": 0.001,
-  "model_approach": "priors",
-  "model_type": "mlp",
-  "n_neighbors": 5,
-  "n_to_plot": 5,
+  "knn-samples": 2000,
+  "knn-seed": 1,
+  "l1-reg": 0,
+  "training-set-size": 6000,
+  "learning-rate": 0.001,
+  "model-approach": "priors",
+  "model-type": "mlp",
+  "n-neighbors": 5,
+  "n-to-plot": 5,
   "priors": [
     "Proportionality",
     "Temporal",
     "Causality",
     "Repeatability"
   ],
-  "use_continuous": false
+  "use-continuous": false
 }

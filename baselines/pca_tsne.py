@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 
 import argparse
+
 # Python 2/3 compatibility
 try:
     import cPickle as pkl
@@ -18,11 +19,13 @@ import plotting.representation_plot as plot_script
 from plotting.representation_plot import plot_representation
 from preprocessing.data_loader import AutoEncoderDataLoader
 from utils import parseDataFolder, createFolder
+
 # Python 2/3 compatibility
 try:
     input = raw_input
 except NameError:
     pass
+
 
 def getModelName(args):
     """
@@ -38,14 +41,15 @@ def saveExpConfig(args, log_folder):
     :param log_folder: (str)
     """
     exp_config = {
-        "batch_size": args.batch_size,
-        "data_folder": args.data_folder,
-        "training_set_size": args.training_set_size,
-        "log_folder": log_folder,
-        "state_dim": args.state_dim,
+        "batch-size": args.batch_size,
+        "data-folder": args.data_folder,
+        "training-set-size": args.training_set_size,
+        "log-folder": log_folder,
+        "state-dim": args.state_dim,
     }
 
     saveConfig(exp_config, print_config=True)
+
 
 def toNumpyMatrix(obs_var):
     """
@@ -56,13 +60,14 @@ def toNumpyMatrix(obs_var):
     n_features = np.prod(obs_tensor.shape[1:])
     return obs_tensor.reshape(-1, n_features)
 
+
 parser = argparse.ArgumentParser(description='Dimension Reduction using PCA or TSNE')
-parser.add_argument('-bs', '--batch_size', type=int, default=16, help='batch_size for IncrementalPCA (default: 16)')
+parser.add_argument('-bs', '--batch-size', type=int, default=16, help='batch_size for IncrementalPCA (default: 16)')
 parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
 parser.add_argument('--method', type=str, default="pca", help='one of "pca" or "tsne"')
-parser.add_argument('--data_folder', type=str, default="", help='Dataset folder', required=True)
-parser.add_argument('--training_set_size', type=int, default=-1, help='Limit size of the training set (default: -1)')
-parser.add_argument('--state_dim', type=int, default=3, help='State dimension')
+parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
+parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
+parser.add_argument('--state-dim', type=int, default=3, help='State dimension')
 
 args = parser.parse_args()
 DISPLAY_PLOTS = not args.no_plots
@@ -99,7 +104,6 @@ print("batch_size = {}".format(batch_size))
 # Create data loader
 data_loader = AutoEncoderDataLoader(x_indices, images_path, batch_size=batch_size,
                                     no_targets=True, is_training=False)
-
 
 print("Fitting PCA with n_components={}".format(n_components))
 ipca = IncrementalPCA(n_components=n_components)
