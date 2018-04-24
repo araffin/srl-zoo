@@ -50,10 +50,11 @@ def main():
     assert os.path.exists(args.log_dir), "Error: folder '{}' does not exist".format(args.log_dir)
 
     srl_model_type = None
-    for name, file in [('priors','srl_model.pth'), ('vae','srl_vae_model.pth'), ('autoencoder','srl_ae_model.pth')]:
-        if os.path.exists(args.log_dir + file):
+    for name, filename in zip(['priors', 'vae', 'autoencoder'], ['', '_vae', '_ae']):
+        filename = "srl{}_model.pth".format(filename)
+        if os.path.exists(args.log_dir + filename):
             srl_model_type = name
-            model_path = args.log_dir + file
+            model_path = args.log_dir + filename
 
     assert srl_model_type is not None, "Error: the folder did not containe any \"srl_model.pth\", could not determine model type."
     print("Found srl model type: " + srl_model_type)
