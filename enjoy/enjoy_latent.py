@@ -61,7 +61,7 @@ def main():
     else:
         assert False, "Error: the folder did not containe any \"srl_model.pth\", could not determine model type."
 
-    print(srl_model_type)
+    print("Found srl model type: " + srl_model_type)
 
     # is this a valid model
     assert srl_model_type in VALID_MODEL, "Error: '{}' model is not supported."
