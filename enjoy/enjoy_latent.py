@@ -8,11 +8,12 @@ import numpy as np
 import cv2
 import torch
 from torch.autograd import Variable
+from sklearn.neighbors import KNeighborsClassifier
 
 from preprocessing.utils import deNormalize
 from models import CNNAutoEncoder, CNNVAE
 
-VALID_MODEL = ['vae', 'autoencoder']
+VALID_MODEL = ['vae', 'autoencoder', 'priors']
 
 
 def getImage(srl_model, mu, cuda=True):
@@ -39,7 +40,7 @@ def getImage(srl_model, mu, cuda=True):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="autoencoder enjoy")
+    parser = argparse.ArgumentParser(description="latent space enjoy")
     parser.add_argument('--log-dir', default='', type=str, help='directory to load model')
     parser.add_argument('--no-cuda', default=False, action="store_true")
 
@@ -47,36 +48,51 @@ def main():
 
     # making sure you chose the right folder
     assert os.path.exists(args.log_dir), "Error: folder '{}' does not exist".format(args.log_dir)
-    assert os.path.exists(args.log_dir + "exp_config.json"), "Error: could not find 'exp_config.json' in '{}'".format(
-        args.log_dir)
 
-    # model param and info
-    data = json.load(open(args.log_dir + 'exp_config.json'))
-    state_dim = data["state_dim"]
-    srl_model_type = data["log_folder"].split("/")[-1].split("_")[0]
+    srl_model_type = None
+    for name, filename in zip(['priors', 'vae', 'autoencoder'], ['', '_vae', '_ae']):
+        filename = "srl{}_model.pth".format(filename)
+        if os.path.exists(args.log_dir + filename):
+            srl_model_type = name
+            model_path = args.log_dir + filename
+
+    assert srl_model_type is not None, "Error: the folder did not containe any \"srl_model.pth\", could not determine model type."
+    print("Found srl model type: " + srl_model_type)
 
     # is this a valid model
     assert srl_model_type in VALID_MODEL, "Error: '{}' model is not supported."
 
-    # setup the loading location
-    if srl_model_type == 'vae':
-        model_path = args.log_dir + 'srl_vae_model.pth'
-    elif srl_model_type == 'autoencoder':
-        model_path = args.log_dir + 'srl_ae_model.pth'
+    # model param and info
+    if srl_model_type != 'priors':
+        assert os.path.exists(
+            args.log_dir + "exp_config.json"), "Error: could not find 'exp_config.json' in '{}'".format(
+            args.log_dir)
 
-    # making sure the model actually exists
-    assert os.path.exists(model_path), "Error: could not find '{}' in '{}'".format(model_path.split("/")[-1],
-                                                                                   args.log_dir)
+        data = json.load(open(args.log_dir + 'exp_config.json'))
+        state_dim = data["state_dim"]
 
-    # loading the model
-    if srl_model_type == "autoencoder":
-        srl_model = CNNAutoEncoder(state_dim)
-    elif srl_model_type == "vae":
-        srl_model = CNNVAE(state_dim)
-    srl_model.eval()
-    srl_model.load_state_dict(torch.load(model_path))
-    if not args.no_cuda:
-        srl_model.cuda()
+        # loading the model
+        if srl_model_type == "autoencoder":
+            srl_model = CNNAutoEncoder(state_dim)
+        elif srl_model_type == "vae":
+            srl_model = CNNVAE(state_dim)
+        srl_model.eval()
+        srl_model.load_state_dict(torch.load(model_path))
+        if not args.no_cuda:
+            srl_model.cuda()
+
+    else:
+        data = json.load(open(args.log_dir + 'image_to_state.json'))
+        state_dim = len(list(data.values())[0])
+        srl_model_knn = KNeighborsClassifier()
+
+        # Load all the points and images, find bounds and train KNN model
+        X = np.array(list(data.values())).astype(float)
+        y = list(data.keys())
+        srl_model_knn.fit(X, np.arange(X.shape[0]))
+
+        min_X = np.min(X, axis=0)
+        max_X = np.max(X, axis=0)
 
     # opencv gui setup
     cv2.namedWindow(srl_model_type, cv2.WINDOW_NORMAL)
@@ -99,8 +115,13 @@ def main():
         mu = []
         for i in range(state_dim):
             mu.append(cv2.getTrackbarPos(str(i), 'sliders'))
-        mu = (np.array(mu) - 50) / 10
-        img = getImage(srl_model, mu)
+        if srl_model_type != 'priors':
+            mu = (np.array(mu) - 50) / 10
+            img = getImage(srl_model, mu)
+        else:
+            # rescale for the bounds of the priors representation, and find nearest image
+            img_path = y[srl_model_knn.predict([(np.array(mu) / 100) * (max_X - min_X) + min_X])[0]]
+            img = cv2.imread("data/" + img_path + ".jpg")
 
         # stop if user closed a window
         if (cv2.getWindowProperty(srl_model_type, 0) < 0) or (cv2.getWindowProperty('sliders', 0) < 0):
