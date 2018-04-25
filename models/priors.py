@@ -60,7 +60,7 @@ class SRLCustomCNN(BaseModelSRL):
             x = self.noise(x)
         return x
 
-class SRLCustomForward(nn.Module):
+class SRLCustomForward(BaseModelSRL):
     def __init__(self, state_dim=2, action_dim=1, cuda=False, noise_std=1e-6, type='linear'):
         """
         :param state_dim:
