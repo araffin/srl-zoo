@@ -148,11 +148,11 @@ Related papers:
 
 ### Evaluation and Plotting
 
-### VAE & autoencoder visualization
+### learned space visualization
 
-To view the learned state and play with the latent space of a VAE or autoencoder, you may use:
+To view the learned state and play with the latent space of a VAE, autoencoder or srl-priors, you may use:
 ```bash
-python -m enjoy.enjoy_autoencoders --log-dir logs/nameOfTheDataset/nameOfTheModel
+python -m enjoy.enjoy_latent --log-dir logs/nameOfTheDataset/nameOfTheModel
 ```
 
 #### Create a report
