@@ -7,7 +7,6 @@ import os
 import numpy as np
 import cv2
 import torch
-from torch.autograd import Variable
 from sklearn.neighbors import KNeighborsClassifier
 
 from preprocessing.utils import deNormalize
@@ -15,25 +14,21 @@ from models import CNNAutoEncoder, CNNVAE
 
 VALID_MODEL = ['vae', 'autoencoder', 'priors']
 
-
-def getImage(srl_model, mu, cuda=True):
+def getImage(srl_model, mu, device):
     """
     Gets an image for a chosen mu value using the srl_model
     :param srl_model: (Pytorch model)
     :param mu: ([float]) the mu vector from latent space
-    :param cuda: (bool) if the gpu should be used or not (default: True)
+    :param device: (pytorch device)
     :return: ([float])
     """
-    mu = Variable(torch.from_numpy(np.array(mu).reshape(1, -1))).float()
-    if cuda:
-        mu = mu.cuda()
-        srl_model = srl_model.cuda()
+    mu = torch.from_numpy(np.array(mu).reshape(1, -1)).to(torch.float)
+    mu.to(device)
+    srl_model.to(device)
 
     net_out = srl_model.decode(mu)
 
-    if cuda:
-        net_out = net_out.cpu()
-    img = net_out.data.numpy()[0].T
+    img = net_out.detach().numpy()[0].T
 
     img = deNormalize(img)
     return img[:, :, ::-1]
@@ -45,6 +40,8 @@ def main():
     parser.add_argument('--no-cuda', default=False, action="store_true")
 
     args = parser.parse_args()
+
+    device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
 
     # making sure you chose the right folder
     assert os.path.exists(args.log_dir), "Error: folder '{}' does not exist".format(args.log_dir)
@@ -78,8 +75,7 @@ def main():
             srl_model = CNNVAE(state_dim)
         srl_model.eval()
         srl_model.load_state_dict(torch.load(model_path))
-        if not args.no_cuda:
-            srl_model.cuda()
+        srl_model.to(device)
 
     else:
         data = json.load(open(args.log_dir + 'image_to_state.json'))
@@ -117,7 +113,7 @@ def main():
             mu.append(cv2.getTrackbarPos(str(i), 'sliders'))
         if srl_model_type != 'priors':
             mu = (np.array(mu) - 50) / 10
-            img = getImage(srl_model, mu)
+            img = getImage(srl_model, mu, device)
         else:
             # rescale for the bounds of the priors representation, and find nearest image
             img_path = y[srl_model_knn.predict([(np.array(mu) / 100) * (max_X - min_X) + min_X])[0]]

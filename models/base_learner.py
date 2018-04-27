@@ -4,25 +4,23 @@ import json
 
 import numpy as np
 import torch as th
-from torch.autograd import Variable
 
 MAX_BATCH_SIZE_GPU = 512  # For plotting, max batch_size before having memory issues
 
 
-def observationsGenerator(observations, batch_size=64, cuda=False):
+def observationsGenerator(observations, device, batch_size=64):
     """
     Python generator to avoid out of memory issues
     when predicting states for all the observations
     :param observations: (torch tensor)
     :param batch_size: (int)
-    :param cuda: (bool)
+    :param device: (pytorch device)
     """
     n_minibatches = len(observations) // batch_size + 1
     for i in range(n_minibatches):
         start_idx, end_idx = batch_size * i, batch_size * (i + 1)
-        obs_var = Variable(observations[start_idx:end_idx], volatile=True)
-        if cuda:
-            obs_var = obs_var.cuda()
+        obs_var = observations[start_idx:end_idx].set_grad_enabled(False)
+        obs_var = obs_var.to(device)
         yield obs_var
 
 
@@ -49,6 +47,8 @@ class BaseLearner(object):
         if cuda:
             th.cuda.manual_seed(seed)
 
+        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
+
     def _predFn(self, observations, restore_train=True):
         """
         Predict states in test mode given observations
@@ -62,10 +62,8 @@ class BaseLearner(object):
         if restore_train:
             # Restore training mode
             self.model.train()
-        if self.cuda:
-            # Move the tensor back to the cpu
-            return states.data.cpu().numpy()
-        return states.data.numpy()
+        # Move the tensor back to the cpu
+        return states.detach().numpy()
 
     def predStates(self, observations):
         """
@@ -76,9 +74,8 @@ class BaseLearner(object):
         :return: (numpy tensor)
         """
         observations = observations.astype(np.float32)
-        obs_var = Variable(th.from_numpy(observations), volatile=True)
-        if self.cuda:
-            obs_var = obs_var.cuda()
+        obs_var = th.from_numpy(observations).set_grad_enabled(False)
+        obs_var = obs_var.to(self.device)
         states = self._predFn(obs_var, restore_train=False)
         return states
 
@@ -89,7 +86,7 @@ class BaseLearner(object):
         :return: (numpy tensor)
         """
         predictions = []
-        for obs_var in observationsGenerator(th.from_numpy(observations), MAX_BATCH_SIZE_GPU, cuda=self.cuda):
+        for obs_var in observationsGenerator(th.from_numpy(observations), self.device, MAX_BATCH_SIZE_GPU):
             predictions.append(self._predFn(obs_var))
         return np.concatenate(predictions, axis=0)
 
@@ -104,8 +101,7 @@ class BaseLearner(object):
         data_loader.testMode()
         predictions = []
         for obs_var in data_loader:
-            if self.cuda:
-                obs_var = obs_var.cuda()
+            obs_var = obs_var.to(self.device)
             predictions.append(self._predFn(obs_var, restore_train))
         # Switch back to train mode
         if restore_train:

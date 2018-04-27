@@ -20,16 +20,17 @@ class SRLConvolutionalNetwork(BaseModelSRL):
         # TODO: freeze less layers
         # Freeze params
         for param in self.resnet.parameters():
-            param.requires_grad = False
+            param.set_grad_enabled(False)
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
         # Replace the last fully-connected layer
         n_units = self.resnet.fc.in_features
         print("{} units in the last layer".format(n_units))
         self.resnet.fc = nn.Linear(n_units, state_dim)
-        if cuda:
-            self.resnet.cuda()
+        self.resnet.to(self.device)
         # This variant does not require the batch_size
-        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
-        # self.noise = GaussianNoise(batch_size, state_dim, noise_std, cuda=cuda)
+        self.noise = GaussianNoiseVariant(self.device, noise_std)
+        # self.noise = GaussianNoise(batch_size, state_dim, self.device, noise_std)
 
     def forward(self, x):
         x = self.resnet(x)
@@ -50,9 +51,9 @@ class SRLCustomCNN(BaseModelSRL):
     def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
         super(SRLCustomCNN, self).__init__()
         self.cnn = CustomCNN(state_dim)
-        if cuda:
-            self.cnn.cuda()
-        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
+        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
+        self.cnn.to(self.device)
+        self.noise = GaussianNoiseVariant(self.device, noise_std)
 
     def forward(self, x):
         x = self.cnn(x)
@@ -77,10 +78,12 @@ class SRLDenseNetwork(BaseModelSRL):
                  cuda=False, n_hidden=32, noise_std=1e-6):
         super(SRLDenseNetwork, self).__init__()
 
+        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
+
         self.fc1 = nn.Linear(input_dim, n_hidden)
         self.fc2 = nn.Linear(n_hidden, state_dim)
-        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
-        # self.noise = GaussianNoise(batch_size, state_dim, noise_std, cuda=cuda)
+        self.noise = GaussianNoiseVariant(self.device, noise_std)
+        # self.noise = GaussianNoise(batch_size, state_dim, self.device, noise_std)
 
     def forward(self, x):
         # Flatten input

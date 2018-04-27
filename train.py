@@ -291,8 +291,9 @@ class SRL4robotics(BaseLearner):
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
 
-        if cuda:
-            self.model.cuda()
+        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
+
+        self.model.to(self.device)
 
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
 
@@ -538,13 +539,12 @@ class SRL4robotics(BaseLearner):
             for _input in baxter_data_loader:
                 # Unpack input
                 minibatch_idx, obs, next_obs, same, diss, is_ref_point_list, sim_pairs = _input
-                if self.cuda:
-                    obs, next_obs = obs.cuda(), next_obs.cuda()
-                    same, diss = same.cuda(), diss.cuda()
-                    if len(is_ref_point_list) > 0:
-                        is_ref_point_list = is_ref_point_list.cuda()
-                    if len(sim_pairs) > 0:
-                        sim_pairs = sim_pairs.cuda()
+                obs, next_obs = obs.to(self.device), next_obs.to(self.device)
+                same, diss = same.to(self.device), diss.to(self.device)
+                if len(is_ref_point_list) > 0:
+                    is_ref_point_list = is_ref_point_list.to(self.device)
+                if len(sim_pairs) > 0:
+                    sim_pairs = sim_pairs.to(self.device)
 
                 self.optimizer.zero_grad()
 
@@ -569,12 +569,12 @@ class SRL4robotics(BaseLearner):
                 # to avoid memory error
                 loss.backward()
                 if minibatch_idx in val_indices:
-                    val_loss += loss.data[0]
+                    val_loss += loss.item()
                     # We do not optimize on validation data
                     # so optimizer.step() is not called
                 else:
                     self.optimizer.step()
-                    epoch_loss += loss.data[0]
+                    epoch_loss += loss.item()
                     epoch_batches += 1
                 pbar.update(1)
             pbar.close()

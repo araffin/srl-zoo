@@ -10,7 +10,6 @@ import random
 import cv2
 import numpy as np
 import torch as th
-from torch.autograd import Variable
 
 from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
@@ -396,7 +395,7 @@ class BaxterImageLoader(object):
                 self.n_received += 1
             # Channel first
             obs = np.transpose(obs, (0, 3, 2, 1))
-            obs_dict[key] = Variable(th.from_numpy(obs), volatile=not self.is_training)
+            obs_dict[key] = th.from_numpy(obs).set_grad_enabled(self.is_training)
             # Free memory
             del obs
 
@@ -580,7 +579,7 @@ class SupervisedDataLoader(BaxterImageLoader):
         # Alias to improve readability
         i = self.current_preprocessed_idx
         obs_indices = self.minibatchlist[i]
-        targets = Variable(th.from_numpy(self.targets[i]), volatile=not self.is_training)
+        targets = th.from_numpy(self.targets[i]).set_grad_enabled(self.is_training)
 
         batch_size = len(obs_indices)
         obs_dict = {'obs': None}
@@ -664,7 +663,7 @@ class AutoEncoderDataLoader(BaxterImageLoader):
         if self.noise_factor > 0:
             noise_shape = (len(obs_indices), N_CHANNELS, IMAGE_HEIGHT, IMAGE_WIDTH)
             noise = self.noise_factor * np.random.normal(loc=0.0, scale=1.0, size=noise_shape).astype(np.float32)
-            noise = Variable(th.from_numpy(noise), volatile=not self.is_training)
+            noise = th.from_numpy(noise).set_grad_enabled(self.is_training)
 
         batch_size = len(obs_indices)
         obs_dict = {'obs': None}

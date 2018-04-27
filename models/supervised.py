@@ -41,7 +41,7 @@ class ConvolutionalNetwork(BaseModelSRL):
         self.resnet = models.resnet18(pretrained=True)
         # Freeze params
         for param in self.resnet.parameters():
-            param.requires_grad = False
+            param.set_grad_enabled(False)
         # Replace the last fully-connected layer
         n_units = self.resnet.fc.in_features
         print("{} units in the last layer".format(n_units))

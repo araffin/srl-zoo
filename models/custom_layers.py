@@ -2,7 +2,6 @@ from __future__ import print_function, division, absolute_import
 
 import torch as th
 import torch.nn as nn
-from torch.autograd import Variable
 
 
 class GaussianNoise(nn.Module):
@@ -15,13 +14,12 @@ class GaussianNoise(nn.Module):
     :param cuda: (bool)
     """
 
-    def __init__(self, batch_size, input_dim, std, mean=0, cuda=False):
+    def __init__(self, batch_size, input_dim, device, std, mean=0):
         super(GaussianNoise, self).__init__()
         self.std = std
         self.mean = mean
-        self.noise = Variable(th.zeros(batch_size, input_dim))
-        if cuda:
-            self.noise = self.noise.cuda()
+        self.noise = th.zeros(batch_size, input_dim)
+        self.noise = self.noise.to(self.device)
 
     def forward(self, x):
         if self.training:
@@ -39,7 +37,7 @@ class GaussianNoiseVariant(nn.Module):
     :param cuda: (bool)
     """
 
-    def __init__(self, std, mean=0, cuda=False):
+    def __init__(self, device, std, mean=0):
         super(GaussianNoiseVariant, self).__init__()
         self.std = std
         self.mean = mean
@@ -47,9 +45,8 @@ class GaussianNoiseVariant(nn.Module):
 
     def forward(self, x):
         if self.training:
-            noise = Variable(th.zeros(x.size()))
-            if self.cuda:
-                noise = noise.cuda()
+            noise = th.zeros(x.size())
+            noise = noise.to(self.device)
             noise.data.normal_(self.mean, std=self.std)
             return x + noise
         return x
