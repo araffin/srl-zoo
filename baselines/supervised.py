@@ -54,8 +54,9 @@ class SupervisedLearning(BaseLearner):
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
 
-        if cuda:
-            self.model.cuda()
+        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
+
+        self.model.to(self.device)
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.log_folder = log_folder
@@ -95,15 +96,14 @@ class SupervisedLearning(BaseLearner):
             train_loader.resetAndShuffle()
             pbar = tqdm(total=len(train_loader))
             for batch_idx, (obs, target_states) in enumerate(train_loader):
-                if self.cuda:
-                    obs, target_states = obs.cuda(), target_states.cuda()
+                obs, target_states = obs.to(self.device), target_states.to(self.device)
 
                 pred_states = self.model(obs)
                 self.optimizer.zero_grad()
                 loss = criterion(pred_states, target_states)
                 loss.backward()
                 self.optimizer.step()
-                train_loss += loss.data[0]
+                train_loss += loss.item()
                 pbar.update(1)
             pbar.close()
 
@@ -113,12 +113,11 @@ class SupervisedLearning(BaseLearner):
             val_loader.resetIterator()
             # Pass on the validation set
             for obs, target_states in val_loader:
-                if self.cuda:
-                    obs, target_states = obs.cuda(), target_states.cuda()
+                obs, target_states = obs.to(self.device), target_states.to(self.device)
 
                 pred_states = self.model(obs)
                 loss = criterion(pred_states, target_states)
-                val_loss += loss.data[0]
+                val_loss += loss.item()
 
             val_loss /= len(val_loader)
             self.model.train()  # Restore train mode

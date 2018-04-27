@@ -56,8 +56,9 @@ class VAELearning(BaseLearner):
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
 
-        if cuda:
-            self.model.cuda()
+        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
+
+        self.model.to(self.device)
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
 
@@ -118,15 +119,14 @@ class VAELearning(BaseLearner):
             train_loader.resetAndShuffle()
             pbar = tqdm(total=len(train_loader))
             for batch_idx, (noisy_obs, obs) in enumerate(train_loader):
-                if self.cuda:
-                    noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
+                noisy_obs, obs = noisy_obs.to(self.device), obs.to(self.device)
 
                 self.optimizer.zero_grad()
                 decoded, mu, logvar = self.model(noisy_obs)
                 loss = VAELearning._lossFunction(decoded, obs, mu, logvar, self.beta)
                 loss.backward()
                 self.optimizer.step()
-                train_loss += loss.data[0]
+                train_loss += loss.item()
                 pbar.update(1)
             pbar.close()
 
@@ -136,18 +136,17 @@ class VAELearning(BaseLearner):
             val_loader.resetIterator()
             # Pass on the validation set
             for noisy_obs, obs in val_loader:
-                if self.cuda:
-                    noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
+                noisy_obs, obs = noisy_obs.to(self.device), obs.to(self.device)
 
                 decoded, mu, logvar = self.model(noisy_obs)
                 loss = VAELearning._lossFunction(decoded, obs, mu, logvar, self.beta)
-                val_loss += loss.data[0]
+                val_loss += loss.item()
 
             val_loss /= len(val_loader)
             if DISPLAY_PLOTS:
                 # Plot Reconstructed Image
-                plot_image(deNormalize(noisy_obs[0].data.cpu().numpy()), "Input Validation Image")
-                plot_image(deNormalize(decoded[0].data.cpu().numpy()), "Reconstructed Image")
+                plot_image(deNormalize(noisy_obs[0].detach().numpy()), "Input Validation Image")
+                plot_image(deNormalize(decoded[0].detach().numpy()), "Reconstructed Image")
 
             self.model.train()  # Restore train mode
 
