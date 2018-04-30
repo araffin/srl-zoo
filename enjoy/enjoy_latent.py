@@ -23,12 +23,11 @@ def getImage(srl_model, mu, device):
     :return: ([float])
     """
     mu = torch.from_numpy(np.array(mu).reshape(1, -1)).to(torch.float)
-    mu.to(device)
-    srl_model.to(device)
+    mu = mu.to(device)
 
     net_out = srl_model.decode(mu)
 
-    img = net_out.detach().numpy()[0].T
+    img = net_out.to(torch.device("cpu")).detach().numpy()[0].T
 
     img = deNormalize(img)
     return img[:, :, ::-1]
@@ -41,7 +40,7 @@ def main():
 
     args = parser.parse_args()
 
-    device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() and (not args.no_cuda) else "cpu")
 
     # making sure you chose the right folder
     assert os.path.exists(args.log_dir), "Error: folder '{}' does not exist".format(args.log_dir)
