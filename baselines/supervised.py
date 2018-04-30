@@ -89,6 +89,8 @@ class SupervisedLearning(BaseLearner):
 
         self.model.train()
         start_time = time.time()
+        epoch_train_loss = [[] for _ in range(N_EPOCHS)]
+        epoch_val_loss = [[] for _ in range(N_EPOCHS)]
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             train_loss, val_loss = 0, 0
@@ -104,6 +106,7 @@ class SupervisedLearning(BaseLearner):
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.data[0]
+                epoch_train_loss[epoch].append(loss.data[0])
                 pbar.update(1)
             pbar.close()
 
@@ -119,6 +122,7 @@ class SupervisedLearning(BaseLearner):
                 pred_states = self.model(obs)
                 loss = criterion(pred_states, target_states)
                 val_loss += loss.data[0]
+                epoch_val_loss[epoch].append(loss.data[0])
 
             val_loss /= len(val_loader)
             self.model.train()  # Restore train mode
@@ -142,6 +146,8 @@ class SupervisedLearning(BaseLearner):
 
         # Load best model before predicting states
         self.model.load_state_dict(th.load(best_model_path))
+        # save loss
+        np.savez(self.log_folder + "/loss.npz", train=epoch_train_loss, val=epoch_val_loss)
         # return predicted states for training observations
         return self.predStatesWithDataLoader(data_loader)
 
