@@ -124,8 +124,8 @@ class AutoEncoderLearning(BaseLearner):
             val_loss /= len(val_loader)
             if DISPLAY_PLOTS:
                 # Plot Reconstructed Image
-                plot_image(deNormalize(noisy_obs[0].detach().numpy()), "Input Validation Image")
-                plot_image(deNormalize(decoded[0].detach().numpy()), "Reconstructed Image")
+                plot_image(deNormalize(noisy_obs[0].to(th.device('cpu')).detach().numpy()), "Input Validation Image")
+                plot_image(deNormalize(decoded[0].to(th.device('cpu')).detach().numpy()), "Reconstructed Image")
 
             self.model.train()  # Restore train mode
 

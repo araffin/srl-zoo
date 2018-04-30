@@ -63,7 +63,7 @@ class BaseLearner(object):
             # Restore training mode
             self.model.train()
         # Move the tensor back to the cpu
-        return states.detach().numpy()
+        return states.to(th.device('cpu')).detach().numpy()
 
     def predStates(self, observations):
         """
