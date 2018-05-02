@@ -40,7 +40,7 @@ def getLogFolderName(exp_config):
                                        exp_config['seed'])
 
     # baselines
-    if "priors" not in exp_config: 
+    if "priors" not in exp_config:
         for name in ['vae', 'autoencoder', 'supervised']:
             if name in exp_config['log-folder']:
                 srl_str = "_" + name + "_" + srl_str
@@ -59,7 +59,6 @@ def getLogFolderName(exp_config):
     experiment_name = "{}{}{}{}".format(date, model_str, continuous_str, srl_str)
     if 'model-approach' in exp_config:
         experiment_name = experiment_name + "_" + str(exp_config['model-approach'])
-
 
     printBlue("\nExperiment: {}\n".format(experiment_name))
     log_folder = "logs/{}/{}".format(exp_config['data-folder'], experiment_name)
@@ -344,14 +343,14 @@ if __name__ == '__main__':
             exp_config = json.load(f)
 
         print("\n Pipeline using json config file: {} \n".format(args.exp_config))
-        exp_config = {k.replace('_', '-'):v for k, v in exp_config.items()}
+        exp_config = {k.replace('_', '-'): v for k, v in exp_config.items()}
 
         baseline = None
         for name in ['vae', 'autoencoder', 'supervised']:
             if name in exp_config['log-folder']:
                 baseline = name
                 break
-        
+
         data_folder = exp_config['data-folder']
         printGreen("\nDataset folder: {}".format(data_folder))
         # Update and save config
@@ -371,11 +370,8 @@ if __name__ == '__main__':
                 # Evaluate the representation with kNN
                 knnCall(exp_config)
         else:
-            ok = baselineCall(exp_config, baseline)
-            if ok:
-                evaluateBaseline(base_config)
-        
-
+            baselineCall(exp_config, baseline)
+            evaluateBaseline(exp_config)
 
     # Grid on State Representation Learning with Priors
     # If using multi_view=true with custom_cnn : make sure you set N_CHANNELS to 6 in preprocess.py
