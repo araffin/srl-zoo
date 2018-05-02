@@ -207,6 +207,7 @@ if __name__ == '__main__':
     parser.add_argument('--state-dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('--noise-factor', type=float, default=0.1, help='Noise factor for denoising autoencoder')
     parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
+    parser.add_argument('--log-folder', type=str, default='', help='Override the default log-folder')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -217,8 +218,10 @@ if __name__ == '__main__':
     NOISE_FACTOR = args.noise_factor
     args.data_folder = parseDataFolder(args.data_folder)
 
-    name = getModelName(args)
-    log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
+    log_folder = args.log_folder
+    if log_folder == '':
+        name = getModelName(args)
+        log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
     createFolder(log_folder, "autoencoder folder already exist")
     saveExpConfig(args, log_folder)
 

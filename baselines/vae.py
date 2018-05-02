@@ -232,6 +232,7 @@ if __name__ == '__main__':
                         help='Limit size of the training set (default: -1)')
     parser.add_argument('--beta', type=float, default=1.0,
                         help='the Beta factor on the KL divergence, higher value means more disentangling.')
+    parser.add_argument('--log-folder', type=str, default='', help='Override the default log-folder')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -241,9 +242,11 @@ if __name__ == '__main__':
     BATCH_SIZE = args.batch_size
     NOISE_FACTOR = args.noise_factor
     args.data_folder = parseDataFolder(args.data_folder)
-
-    name = getModelName(args)
-    log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
+    
+    log_folder = args.log_folder
+    if log_folder == '':
+        name = getModelName(args)
+        log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
     createFolder(log_folder, "vae folder already exist")
     saveExpConfig(args, log_folder)
 

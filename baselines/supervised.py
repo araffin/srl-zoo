@@ -197,6 +197,7 @@ if __name__ == '__main__':
     parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
     parser.add_argument('--relative-pos', action='store_true', default=False,
                         help='Use relative position as ground_truth')
+    parser.add_argument('--log-folder', type=str, default='', help='Override the default log-folder')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -205,8 +206,10 @@ if __name__ == '__main__':
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     args.data_folder = parseDataFolder(args.data_folder)
-    name = getModelName(args)
-    log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
+    log_folder = args.log_folder
+    if log_folder == '':
+        name = getModelName(args)
+        log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
     createFolder(log_folder, "supervised folder already exist")
 
     folder_path = '{}/NearestNeighbors/'.format(log_folder)
