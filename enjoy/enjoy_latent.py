@@ -121,6 +121,7 @@ def main():
         else:
             # rescale for the bounds of the priors representation, and find nearest image
             img_path = y[srl_model_knn.predict([(np.array(mu) / 100) * (max_X - min_X) + min_X])[0]]
+            img_path = img_path.split('.jpg')[0]
             img = cv2.imread("data/" + img_path + ".jpg")
 
         # stop if user closed a window
