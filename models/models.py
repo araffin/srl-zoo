@@ -47,8 +47,8 @@ class BaseModelAutoEncoder(BaseModelSRL):
         # conv3x3 followed by BatchNorm2d
         # TODO: implement residual connection
         self.encoder_conv = nn.Sequential(
-            # 224x224x3 -> 112x112x64
-            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            # 224x224xN_CHANNELS -> 112x112x64
+            nn.Conv2d(N_CHANNELS, 64, kernel_size=7, stride=2, padding=3, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),  # 56x56x64
@@ -81,7 +81,7 @@ class BaseModelAutoEncoder(BaseModelSRL):
             nn.BatchNorm2d(64),
             nn.ReLU(True),
 
-            nn.ConvTranspose2d(64, 3, kernel_size=4, stride=2),  # 224x224x3
+            nn.ConvTranspose2d(64, N_CHANNELS, kernel_size=4, stride=2),  # 224x224xN_CHANNELS
         )
 
     def getStates(self, observations):

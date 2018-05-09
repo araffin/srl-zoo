@@ -42,7 +42,7 @@ class AutoEncoderLearning(BaseLearner):
     """
 
     def __init__(self, state_dim, model_type="cnn", log_folder="logs/default",
-                 seed=1, learning_rate=0.001, cuda=False):
+                 seed=1, learning_rate=0.001, cuda=False, multi_view=False):
 
         super(AutoEncoderLearning, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -61,6 +61,7 @@ class AutoEncoderLearning(BaseLearner):
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
 
         self.log_folder = log_folder
+        self.multi_view = multi_view
 
     def learn(self, images_path, rewards):
         """
@@ -76,13 +77,13 @@ class AutoEncoderLearning(BaseLearner):
 
         train_loader = AutoEncoderDataLoader(x_train, images_path,
                                              batch_size=self.batch_size,
-                                             noise_factor=NOISE_FACTOR)
+                                             noise_factor=NOISE_FACTOR, multi_view=self.multi_view)
         val_loader = AutoEncoderDataLoader(x_val, images_path,
                                            batch_size=TEST_BATCH_SIZE,
-                                           noise_factor=NOISE_FACTOR, is_training=False)
+                                           noise_factor=NOISE_FACTOR, is_training=False, multi_view=self.multi_view)
         # For plotting
         data_loader = AutoEncoderDataLoader(x_indices, images_path, batch_size=TEST_BATCH_SIZE,
-                                            no_targets=True, is_training=False)
+                                            no_targets=True, is_training=False, multi_view=self.multi_view)
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = nn.MSELoss(size_average=True)
@@ -201,6 +202,8 @@ if __name__ == '__main__':
     parser.add_argument('--state-dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('--noise-factor', type=float, default=0.1, help='Noise factor for denoising autoencoder')
     parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
+    parser.add_argument('--multi-view', action='store_true', default=False,
+                        help='Enable use of multiple camera')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -233,7 +236,7 @@ if __name__ == '__main__':
     print('Learning a state representation ... ')
     srl = AutoEncoderLearning(args.state_dim, model_type=args.model_type, seed=args.seed,
                               log_folder=log_folder, learning_rate=args.learning_rate,
-                              cuda=args.cuda)
+                              cuda=args.cuda, multi_view=args.multi_view)
     learned_states = srl.learn(images_path, rewards)
     srl.saveStates(learned_states, images_path, rewards, log_folder)
 

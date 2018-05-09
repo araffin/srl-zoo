@@ -48,7 +48,6 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             break
         # Remove trailing .jpg if present
         image_path = image_path.split('.jpg')[0]
-
         if multi_view:
 
             images = []
@@ -627,7 +626,7 @@ class AutoEncoderDataLoader(BaxterImageLoader):
     """
 
     def __init__(self, x_indices, images_path, batch_size, noise_factor=0.0, is_training=True,
-                 no_targets=False, n_workers=5, auto_cleanup=True):
+                 no_targets=False, n_workers=5, auto_cleanup=True, multi_view=False):
         # Create minibatch list
         minibatchlist, _ = self.createMinibatchList(x_indices, x_indices, batch_size)
 
@@ -635,12 +634,13 @@ class AutoEncoderDataLoader(BaxterImageLoader):
         # (not needed when plotting or predicting states)
         self.no_targets = no_targets
         self.noise_factor = noise_factor
+        self.multi_view = multi_view
 
         # Here the cache is not useful: we do not have observations
         # that are present in different minibatches
         super(AutoEncoderDataLoader, self).__init__(minibatchlist, images_path, [], [],
                                                     cache_capacity=0,
-                                                    n_workers=n_workers, auto_cleanup=auto_cleanup)
+                                                    n_workers=n_workers, auto_cleanup=auto_cleanup, multi_view=multi_view)
         # Training mode is the default one
         if not is_training:
             self.testMode()

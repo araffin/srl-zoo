@@ -43,10 +43,11 @@ class VAELearning(BaseLearner):
     """
 
     def __init__(self, state_dim, model_type="cnn", log_folder="logs/default",
-                 seed=1, learning_rate=0.001, cuda=False, beta=1):
+                 seed=1, learning_rate=0.001, cuda=False, beta=1, multi_view=False):
 
         super(VAELearning, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
         self.beta = beta
+        self.multi_view = multi_view
 
         if model_type == "cnn":
             self.model = CNNVAE(self.state_dim)
@@ -98,13 +99,13 @@ class VAELearning(BaseLearner):
 
         train_loader = AutoEncoderDataLoader(x_train, images_path,
                                              batch_size=self.batch_size,
-                                             noise_factor=NOISE_FACTOR)
+                                             noise_factor=NOISE_FACTOR, multi_view=self.multi_view)
         val_loader = AutoEncoderDataLoader(x_val, images_path,
                                            batch_size=TEST_BATCH_SIZE,
-                                           noise_factor=NOISE_FACTOR, is_training=False)
+                                           noise_factor=NOISE_FACTOR, is_training=False, multi_view=self.multi_view)
         # For plotting
         data_loader = AutoEncoderDataLoader(x_indices, images_path, batch_size=TEST_BATCH_SIZE,
-                                            no_targets=True, is_training=False)
+                                            no_targets=True, is_training=False, multi_view=self.multi_view)
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         best_error = np.inf
@@ -227,6 +228,8 @@ if __name__ == '__main__':
                         help='Limit size of the training set (default: -1)')
     parser.add_argument('--beta', type=float, default=1.0,
                         help='the Beta factor on the KL divergence, higher value means more disentangling.')
+    parser.add_argument('--multi-view', action='store_true', default=False,
+                        help='Enable use of multiple camera')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -259,7 +262,7 @@ if __name__ == '__main__':
     print('Learning a state representation ... ')
     srl = VAELearning(args.state_dim, model_type=args.model_type, seed=args.seed,
                       log_folder=log_folder, learning_rate=args.learning_rate,
-                      cuda=args.cuda, beta=args.beta)
+                      cuda=args.cuda, beta=args.beta, multi_view=args.multi_view)
     learned_states = srl.learn(images_path, rewards)
     srl.saveStates(learned_states, images_path, rewards, log_folder)
 
