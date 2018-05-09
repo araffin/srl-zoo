@@ -581,11 +581,9 @@ class SRL4robotics(BaseLearner):
                     actions_st = actions[minibatchlist[minibatch_idx]]
                     b_size = actions_st.shape[0]
                     actions_st = th.autograd.Variable(th.from_numpy(actions_st).cuda()).view(b_size, 1)
-                    #print("types: ", states_t, actions_st, states_t.long())
                     states_t1 = self.model.forward_extra(states_t, actions_st)
                     loss = criterion(states_t, states_t2, diss, same,
                                      is_ref_point_list, sim_pairs, next_states_pred=states_t1)
-                    pass
                 else:
                     states, next_states = self.model(obs), self.model(next_obs)
                     loss = criterion(states, next_states, diss, same,

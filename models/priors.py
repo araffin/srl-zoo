@@ -1,7 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
 from .models import *
-
+import torch
 
 class SRLConvolutionalNetwork(BaseModelSRL):
     """
@@ -61,7 +61,7 @@ class SRLCustomCNN(BaseModelSRL):
         return x
 
 class SRLCustomForward(BaseModelSRL):
-    def __init__(self, state_dim=2, action_dim=1, cuda=False, noise_std=1e-6, type='linear'):
+    def __init__(self, state_dim=2, action_dim=6, cuda=False, noise_std=1e-6, type='linear'):
         """
         :param state_dim:
         :param action_dim:
@@ -96,8 +96,14 @@ class SRLCustomForward(BaseModelSRL):
         :param a_t: a(t)
         :return: s(t+1)
         """
-        #print("data shapes: ", s_t.shape , a_t.shape, a_t.view( 64,1).shape)
-        return self.forward_l1(s_t.float()) + self.forward_l2(a_t.float())
+
+        # Onehot encoding of the action
+        a_one_hot = torch.Tensor(a_t.shape[0], 6).zero_() 
+        if a_t.is_cuda:
+            a_one_hot = a_one_hot.cuda()
+        a_one_hot = torch.autograd.Variable(a_one_hot.scatter_(1, a_t.data, 1.))
+        # Forward pass
+        return self.forward_l1(s_t.float()) + self.forward_l2(a_one_hot.float())
 
 class SRLDenseNetwork(BaseModelSRL):
     """
