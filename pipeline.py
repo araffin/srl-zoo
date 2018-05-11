@@ -49,7 +49,7 @@ def getLogFolderName(exp_config):
     elif len(exp_config["priors"]) > 0:
         srl_str = priorsToString(exp_config['priors']) + "_" + srl_str
 
-    if 'use-continuous' in exp_config and exp_config['use-continuous']:
+    if exp_config.get('use-continuous', False):
         raise NotImplementedError("Continous actions not supported yet")
         # continuous_str = "_cont_MCD{}_S{}".format(MAX_COS_DIST_AMONG_ACTIONS_THRESHOLD, CONTINUOUS_ACTION_SIGMA)
         # continuous_str = continuous_str.replace(".", "_")  # replace decimal points by '_' for folder naming
