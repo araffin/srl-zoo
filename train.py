@@ -16,13 +16,15 @@ from collections import defaultdict
 
 import numpy as np
 import torch as th
+from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
-from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet
+from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet, Discriminator
+from models.priors import ReverseLayerF
 from plotting.representation_plot import plot_representation, plt
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import BaxterImageLoader
@@ -111,7 +113,6 @@ class RoboticPriorsLoss(nn.Module):
         total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
                      + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
                      + w_same_env * same_env_loss
-
 
         if self.loss_history is not None:
             weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
@@ -271,14 +272,17 @@ class SRL4robotics(BaseLearner):
     :param l1_reg: (float)
     :param cuda: (bool)
     :param multi_view (bool)
+    :param episode_prior (bool)
     """
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
-                 seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False, multi_view=False, no_priors=False):
+                 seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False,
+                 multi_view=False, no_priors=False, episode_prior=False):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
         self.multi_view = multi_view
+        self.episode_prior = episode_prior
 
         if model_type == "resnet":
             self.model = SRLConvolutionalNetwork(self.state_dim, cuda, noise_std=NOISE_STD)
@@ -292,10 +296,18 @@ class SRL4robotics(BaseLearner):
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
 
+        if self.episode_prior:
+            self.discriminator = Discriminator(2 * self.state_dim)
+
         if cuda:
             self.model.cuda()
+            if self.episode_prior:
+                self.discriminator.cuda()
 
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
+
+        if self.episode_prior:
+            learnable_params += [p for p in self.discriminator.parameters()]
 
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.l1_reg = l1_reg
@@ -515,16 +527,21 @@ class SRL4robotics(BaseLearner):
                 printRed(msg)
                 sys.exit(NO_PAIRS_ERROR)
 
-        baxter_data_loader = BaxterImageLoader(minibatchlist, images_path,
-                                               same_actions, dissimilar, ref_point_pairs,
-                                               similar_pairs, cache_capacity=100, multi_view=self.multi_view,
-                                               triplets=(self.model_type == "triplet_cnn"))
+        # For episode prior
+        idx_to_episode = {idx: episode_idx for idx, episode_idx in enumerate(np.cumsum(episode_starts))}
+        minibatch_episodes = [[idx_to_episode[i] for i in minibatch] for minibatch in minibatchlist]
+
+        data_loader = BaxterImageLoader(minibatchlist, images_path,
+                                        same_actions, dissimilar, ref_point_pairs,
+                                        similar_pairs, cache_capacity=100, multi_view=self.multi_view,
+                                        triplets=(self.model_type == "triplet_cnn"))
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
         if self.model_type == "triplet_cnn":
             criterion = RoboticPriorsTripletLoss(self.model, self.l1_reg, loss_history)
         else:
             criterion = RoboticPriorsLoss(self.model, self.l1_reg, loss_history)
+        criterion_episode = nn.BCELoss(size_average=False)
         best_error = np.inf
         best_model_path = "{}/srl_model.pth".format(self.log_folder)
         self.model.train()
@@ -535,8 +552,8 @@ class SRL4robotics(BaseLearner):
             epoch_loss, epoch_batches = 0, 0
             val_loss = 0
             pbar = tqdm(total=len(minibatchlist))
-            baxter_data_loader.resetAndShuffle()
-            for _input in baxter_data_loader:
+            data_loader.resetAndShuffle()
+            for minibatch_num, _input in enumerate(data_loader):
                 # Unpack input
                 minibatch_idx, obs, next_obs, same, diss, is_ref_point_list, sim_pairs = _input
                 if self.cuda:
@@ -565,7 +582,25 @@ class SRL4robotics(BaseLearner):
                     states, next_states = self.model(obs), self.model(next_obs)
                     loss = criterion(states, next_states, diss, same,
                                      is_ref_point_list, sim_pairs)
+                    if self.episode_prior:
+                        p = (minibatch_num + epoch * len(data_loader)) / (N_EPOCHS * len(data_loader))
+                        alpha = 2. / (1. + np.exp(-10 * p)) - 1
+                        alpha = 1
+                        # Reverse gradient
+                        reverse_states = ReverseLayerF.apply(states, alpha)
+                        others_idx = np.random.permutation(len(states))
+                        # Create input for episode discriminator
+                        episode_input = th.cat((reverse_states, reverse_states[others_idx, :]), dim=1)
+                        episode_output = self.discriminator(episode_input)
+                        episodes = np.array(minibatch_episodes[minibatch_idx])
+                        others_episodes = episodes[others_idx]
+                        same_episodes = Variable(th.from_numpy((episodes == others_episodes).astype(np.float32)))
 
+                        if self.cuda:
+                            same_episodes = same_episodes.cuda()
+                        # TODO: balance the two classes
+                        loss_episode = criterion_episode(episode_output.squeeze(1), same_episodes)
+                        loss += 1 * loss_episode
                 # We have to call backward in both train/val
                 # to avoid memory error
                 loss.backward()
@@ -610,7 +645,7 @@ class SRL4robotics(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
-                    plot_representation(self.predStatesWithDataLoader(baxter_data_loader, restore_train=True), rewards,
+                    plot_representation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
                                         add_colorbar=epoch == 0,
                                         name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
@@ -621,7 +656,7 @@ class SRL4robotics(BaseLearner):
 
         print("Predicting states for all the observations...")
         # return predicted states for training observations
-        return loss_history, self.predStatesWithDataLoader(baxter_data_loader, restore_train=False)
+        return loss_history, self.predStatesWithDataLoader(data_loader, restore_train=False)
 
 
 if __name__ == '__main__':
@@ -651,6 +686,8 @@ if __name__ == '__main__':
                         help='Enable same env prior (disables ref prior)')
     parser.add_argument('--multi-view', action='store_true', default=False,
                         help='Enable use of multiple camera')
+    parser.add_argument('--episode-prior', action='store_true', default=False,
+                        help='Enable episode independent prior')
     parser.add_argument('--no-priors', action='store_true', default=False,
                         help='Disable use of priors - in case of triplet loss')
 
@@ -672,13 +709,14 @@ if __name__ == '__main__':
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
 
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
+    # images_path = np.array([path.decode("utf-8") for path in ground_truth['images_path']])
     images_path = ground_truth['images_path']
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       no_priors=args.no_priors)
+                       no_priors=args.no_priors, episode_prior=args.episode_prior)
 
     is_ref_point_list = None
     if APPLY_5TH_PRIOR:

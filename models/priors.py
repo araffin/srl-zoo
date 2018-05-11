@@ -1,5 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
+from torch.autograd import Function
+
 from .models import *
 
 
@@ -90,3 +92,37 @@ class SRLDenseNetwork(BaseModelSRL):
         if self.training:
             x = self.noise(x)
         return x
+
+# From https://github.com/fungtion/DANN
+class ReverseLayerF(Function):
+
+    @staticmethod
+    def forward(ctx, x, alpha):
+        ctx.alpha = alpha
+
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        output = grad_output.neg() * ctx.alpha
+
+        return output, None
+
+
+class Discriminator(nn.Module):
+    """
+    :input_dim: (int) input_dim = 2 * state_dim
+    """
+    def __init__(self, input_dim):
+        super(Discriminator, self).__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        return self.net(x)
