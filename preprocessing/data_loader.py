@@ -54,6 +54,8 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             images = []
             for i in range(2):
                 im = cv2.imread("{}_{}.jpg".format(image_path, i + 1))
+                if im is None:
+                    raise ValueError("tried to load {}_{}.jpg, but it was not found".format(image_path, i + 1))
                 images.append(preprocessImage(im))
 
             ####################
@@ -79,6 +81,8 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                 negative_path = '{}{:06d}'.format(image_path[:-6], negative)
 
                 im3 = cv2.imread(negative_path + "_1.jpg")
+                if im3 is None:
+                    raise ValueError("tried to load {}_{}.jpg, but it was not found".format(negative_path, 1))
                 im3 = preprocessImage(im3)
                 # stacking along channels
                 images.append(im3)
@@ -87,6 +91,8 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
 
         else:
             im = cv2.imread(image_path + ".jpg")
+            if im is None:
+                raise ValueError("tried to load {}.jpg, but it was not found".format(image_path))
             im = preprocessImage(im)
 
         output_queue.put((idx, im))
