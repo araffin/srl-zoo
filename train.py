@@ -67,7 +67,7 @@ class RoboticPriorsLoss(nn.Module):
 
     def forward(self, states, next_states,
                 dissimilar_pairs, same_actions_pairs, ref_point_pairs,
-                similar_pairs, next_states_pred=None):
+                similar_pairs, next_states_pred=None, weight_forward=0.03):
         """
         :param states: (th Variable)
         :param next_states: (th Variable)
@@ -111,24 +111,25 @@ class RoboticPriorsLoss(nn.Module):
 
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
+        #total_loss = 0
         total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
                      + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
                      + w_same_env * same_env_loss
 
         # Forward model's loss:
-        if (actions is not None) and (next_states_pred is not None):
+        if next_states_pred is not None:
             #print("shapes: ", next_states_pred.shape, next_states.shape)
             forward_loss = next_states_pred - next_states
             forward_loss = forward_loss.norm(2, dim=1).mean()
             #print("forward loss: ", forward_loss)
-            total_loss +=forward_loss
+            total_loss += weight_forward * forward_loss
 
         if self.loss_history is not None:
-            weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
+            weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env, weight_forward]
             names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
-                     'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss']
+                     'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss', 'forward_loss']
             losses = [temp_coherence_loss, causality_loss, proportionality_loss,
-                      repeatability_loss, fixed_ref_point_loss, l1_loss, same_env_loss]
+                      repeatability_loss, fixed_ref_point_loss, l1_loss, same_env_loss, forward_loss]
             for name, w, loss in zip(names, weights, losses):
                 if w > 0:
                     if len(self.loss_history[name]) > 0:
