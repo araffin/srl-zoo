@@ -82,6 +82,7 @@ dependencies:
 - pytorch=0.3.0=py27_cuda8.0.61_cudnn7.0.3hf383a3f_4
 - torchvision=0.2.0=py27hfb27419_1
 - pip:
+  - coverage
   - backports-abc==0.5
   - backports.functools-lru-cache==1.4
   - backports.shutil-get-terminal-size==1.0.0

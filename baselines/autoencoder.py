@@ -18,6 +18,7 @@ from models.base_learner import BaseLearner
 from models import LinearAutoEncoder, DenseAutoEncoder, CNNAutoEncoder
 from pipeline import saveConfig
 from plotting.representation_plot import plot_representation, plt, plot_image
+from plotting.losses_plot import plotLosses
 
 # Python 2/3 compatibility
 try:
@@ -155,6 +156,8 @@ class AutoEncoderLearning(BaseLearner):
         self.model.load_state_dict(th.load(best_model_path))
         # save loss
         np.savez(self.log_folder + "/loss.npz", train=epoch_train_loss, val=epoch_val_loss)
+        # Save plot
+        plotLosses({"train":epoch_train_loss, "val":epoch_val_loss}, self.log_folder)
         # return predicted states for training observations
         return self.predStatesWithDataLoader(data_loader)
 

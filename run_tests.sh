@@ -1,2 +1,4 @@
 #!/bin/bash
-pytest tests/
+coverage run --source=./  -m pytest tests/
+echo ""
+coverage report --omit=tests/*
