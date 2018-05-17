@@ -19,11 +19,16 @@ def plotLosses(loss_history, path=None):
     keys = list(loss_history.keys())
     keys.sort()
 
-    x = np.arange(1, len(loss_history[keys[0]]) + 1)
-
     plt.figure("Losses")
     for key in keys:
-        plt.plot(x, loss_history[key], label=key, linewidth=2)
+        # check if the loss was averaged by epoch or not yet
+        if len(loss_history[key].shape) > 1:
+            # the axis here means every axis but the first, so average over every dim, except dim 0
+            loss_hist_key = np.mean(loss_history[key], axis=tuple(range(1, len(loss_history[key].shape))))
+        else:
+            loss_hist_key = loss_history[key]
+        x = np.arange(1, len(loss_hist_key) + 1)
+        plt.plot(x, loss_hist_key, label=key, linewidth=2)
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend(loc='upper right')
