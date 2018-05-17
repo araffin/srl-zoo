@@ -369,7 +369,7 @@ if __name__ == '__main__':
         # Grid search
         for seed in [0]:
             exp_config['seed'] = seed
-            for state_dim in [3, 4, 6, 10]:
+            for state_dim in [10]: #[3, 4, 6, 10]:
                 # Update config
                 exp_config['state-dim'] = state_dim
                 log_folder, experiment_name = getLogFolderName(exp_config)

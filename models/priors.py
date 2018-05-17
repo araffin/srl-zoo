@@ -2,7 +2,7 @@ from __future__ import print_function, division, absolute_import
 
 from .models import *
 import torch
-
+import torch.nn.functional as F
 class SRLConvolutionalNetwork(BaseModelSRL):
     """
     Convolutional Neural Net for State Representation Learning (SRL)
@@ -72,16 +72,12 @@ class SRLCustomForward(BaseModelSRL):
         super(SRLCustomForward, self).__init__()
         self.cnn = CustomCNN(state_dim)
 
-        self.forward_l1 = nn.Linear(state_dim, state_dim)
-        self.forward_l2 = nn.Linear(action_dim, state_dim)
+        self.forward_l1 = nn.Linear(state_dim + action_dim, 256)
+        self.forward_l2 = nn.Linear(256, state_dim)
         if cuda:
             self.cnn.cuda()
             self.forward_l1.cuda()
             self.forward_l2.cuda()
-
-        if type == 'gaussian':
-            self.mu = None
-            self.sigma = None
 
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
 
@@ -102,9 +98,91 @@ class SRLCustomForward(BaseModelSRL):
         if a_t.is_cuda:
             a_one_hot = a_one_hot.cuda()
         a_one_hot = torch.autograd.Variable(a_one_hot.scatter_(1, a_t.data, 1.))
-        # Forward pass
-        return self.forward_l1(s_t.float()) + self.forward_l2(a_one_hot.float())
 
+        # Forward pass
+        concat = torch.cat((s_t, a_one_hot),1)
+        inter = nn.functional.relu( self.forward_l1(concat))
+        return self.forward_l2(inter)
+
+class SRLCustomInverse(BaseModelSRL):
+    def __init__(self, state_dim=2, action_dim=6, cuda=False, noise_std=1e-6, type='linear'):
+        """
+        :param state_dim:
+        :param action_dim:
+        :param cuda:
+        :param noise_std:
+        :param type:
+        """
+        super(SRLCustomInverse, self).__init__()
+        self.cnn = CustomCNN(state_dim)
+
+        self.inverse_l1 = nn.Linear(state_dim * 2, 256)  #+ action_dim, 256)
+        self.inverse_l2 = nn.Linear(256, 128)
+        self.inverse_l3 = nn.Linear(128, action_dim)
+        if cuda:
+            self.cnn.cuda()
+            self.inverse_l1.cuda()
+            self.inverse_l2.cuda()
+            self.inverse_l3.cuda()
+
+        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
+
+    def forward(self, x):
+        x = self.cnn(x)
+        return self.noise(x)
+
+    def inverse(self, s_t, s_t_plus):
+        """
+        #TODO: add bias to for
+        :param s_t: s(t)
+        :param s_t_plus: s(t+1)
+        :return: probability of a_t
+        """
+        concat = torch.cat((s_t, s_t_plus), 1)
+        inter = nn.functional.relu(self.inverse_l1(concat))
+        inter2 = nn.functional.relu(self.inverse_l2(inter))
+        return self.inverse_l3(inter2)
+
+class SRLCustomForwardInverse(SRLCustomForward):
+    def __init__(self, state_dim=2, action_dim=6, cuda=False, noise_std=1e-6, type='linear'):
+        """
+        :param state_dim:
+        :param action_dim:
+        :param cuda:
+        :param noise_std:
+        :param type:
+        """
+        super(SRLCustomForwardInverse, self).__init__()
+        self.cnn = CustomCNN(state_dim)
+
+        self.forward_l1 = nn.Linear(state_dim + action_dim, 256)
+        self.forward_l2 = nn.Linear(256, state_dim)
+        self.inverse_l1 = nn.Linear(state_dim * 2, 256)  # + action_dim, 256)
+        self.inverse_l2 = nn.Linear(256, 128)
+        self.inverse_l3 = nn.Linear(128, action_dim)
+
+        if cuda:
+            self.cnn.cuda()
+            self.forward_l1.cuda()
+            self.forward_l2.cuda()
+            self.inverse_l1.cuda()
+            self.inverse_l2.cuda()
+            self.inverse_l3.cuda()
+
+        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)    
+
+    def inverse(self, s_t, s_t_plus):
+        """
+        #TODO: add bias to for
+        :param s_t: s(t)
+        :param s_t_plus: s(t+1)
+        :return: probability of a_t
+        """
+        concat = torch.cat((s_t, s_t_plus), 1)
+        inter = nn.functional.relu(self.inverse_l1(concat))
+        inter2 = nn.functional.relu(self.inverse_l2(inter))
+        return self.inverse_l3(inter2)
+    
 class SRLDenseNetwork(BaseModelSRL):
     """
     Dense Neural Net for State Representation Learning (SRL)

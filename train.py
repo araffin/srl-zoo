@@ -23,7 +23,7 @@ from tqdm import tqdm
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
 
-from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet, SRLCustomForward
+from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet, SRLCustomForward, SRLCustomInverse, SRLCustomForwardInverse
 from plotting.representation_plot import plot_representation, plt
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import BaxterImageLoader
@@ -67,7 +67,7 @@ class RoboticPriorsLoss(nn.Module):
 
     def forward(self, states, next_states,
                 dissimilar_pairs, same_actions_pairs, ref_point_pairs,
-                similar_pairs, next_states_pred=None, weight_forward=0.03):
+                similar_pairs, next_states_pred=None, actions_st=None, actions_pred=None, weight_forward=1, weight_inverse=1.):
         """
         :param states: (th Variable)
         :param next_states: (th Variable)
@@ -111,25 +111,42 @@ class RoboticPriorsLoss(nn.Module):
 
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
-        #total_loss = 0
-        total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
-                     + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
-                     + w_same_env * same_env_loss
+        if next_states_pred is not None or  actions_pred is not None:
+            total_loss = 0
+        else:
+            total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
+                         + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
+                         + w_same_env * same_env_loss
+
+        weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
+        names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
+                 'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss']
+        losses = [temp_coherence_loss, causality_loss, proportionality_loss,
+                  repeatability_loss, fixed_ref_point_loss, l1_loss, same_env_loss]
 
         # Forward model's loss:
         if next_states_pred is not None:
-            #print("shapes: ", next_states_pred.shape, next_states.shape)
             forward_loss = next_states_pred - next_states
-            forward_loss = forward_loss.norm(2, dim=1).mean()
-            #print("forward loss: ", forward_loss)
+            forward_loss = forward_loss.norm(2, dim=1).mean()            
             total_loss += weight_forward * forward_loss
+            weights.append(weight_forward)
+            names.append('forward_loss')
+            losses.append(forward_loss)
+
+        # Inverse model's loss:
+        if actions_pred is not None:
+            lss = nn.CrossEntropyLoss()
+            #print('pred :',actions_pred.shape, actions_st.squeeze(1).shape)
+            #inverse_loss = F.cross_entropy(input=actions_pred, target=actions_st.squeeze(1))
+            inverse_loss = lss(actions_pred, actions_st.squeeze(1))
+            #inverse_loss = actions_pred - actions_st
+            #inverse_loss = inverse_loss.norm(2, dim=1).mean()
+            total_loss += weight_inverse * inverse_loss
+            weights.append(weight_inverse)
+            names.append('inverse_loss')
+            losses.append(inverse_loss)
 
         if self.loss_history is not None:
-            weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env, weight_forward]
-            names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
-                     'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss', 'forward_loss']
-            losses = [temp_coherence_loss, causality_loss, proportionality_loss,
-                      repeatability_loss, fixed_ref_point_loss, l1_loss, same_env_loss, forward_loss]
             for name, w, loss in zip(names, weights, losses):
                 if w > 0:
                     if len(self.loss_history[name]) > 0:
@@ -301,6 +318,10 @@ class SRL4robotics(BaseLearner):
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         elif model_type == "forward_model":
             self.model = SRLCustomForward(state_dim=self.state_dim, cuda=cuda, noise_std=NOISE_STD)
+        elif model_type == "inverse_model":
+            self.model = SRLCustomInverse(state_dim=self.state_dim, cuda=cuda, noise_std=NOISE_STD)
+        elif model_type == "fwd_inv_model":
+            self.model = SRLCustomForwardInverse(state_dim=self.state_dim, cuda=cuda, noise_std=NOISE_STD)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -545,6 +566,7 @@ class SRL4robotics(BaseLearner):
         self.model.train()
         start_time = time.time()
 
+        actions_st_prev = None
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             epoch_loss, epoch_batches = 0, 0
@@ -576,15 +598,39 @@ class SRL4robotics(BaseLearner):
                     loss = criterion(states, positive_states, negtive_states, next_states, next_positive_states, diss,
                                      same, is_ref_point_list, sim_pairs, no_priors=self.no_priors)
 
-                elif self.model_type == "forward_model":
+                elif 'forward_model' in self.model_type:
                     states_t, states_t2 = self.model(obs), self.model(next_obs)
-                    #print("dim states_t: ", states_t.shape)
                     actions_st = actions[minibatchlist[minibatch_idx]]
                     b_size = actions_st.shape[0]
                     actions_st = th.autograd.Variable(th.from_numpy(actions_st).cuda()).view(b_size, 1)
                     states_t1 = self.model.forward_extra(states_t, actions_st)
                     loss = criterion(states_t, states_t2, diss, same,
                                      is_ref_point_list, sim_pairs, next_states_pred=states_t1)
+
+                elif 'inverse_model' in self.model_type:
+                    states_t, states_t_plus = self.model(obs), self.model(next_obs)                    
+                    actions_st = actions[minibatchlist[minibatch_idx]]
+                    b_size = actions_st.shape[0]
+                    actions_st = th.autograd.Variable(th.from_numpy(actions_st), requires_grad=False).view(b_size, 1)
+                    if states_t_plus.is_cuda:
+                        actions_st = actions_st.cuda()
+                    actions_pred = self.model.inverse(states_t, states_t_plus)
+                    loss = criterion(states_t, states_t_plus, diss, same,
+                                     is_ref_point_list, sim_pairs, next_states_pred=None,
+                                     actions_st=actions_st, actions_pred=actions_pred)
+
+                elif 'fwd_inv_model' in self.model_type:
+                    states_t, states_t_plus = self.model(obs), self.model(next_obs)                    
+                    actions_st = actions[minibatchlist[minibatch_idx]]
+                    b_size = actions_st.shape[0]
+                    actions_st = th.autograd.Variable(th.from_numpy(actions_st), requires_grad=False).view(b_size, 1)
+                    if states_t_plus.is_cuda:
+                        actions_st = actions_st.cuda()
+                    states_t_plus_pred = self.model.forward_extra(states_t, actions_st)
+                    actions_pred = self.model.inverse(states_t, states_t_plus)
+                    loss = criterion(states_t, states_t_plus, diss, same,
+                                     is_ref_point_list, sim_pairs, next_states_pred=states_t_plus_pred,
+                                     actions_st=actions_st, actions_pred=actions_pred)
                 else:
                     states, next_states = self.model(obs), self.model(next_obs)
                     loss = criterion(states, next_states, diss, same,
@@ -664,7 +710,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model-type', type=str, default="custom_cnn",
-                        choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn', 'forward_model'],
+                        choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn', 'forward_model', 'inverse_model', 'fwd_inv_model'],
                         help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log-folder', type=str, default='logs/default_folder',
