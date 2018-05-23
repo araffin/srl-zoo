@@ -16,25 +16,33 @@ class SRLConvolutionalNetwork(BaseModelSRL):
 
     def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
         super(SRLConvolutionalNetwork, self).__init__()
-        self.resnet = models.resnet18(pretrained=True)
+        self.resnet = models.resnet18(pretrained=False)
         # TODO: add squeezeNet support
         # self.squeezeNet = models.squeezenet1_0(pretrained=True)
         # TODO: freeze less layers
         # Freeze params
-        for param in self.resnet.parameters():
-            param.requires_grad = False
+        # for param in self.resnet.parameters():
+        #     param.requires_grad = False
         # Replace the last fully-connected layer
         n_units = self.resnet.fc.in_features
         print("{} units in the last layer".format(n_units))
-        self.resnet.fc = nn.Linear(n_units, state_dim)
+        self.resnet.fc = nn.Linear(n_units, 64)
         if cuda:
             self.resnet.cuda()
+        self.fc = nn.Sequential(
+            nn.Linear(64, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, state_dim),
+        )
         # This variant does not require the batch_size
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
         # self.noise = GaussianNoise(batch_size, state_dim, noise_std, cuda=cuda)
 
     def forward(self, x):
         x = self.resnet(x)
+        x = self.fc(x)
         if self.training:
             x = self.noise(x)
         return x
@@ -97,15 +105,15 @@ class SRLDenseNetwork(BaseModelSRL):
 class ReverseLayerF(Function):
 
     @staticmethod
-    def forward(ctx, x, alpha):
-        ctx.alpha = alpha
-
+    def forward(ctx, x, lambda_):
+        ctx.lambda_ = lambda_
+        # Equivalent to return x ?
         return x.view_as(x)
 
     @staticmethod
     def backward(ctx, grad_output):
-        output = grad_output.neg() * ctx.alpha
-
+        # Compute the opposite of the gradient
+        output = grad_output.neg() * ctx.lambda_
         return output, None
 
 

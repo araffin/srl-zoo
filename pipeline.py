@@ -307,14 +307,14 @@ if __name__ == '__main__':
             # Autoencoder and VAE
             exp_config['model-type'] = "cnn"
             for baseline in ['autoencoder', 'vae']:
-                for state_dim in [3, 6, 12, 32]:
+                for state_dim in [2, 3, 6, 12, 32]:
                     # Update config
                     exp_config['state-dim'] = state_dim
                     baselineCall(exp_config, baseline)
                     evaluateBaseline(base_config)
 
         # PCA
-        for state_dim in [6, 12, 32]:
+        for state_dim in [2, 6, 12, 32]:
             # Update config
             exp_config['state-dim'] = state_dim
             dimReductionCall(exp_config, 'pca')
@@ -369,7 +369,7 @@ if __name__ == '__main__':
         # Grid search
         for seed in [0]:
             exp_config['seed'] = seed
-            for state_dim in [3, 4, 6, 10]:
+            for state_dim in [2, 3, 4, 6, 10]:
                 # Update config
                 exp_config['state-dim'] = state_dim
                 log_folder, experiment_name = getLogFolderName(exp_config)

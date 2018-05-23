@@ -546,13 +546,13 @@ class SRL4robotics(BaseLearner):
         best_model_path = "{}/srl_model.pth".format(self.log_folder)
         self.model.train()
         start_time = time.time()
-
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             epoch_loss, epoch_batches = 0, 0
             val_loss = 0
             pbar = tqdm(total=len(minibatchlist))
             data_loader.resetAndShuffle()
+
             for minibatch_num, _input in enumerate(data_loader):
                 # Unpack input
                 minibatch_idx, obs, next_obs, same, diss, is_ref_point_list, sim_pairs = _input
@@ -583,22 +583,39 @@ class SRL4robotics(BaseLearner):
                     loss = criterion(states, next_states, diss, same,
                                      is_ref_point_list, sim_pairs)
                     if self.episode_prior:
-                        p = (minibatch_num + epoch * len(data_loader)) / (N_EPOCHS * len(data_loader))
-                        alpha = 2. / (1. + np.exp(-10 * p)) - 1
-                        alpha = 1
+                        # lambda_ from 0 to 1
+                        # p = (minibatch_num + epoch * len(data_loader)) / (N_EPOCHS * len(data_loader))
+                        # lambda_ = 2. / (1. + np.exp(-10 * p)) - 1
+                        lambda_ = 1
                         # Reverse gradient
-                        reverse_states = ReverseLayerF.apply(states, alpha)
+                        reverse_states = ReverseLayerF.apply(states, lambda_)
+
+                        # Get episodes indices for current minibatch
+                        episodes = np.array(minibatch_episodes[minibatch_idx])
+
+                        # Sample other states
+                        # Uniform (unbalanced) sampling
                         others_idx = np.random.permutation(len(states))
+
+                        # # balanced sampling
+                        # others_idx = np.arange(len(episodes))
+                        # for i in range(len(episodes)):
+                        #     if np.random.rand() > 0.5:
+                        #         others_idx[i] = np.random.choice(np.where(episodes != episodes[i])[0])
+                        #     else:
+                        #         others_idx[i] = np.random.choice(np.where(episodes == episodes[i])[0])
+
+
                         # Create input for episode discriminator
                         episode_input = th.cat((reverse_states, reverse_states[others_idx, :]), dim=1)
                         episode_output = self.discriminator(episode_input)
-                        episodes = np.array(minibatch_episodes[minibatch_idx])
+
                         others_episodes = episodes[others_idx]
                         same_episodes = Variable(th.from_numpy((episodes == others_episodes).astype(np.float32)))
 
                         if self.cuda:
                             same_episodes = same_episodes.cuda()
-                        # TODO: balance the two classes
+                        # TODO: classification accuracy/loss
                         loss_episode = criterion_episode(episode_output.squeeze(1), same_episodes)
                         loss += 1 * loss_episode
                 # We have to call backward in both train/val
@@ -709,8 +726,11 @@ if __name__ == '__main__':
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
 
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
-    # images_path = np.array([path.decode("utf-8") for path in ground_truth['images_path']])
-    images_path = ground_truth['images_path']
+    # Try to convert old python 2 format
+    try:
+        images_path = np.array([path.decode("utf-8") for path in ground_truth['images_path']])
+    except AttributeError:
+        images_path = ground_truth['images_path']
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,

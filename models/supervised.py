@@ -38,10 +38,10 @@ class ConvolutionalNetwork(BaseModelSRL):
 
     def __init__(self, state_dim=2, cuda=False):
         super(ConvolutionalNetwork, self).__init__()
-        self.resnet = models.resnet18(pretrained=True)
+        self.resnet = models.resnet18(pretrained=False)
         # Freeze params
-        for param in self.resnet.parameters():
-            param.requires_grad = False
+        # for param in self.resnet.parameters():
+        #     param.requires_grad = False
         # Replace the last fully-connected layer
         n_units = self.resnet.fc.in_features
         print("{} units in the last layer".format(n_units))
