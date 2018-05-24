@@ -60,8 +60,9 @@ class SRLCustomCNN(BaseModelSRL):
             x = self.noise(x)
         return x
 
+
 class SRLCustomForward(BaseModelSRL):
-    def __init__(self, state_dim=2, action_dim=6, cuda=False, noise_std=1e-6, type='linear'):
+    def __init__(self, state_dim=2, action_dim=6, cuda=False):
         """
         :param state_dim:
         :param action_dim:
@@ -72,19 +73,21 @@ class SRLCustomForward(BaseModelSRL):
         super(SRLCustomForward, self).__init__()
         self.cnn = CustomCNN(state_dim)
 
-        self.forward_l1 = nn.Linear(state_dim + action_dim, 256)
-        self.forward_l2 = nn.Linear(256, state_dim)
+        self.forward_layer = nn.Linear(state_dim + action_dim, state_dim)
+        self.reward_layers = nn.Sequential(nn.Linear(state_dim + action_dim, 32),
+                                           nn.ReLU(),
+                                           nn.Linear(32, 16),
+                                           nn.ReLU(),
+                                           nn.Linear(16, 1))
+
         if cuda:
             self.cnn.cuda()
-            self.forward_l1.cuda()
-            self.forward_l2.cuda()
-
-        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
+            self.forward_layer.cuda()
+            self.reward_layer.cuda()
 
     def forward(self, x):
-        x = self.cnn(x)
-        return self.noise(x)
-
+        return self.cnn(x)
+        
     def forward_extra(self, s_t, a_t):
         """
         #TODO: add bias to for
@@ -94,15 +97,31 @@ class SRLCustomForward(BaseModelSRL):
         """
 
         # Onehot encoding of the action
-        a_one_hot = torch.Tensor(a_t.shape[0], 6).zero_() 
+        a_one_hot = torch.Tensor(a_t.shape[0], 6).zero_()
         if a_t.is_cuda:
             a_one_hot = a_one_hot.cuda()
         a_one_hot = torch.autograd.Variable(a_one_hot.scatter_(1, a_t.data, 1.))
 
         # Forward pass
         concat = torch.cat((s_t, a_one_hot),1)
-        inter = nn.functional.relu( self.forward_l1(concat))
-        return self.forward_l2(inter)
+        return s_t + self.forward_layer(concat)
+
+    def reward(self, s_t, a_t):
+        """
+        #TODO: add bias to for
+        :param s_t: s(t)
+        :param a_t: a(t)
+        :return: s(t+1)
+        """
+
+        # Onehot encoding of the action
+        a_one_hot = torch.Tensor(a_t.shape[0], 6).zero_()
+        if a_t.is_cuda:
+            a_one_hot = a_one_hot.cuda()
+        a_one_hot = torch.autograd.Variable(a_one_hot.scatter_(1, a_t.data, 1.))
+        # Forward pass
+        concat = torch.cat((s_t, a_one_hot),1)
+        return self.reward_layers(concat)
 
 class SRLCustomInverse(BaseModelSRL):
     def __init__(self, state_dim=2, action_dim=6, cuda=False, noise_std=1e-6, type='linear'):
@@ -116,20 +135,20 @@ class SRLCustomInverse(BaseModelSRL):
         super(SRLCustomInverse, self).__init__()
         self.cnn = CustomCNN(state_dim)
 
-        self.inverse_l1 = nn.Linear(state_dim * 2, 256)  #+ action_dim, 256)
-        self.inverse_l2 = nn.Linear(256, 128)
-        self.inverse_l3 = nn.Linear(128, action_dim)
+        self.inverse_l1 = nn.Linear(state_dim * 2, action_dim)
+        self.reward_layers = nn.Sequential(nn.Linear(state_dim + action_dim, 32),
+                                           nn.ReLU(),
+                                           nn.Linear(32, 16),
+                                           nn.ReLU(),
+                                           nn.Linear(16, 1))
+
         if cuda:
             self.cnn.cuda()
             self.inverse_l1.cuda()
-            self.inverse_l2.cuda()
-            self.inverse_l3.cuda()
-
-        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
+            self.reward_layers.cuda()
 
     def forward(self, x):
-        x = self.cnn(x)
-        return self.noise(x)
+        return self.cnn(x)
 
     def inverse(self, s_t, s_t_plus):
         """
@@ -139,9 +158,25 @@ class SRLCustomInverse(BaseModelSRL):
         :return: probability of a_t
         """
         concat = torch.cat((s_t, s_t_plus), 1)
-        inter = nn.functional.relu(self.inverse_l1(concat))
-        inter2 = nn.functional.relu(self.inverse_l2(inter))
-        return self.inverse_l3(inter2)
+        return self.inverse_l1(concat)
+
+    def reward(self, s_t, a_t):
+        """
+        #TODO: add bias to for
+        :param s_t: s(t)
+        :param a_t: a(t)
+        :return: s(t+1)
+        """
+
+        # Onehot encoding of the action
+        a_one_hot = torch.Tensor(a_t.shape[0], 6).zero_()
+        if a_t.is_cuda:
+            a_one_hot = a_one_hot.cuda()
+        a_one_hot = torch.autograd.Variable(a_one_hot.scatter_(1, a_t.data, 1.))
+        # Forward pass
+        concat = torch.cat((s_t, a_one_hot),1)
+        return self.reward_layers(concat)
+
 
 class SRLCustomForwardInverse(SRLCustomForward):
     def __init__(self, state_dim=2, action_dim=6, cuda=False, noise_std=1e-6, type='linear'):
@@ -155,21 +190,13 @@ class SRLCustomForwardInverse(SRLCustomForward):
         super(SRLCustomForwardInverse, self).__init__()
         self.cnn = CustomCNN(state_dim)
 
-        self.forward_l1 = nn.Linear(state_dim + action_dim, 256)
-        self.forward_l2 = nn.Linear(256, state_dim)
-        self.inverse_l1 = nn.Linear(state_dim * 2, 256)  # + action_dim, 256)
-        self.inverse_l2 = nn.Linear(256, 128)
-        self.inverse_l3 = nn.Linear(128, action_dim)
+        self.forward_l1 = nn.Linear(state_dim + action_dim, state_dim)
+        self.inverse_l1 = nn.Linear(state_dim * 2, action_dim)
 
         if cuda:
             self.cnn.cuda()
             self.forward_l1.cuda()
-            self.forward_l2.cuda()
             self.inverse_l1.cuda()
-            self.inverse_l2.cuda()
-            self.inverse_l3.cuda()
-
-        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)    
 
     def inverse(self, s_t, s_t_plus):
         """
@@ -179,9 +206,7 @@ class SRLCustomForwardInverse(SRLCustomForward):
         :return: probability of a_t
         """
         concat = torch.cat((s_t, s_t_plus), 1)
-        inter = nn.functional.relu(self.inverse_l1(concat))
-        inter2 = nn.functional.relu(self.inverse_l2(inter))
-        return self.inverse_l3(inter2)
+        return self.inverse_l1(concat)
     
 class SRLDenseNetwork(BaseModelSRL):
     """

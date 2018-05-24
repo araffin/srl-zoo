@@ -67,7 +67,9 @@ class RoboticPriorsLoss(nn.Module):
 
     def forward(self, states, next_states,
                 dissimilar_pairs, same_actions_pairs, ref_point_pairs,
-                similar_pairs, next_states_pred=None, actions_st=None, actions_pred=None, weight_forward=1, weight_inverse=1.):
+                similar_pairs, rewards_st=None, rewards_st_pred=None,
+                next_states_pred=None, actions_st=None, actions_pred=None, weight_forward=0.,
+                weight_inverse=0., ):
         """
         :param states: (th Variable)
         :param next_states: (th Variable)
@@ -111,24 +113,27 @@ class RoboticPriorsLoss(nn.Module):
 
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
-        if next_states_pred is not None or  actions_pred is not None:
-            total_loss = 0
+        if next_states_pred is not None or actions_pred is not None:
+            total_loss = self.l1_coeff * l1_loss
         else:
+            print('priors')
             total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
                          + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
                          + w_same_env * same_env_loss
 
         weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
-        names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
-                 'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss']
-        losses = [temp_coherence_loss, causality_loss, proportionality_loss,
-                  repeatability_loss, fixed_ref_point_loss, l1_loss, same_env_loss]
-
+        # names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
+        #          'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss']
+        # losses = [temp_coherence_loss, causality_loss, proportionality_loss,
+        #           repeatability_loss, fixed_ref_point_loss, l1_loss, same_env_loss]
+        weights = []
+        names = []
+        losses = []
         # Forward model's loss:
         if next_states_pred is not None:
-            forward_loss = next_states_pred - next_states
-            forward_loss = forward_loss.norm(2, dim=1).mean()            
+            forward_loss = F.mse_loss(next_states_pred, next_states, size_average=True)
             total_loss += weight_forward * forward_loss
+            total_loss += F.mse_loss(rewards_st_pred, rewards_st, size_average=True)
             weights.append(weight_forward)
             names.append('forward_loss')
             losses.append(forward_loss)
@@ -136,15 +141,19 @@ class RoboticPriorsLoss(nn.Module):
         # Inverse model's loss:
         if actions_pred is not None:
             lss = nn.CrossEntropyLoss()
-            #print('pred :',actions_pred.shape, actions_st.squeeze(1).shape)
-            #inverse_loss = F.cross_entropy(input=actions_pred, target=actions_st.squeeze(1))
             inverse_loss = lss(actions_pred, actions_st.squeeze(1))
-            #inverse_loss = actions_pred - actions_st
-            #inverse_loss = inverse_loss.norm(2, dim=1).mean()
-            total_loss += weight_inverse * inverse_loss
+            reward_loss = F.mse_loss(rewards_st_pred, rewards_st, size_average=True)
+            total_loss += weight_inverse * inverse_loss + 1. * reward_loss
+
+            #inverse loss
             weights.append(weight_inverse)
             names.append('inverse_loss')
             losses.append(inverse_loss)
+
+            # reward loss
+            weights.append(1)
+            names.append('reward_loss')
+            losses.append(reward_loss)
 
         if self.loss_history is not None:
             for name, w, loss in zip(names, weights, losses):
@@ -317,11 +326,11 @@ class SRL4robotics(BaseLearner):
         elif model_type == "mlp":
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         elif model_type == "forward_model":
-            self.model = SRLCustomForward(state_dim=self.state_dim, cuda=cuda, noise_std=NOISE_STD)
+            self.model = SRLCustomForward(state_dim=self.state_dim, cuda=cuda)
         elif model_type == "inverse_model":
-            self.model = SRLCustomInverse(state_dim=self.state_dim, cuda=cuda, noise_std=NOISE_STD)
+            self.model = SRLCustomInverse(state_dim=self.state_dim, cuda=cuda)
         elif model_type == "fwd_inv_model":
-            self.model = SRLCustomForwardInverse(state_dim=self.state_dim, cuda=cuda, noise_std=NOISE_STD)
+            self.model = SRLCustomForwardInverse(state_dim=self.state_dim, cuda=cuda)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -588,24 +597,31 @@ class SRL4robotics(BaseLearner):
 
                 # Predict states given observations as in Time Contrastive Network (Triplet Loss) [Sermanet et al.]
                 if self.model_type == "triplet_cnn":
-                    states, positive_states, negtive_states = self.model(obs[:, :3:, :, :], obs[:, 3:6, :, :],
+                    states, positive_states, negative_states = self.model(obs[:, :3:, :, :], obs[:, 3:6, :, :],
                                                                          obs[:, 6:, :, :])
 
                     next_states, next_positive_states, next_negative_states = self.model(next_obs[:, :3:, :, :],
                                                                                          next_obs[:, 3:6, :, :],
                                                                                          next_obs[:, 6:, :, :])
 
-                    loss = criterion(states, positive_states, negtive_states, next_states, next_positive_states, diss,
+                    loss = criterion(states, positive_states, negative_states, next_states, next_positive_states, diss,
                                      same, is_ref_point_list, sim_pairs, no_priors=self.no_priors)
 
                 elif 'forward_model' in self.model_type:
-                    states_t, states_t2 = self.model(obs), self.model(next_obs)
+                    states_t, states_t_plus = self.model(obs), self.model(next_obs)
                     actions_st = actions[minibatchlist[minibatch_idx]]
                     b_size = actions_st.shape[0]
                     actions_st = th.autograd.Variable(th.from_numpy(actions_st).cuda()).view(b_size, 1)
-                    states_t1 = self.model.forward_extra(states_t, actions_st)
-                    loss = criterion(states_t, states_t2, diss, same,
-                                     is_ref_point_list, sim_pairs, next_states_pred=states_t1)
+
+                    states_t_plus_pred = self.model.forward_extra(states_t, actions_st)
+
+                    rewards_st = rewards[minibatchlist[minibatch_idx]]
+                    rewards_st = th.autograd.Variable(th.from_numpy(rewards_st).float().cuda()).view(b_size, 1)
+                    rewards_st_pred = self.model.reward(states_t, actions_st)
+
+                    loss = criterion(states_t, states_t_plus, diss, same,
+                                     is_ref_point_list, sim_pairs, next_states_pred=states_t_plus_pred,
+                                     rewards_st=rewards_st, rewards_st_pred=rewards_st_pred)
 
                 elif 'inverse_model' in self.model_type:
                     states_t, states_t_plus = self.model(obs), self.model(next_obs)                    
@@ -615,9 +631,15 @@ class SRL4robotics(BaseLearner):
                     if states_t_plus.is_cuda:
                         actions_st = actions_st.cuda()
                     actions_pred = self.model.inverse(states_t, states_t_plus)
+
+                    rewards_st = rewards[minibatchlist[minibatch_idx]]
+                    rewards_st = th.autograd.Variable(th.from_numpy(rewards_st).float().cuda()).view(b_size, 1)
+                    rewards_st_pred = self.model.reward(states_t, actions_st)
+
                     loss = criterion(states_t, states_t_plus, diss, same,
                                      is_ref_point_list, sim_pairs, next_states_pred=None,
-                                     actions_st=actions_st, actions_pred=actions_pred)
+                                     actions_st=actions_st, actions_pred=actions_pred,
+                                     rewards_st=rewards_st, rewards_st_pred=rewards_st_pred)
 
                 elif 'fwd_inv_model' in self.model_type:
                     states_t, states_t_plus = self.model(obs), self.model(next_obs)                    
