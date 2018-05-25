@@ -13,7 +13,7 @@ import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
 from models import ConvolutionalNetwork, DenseNetwork, CustomCNN
 from pipeline import saveConfig
-from plotting.representation_plot import plot_representation, plt
+from plotting.representation_plot import plotRepresentation, plt
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import INPUT_DIM
 from utils import parseDataFolder, createFolder
@@ -135,7 +135,7 @@ class SupervisedLearning(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
-                    plot_representation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
+                    plotRepresentation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
                                         name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
@@ -247,7 +247,7 @@ if __name__ == '__main__':
 
     name = "Learned State Representation - {} \n Supervised Learning".format(args.data_folder)
     path = "{}/learned_states.png".format(log_folder)
-    plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
+    plotRepresentation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     if DISPLAY_PLOTS:
         input('\nPress any key to exit.')

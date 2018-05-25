@@ -49,7 +49,7 @@ def createInteractivePlot(fig, ax, states, rewards, images_path, view=0):
     fig.canvas.mpl_connect('button_release_event', callback)
 
 
-def plot_2d_representation(states, rewards, images_path, name="Learned State Representation",
+def plot2dRepresentation(states, rewards, images_path, name="Learned State Representation",
                            add_colorbar=True):
     plt.ion()
     fig = plt.figure(name)
@@ -67,7 +67,7 @@ def plot_2d_representation(states, rewards, images_path, name="Learned State Rep
     plt.show()
 
 
-def plot_3d_representation(states, rewards, images_path, name="Learned State Representation",
+def plot3dRepresentation(states, rewards, images_path, name="Learned State Representation",
                            add_colorbar=True, multi_view=False):
     plt.ion()
     fig = plt.figure(name)
@@ -92,7 +92,7 @@ def plot_3d_representation(states, rewards, images_path, name="Learned State Rep
     plt.show()
 
 
-def plot_representation(states, rewards, images_path, name="Learned State Representation",
+def plotRepresentation(states, rewards, images_path, name="Learned State Representation",
                         add_colorbar=True, fit_pca=True, multi_view=False):
     """
     :param states: (numpy array)
@@ -114,11 +114,11 @@ def plot_representation(states, rewards, images_path, name="Learned State Repres
         # Extend states as 2D:
         states_matrix = np.zeros((states.shape[0], 2))
         states_matrix[:, 0] = states[:, 0]
-        plot_2d_representation(states_matrix, rewards, images_path, name, add_colorbar)
+        plot2dRepresentation(states_matrix, rewards, images_path, name, add_colorbar)
     elif state_dim == 2:
-        plot_2d_representation(states, rewards, images_path, name, add_colorbar)
+        plot2dRepresentation(states, rewards, images_path, name, add_colorbar)
     else:
-        plot_3d_representation(states, rewards, images_path, name, add_colorbar, multi_view)
+        plot3dRepresentation(states, rewards, images_path, name, add_colorbar, multi_view)
 
 
 class ImageFinder(object):
@@ -187,7 +187,7 @@ if __name__ == '__main__':
         print("Loading {}...".format(args.input_file))
         states_rewards = np.load(args.input_file)
         images_path = np.load('data/{}/ground_truth.npz'.format(args.data_folder))['images_path']
-        plot_representation(states_rewards['states'], states_rewards['rewards'], images_path,
+        plotRepresentation(states_rewards['states'], states_rewards['rewards'], images_path,
                             multi_view=args.multi_view)
 
         input('\nPress any key to exit.')
@@ -200,5 +200,5 @@ if __name__ == '__main__':
         rewards = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['rewards']
         name = "Ground Truth States - {}".format(args.data_folder)
 
-        plot_representation(states, rewards, images_path, name, fit_pca=False, multi_view=args.multi_view)
+        plotRepresentation(states, rewards, images_path, name, fit_pca=False, multi_view=args.multi_view)
         input('\nPress any key to exit.')

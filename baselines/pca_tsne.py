@@ -16,7 +16,7 @@ from sklearn.decomposition import IncrementalPCA
 from models.base_learner import BaseLearner
 from pipeline import saveConfig
 import plotting.representation_plot as plot_script
-from plotting.representation_plot import plot_representation
+from plotting.representation_plot import plotRepresentation
 from preprocessing.data_loader import AutoEncoderDataLoader
 from utils import parseDataFolder, createFolder
 
@@ -133,7 +133,7 @@ BaseLearner.saveStates(predictions, images_path, rewards, log_folder)
 
 path = "{}/learned_states.png".format(log_folder)
 name = "Learned State Representation - {} \n {}".format(args.data_folder, args.method)
-plot_representation(predictions, rewards, name, add_colorbar=True, path=path, fit_pca=False)
+plotRepresentation(predictions, rewards, name, add_colorbar=True, path=path, fit_pca=False)
 
 if DISPLAY_PLOTS:
     input('\nPress any key to exit.')

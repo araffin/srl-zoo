@@ -99,9 +99,9 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
         del im  # Free memory
 
 
-class BaxterImageLoader(object):
+class CustomDataLoader(object):
     """
-    Data loader for baxter images.
+    Data loader for effeciently loading images on the fly.
     It uses workers, a prefetch thread and cache the data for efficiency.
 
     :param minibatchlist: [[int]] list of list of int (observations ids)
@@ -124,7 +124,7 @@ class BaxterImageLoader(object):
                  dissimilar, ref_point_pairs=None, similar_pairs=None,
                  test_batch_size=512, cache_capacity=5000,
                  n_workers=5, auto_cleanup=True, multi_view=False, triplets=False):
-        super(BaxterImageLoader, self).__init__()
+        super(CustomDataLoader, self).__init__()
 
         self.n_minibatches = len(minibatchlist)
         # Total number of images
@@ -537,7 +537,7 @@ class BaxterImageLoader(object):
             self._shutdown_workers()
 
 
-class SupervisedDataLoader(BaxterImageLoader):
+class SupervisedDataLoader(CustomDataLoader):
     """
     Data loader for baxter images for supervised learning.
     It uses workers, a prefetch thread.
@@ -617,7 +617,7 @@ class SupervisedDataLoader(BaxterImageLoader):
         self.is_training = False
 
 
-class AutoEncoderDataLoader(BaxterImageLoader):
+class AutoEncoderDataLoader(CustomDataLoader):
     """
     Data loader for baxter images for autoencoder.
     It uses workers, a prefetch thread.

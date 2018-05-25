@@ -25,9 +25,9 @@ import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
 from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet, Discriminator
 from models.priors import ReverseLayerF
-from plotting.representation_plot import plot_representation, plt
+from plotting.representation_plot import plotRepresentation, plt
 from plotting.losses_plot import plotLosses
-from preprocessing.data_loader import BaxterImageLoader
+from preprocessing.data_loader import CustomDataLoader
 from preprocessing.preprocess import INPUT_DIM
 from utils import parseDataFolder, printRed, printYellow
 from pipeline import NO_PAIRS_ERROR, NAN_ERROR
@@ -531,7 +531,7 @@ class SRL4robotics(BaseLearner):
         idx_to_episode = {idx: episode_idx for idx, episode_idx in enumerate(np.cumsum(episode_starts))}
         minibatch_episodes = [[idx_to_episode[i] for i in minibatch] for minibatch in minibatchlist]
 
-        data_loader = BaxterImageLoader(minibatchlist, images_path,
+        data_loader = CustomDataLoader(minibatchlist, images_path,
                                         same_actions, dissimilar, ref_point_pairs,
                                         similar_pairs, cache_capacity=100, multi_view=self.multi_view,
                                         triplets=(self.model_type == "triplet_cnn"))
@@ -662,7 +662,7 @@ class SRL4robotics(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
-                    plot_representation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
+                    plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
                                         add_colorbar=epoch == 0,
                                         name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
@@ -764,7 +764,7 @@ if __name__ == '__main__':
 
     name = "Learned State Representation\n {}".format(args.log_folder.split('/')[-1])
     path = "{}/learned_states.png".format(args.log_folder)
-    plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
+    plotRepresentation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     # Do not close plot at the end of training
     if DISPLAY_PLOTS:

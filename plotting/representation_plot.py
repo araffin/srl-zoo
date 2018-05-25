@@ -47,7 +47,7 @@ def pauseOrClose(fig):
         plt.close(fig)
 
 
-def plot_tsne(states, rewards, name="T-SNE of Learned States", add_colorbar=True, path=None,
+def plotTSNE(states, rewards, name="T-SNE of Learned States", add_colorbar=True, path=None,
               n_components=3, perplexity=100.0, learning_rate=200.0, n_iter=1000, cmap="coolwarm"):
     """
     :param states: (numpy array)
@@ -65,10 +65,10 @@ def plot_tsne(states, rewards, name="T-SNE of Learned States", add_colorbar=True
     t_sne = TSNE(n_components=n_components, perplexity=perplexity,
                  learning_rate=learning_rate, n_iter=n_iter, verbose=1, n_jobs=4)
     s_transformed = t_sne.fit_transform(states)
-    plot_representation(s_transformed, rewards, name, add_colorbar, path, cmap=cmap, fit_pca=False)
+    plotRepresentation(s_transformed, rewards, name, add_colorbar, path, cmap=cmap, fit_pca=False)
 
 
-def plot_representation(states, rewards, name="Learned State Representation",
+def plotRepresentation(states, rewards, name="Learned State Representation",
                         add_colorbar=True, path=None, fit_pca=False, cmap='coolwarm'):
     """
     Plot learned state representation using rewards for coloring
@@ -91,14 +91,14 @@ def plot_representation(states, rewards, name="Learned State Representation",
         # Extend states as 2D:
         states_matrix = np.zeros((states.shape[0], 2))
         states_matrix[:, 0] = states[:, 0]
-        plot_2d_representation(states_matrix, rewards, name, add_colorbar, path, cmap)
+        plot2dRepresentation(states_matrix, rewards, name, add_colorbar, path, cmap)
     elif state_dim == 2:
-        plot_2d_representation(states, rewards, name, add_colorbar, path, cmap)
+        plot2dRepresentation(states, rewards, name, add_colorbar, path, cmap)
     else:
-        plot_3d_representation(states, rewards, name, add_colorbar, path, cmap)
+        plot3dRepresentation(states, rewards, name, add_colorbar, path, cmap)
 
 
-def plot_2d_representation(states, rewards, name="Learned State Representation",
+def plot2dRepresentation(states, rewards, name="Learned State Representation",
                            add_colorbar=True, path=None, cmap='coolwarm'):
     updateDisplayMode()
     fig = plt.figure(name)
@@ -115,7 +115,7 @@ def plot_2d_representation(states, rewards, name="Learned State Representation",
     pauseOrClose(fig)
 
 
-def plot_3d_representation(states, rewards, name="Learned State Representation",
+def plot3dRepresentation(states, rewards, name="Learned State Representation",
                            add_colorbar=True, path=None, cmap='coolwarm'):
     updateDisplayMode()
     fig = plt.figure(name)
@@ -135,20 +135,7 @@ def plot_3d_representation(states, rewards, name="Learned State Representation",
     pauseOrClose(fig)
 
 
-def plot_observations(observations, name='Observation Samples'):
-    updateDisplayMode()
-    fig = plt.figure(name)
-    m, n = 8, 10
-    for i in range(m * n):
-        plt.subplot(m, n, i + 1)
-        plt.imshow(observations[i].reshape(16, 16, 3), interpolation='nearest')
-        plt.gca().invert_yaxis()
-        plt.xticks([])
-        plt.yticks([])
-    pauseOrClose(fig)
-
-
-def plot_image(image, name='Observation Sample'):
+def plotImage(image, name='Observation Sample'):
     """
     Display an image
     :param image: (numpy tensor) (with values in [0, 1])
@@ -183,7 +170,7 @@ def colorPerEpisode(episode_starts):
     return colors
 
 
-def plot_against(states, rewards, title="Representation", fit_pca=False, cmap='coolwarm'):
+def plotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='coolwarm'):
     """
     State dimensions are plotted one against the other (it creates a matrix of 2d representation)
     using rewards for coloring
@@ -261,12 +248,12 @@ if __name__ == '__main__':
 
         if args.t_sne:
             print("Using t-SNE...")
-            plot_tsne(states_rewards['states'], rewards, cmap=cmap)
+            plotTSNE(states_rewards['states'], rewards, cmap=cmap)
         elif args.plot_against:
             print("Plotting against")
-            plot_against(states_rewards['states'], rewards, cmap=cmap)
+            plotAgainst(states_rewards['states'], rewards, cmap=cmap)
         else:
-            plot_representation(states_rewards['states'], rewards, cmap=cmap)
+            plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
         input('\nPress any key to exit.')
 
     elif args.data_folder != "":
@@ -293,9 +280,9 @@ if __name__ == '__main__':
             rewards = colorPerEpisode(episode_starts)
 
         if args.plot_against:
-            plot_against(true_states, rewards, cmap=cmap)
+            plotAgainst(true_states, rewards, cmap=cmap)
         else:
-            plot_representation(true_states, rewards, name, fit_pca=False, cmap=cmap)
+            plotRepresentation(true_states, rewards, name, fit_pca=False, cmap=cmap)
         input('\nPress any key to exit.')
 
     else:

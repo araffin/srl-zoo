@@ -17,7 +17,7 @@ from preprocessing.utils import deNormalize
 from models.base_learner import BaseLearner
 from models import DenseVAE, CNNVAE
 from pipeline import saveConfig
-from plotting.representation_plot import plot_representation, plt, plot_image
+from plotting.representation_plot import plotRepresentation, plt, plotImage
 
 # Python 2/3 compatibility
 try:
@@ -146,8 +146,8 @@ class VAELearning(BaseLearner):
             val_loss /= len(val_loader)
             if DISPLAY_PLOTS:
                 # Plot Reconstructed Image
-                plot_image(deNormalize(noisy_obs[0].data.cpu().numpy()), "Input Validation Image")
-                plot_image(deNormalize(decoded[0].data.cpu().numpy()), "Reconstructed Image")
+                plotImage(deNormalize(noisy_obs[0].data.cpu().numpy()), "Input Validation Image")
+                plotImage(deNormalize(decoded[0].data.cpu().numpy()), "Reconstructed Image")
 
             self.model.train()  # Restore train mode
 
@@ -163,7 +163,7 @@ class VAELearning(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
-                    plot_representation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
+                    plotRepresentation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
                                         name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
@@ -265,7 +265,7 @@ if __name__ == '__main__':
 
     name = "Learned State Representation - {} \n VAE state_dim={}".format(args.data_folder, args.state_dim)
     path = "{}/learned_states.png".format(log_folder)
-    plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
+    plotRepresentation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     if DISPLAY_PLOTS:
         input('\nPress any key to exit.')
