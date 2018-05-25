@@ -50,6 +50,44 @@ NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 VALIDATION_SIZE = 0.2  # 20% of training data for validation
 
 
+def overSampling(batch_size, m_list, pairs, function_on_pairs):
+    """
+    Look for minibatches missing pairs of observations with the similar/dissimilar rewards (see params)
+    Sample for each of those minibatches an observation from another batch that satisfies the
+    similarity/dissimilarity with the 1rst observation.
+    return the new pairs & the modified minibatch list
+    :param batch_size: (int)
+    :param m_list: (list) mini-batch list
+    :param pairs: similar / dissimilar pairs
+    :param function_on_pairs: (function) findDissimilar applied to pairs
+    :return: (list, list) pairs, mini-batch list modified
+    """
+    # For a each minibatch_id
+    if function_on_pairs.__name__ == "findDissimilar":
+        pair_name = 'dissimilar pairs'
+    else:
+        pair_name = 'Unknown pairs'
+    counter = 0
+    for minibatch_id, d in enumerate(pairs):
+        do = True
+        if len(d) == 0:
+            counter += 1
+        # Do if it contains no similar pairs of samples
+        while do and len(d) == 0:
+            # for every minibatch & obs of a mini-batch list
+            for m_id, minibatch in enumerate(m_list):
+                for i in range(batch_size):
+                    # Look for similar samples j in other minibatches m_id
+                    for j in function_on_pairs(i, m_list[minibatch_id], minibatch):
+                        # Copy samples - done once
+                        if (j != i) & (minibatch_id != m_id) and do:
+                            m_list[minibatch_id][j] = minibatch[j]
+                            pairs[minibatch_id] = np.array([[i, j]])
+                            do = False
+    print('Dealt with {} minibatches - {}'.format(counter, pair_name))
+    return pairs, m_list
+
+
 class RoboticPriorsLoss(nn.Module):
     """
     :param model: (PyTorch model)
@@ -67,15 +105,13 @@ class RoboticPriorsLoss(nn.Module):
         self.loss_history = loss_history
 
     def forward(self, states, next_states,
-                dissimilar_pairs, same_actions_pairs, ref_point_pairs,
-                similar_pairs):
+                dissimilar_pairs, same_actions_pairs, ref_point_pairs):
         """
         :param states: (th Variable)
         :param next_states: (th Variable)
         :param dissimilar_pairs: (th tensor)
         :param same_actions_pairs: (th tensor)
         :param ref_point_pairs: (th tensor)
-        :param similar_pairs: (th tensor)
         :return: (th Variable)
         """
         state_diff = next_states - states
@@ -93,7 +129,6 @@ class RoboticPriorsLoss(nn.Module):
                                                                                                    dim=1) ** 2).mean()
 
         w_fixed_point, fixed_ref_point_loss = 0, 0
-        w_same_env, same_env_loss = 0, 0
         if len(ref_point_pairs) > 0:
             # Apply reference point prior
             # It assumes all sequences in the dataset share
@@ -103,23 +138,18 @@ class RoboticPriorsLoss(nn.Module):
             same_pos_states_diff_norm = same_pos_states_diff.norm(2, dim=1)
             w_fixed_point = 1
             fixed_ref_point_loss = (same_pos_states_diff_norm ** 2).mean()
-        elif len(similar_pairs) > 0:
-            # Same Env prior
-            w_same_env = 1
-            same_env_loss = ((states[similar_pairs[:, 1]] - states[similar_pairs[:, 0]]).norm(2, dim=1) ** 2).mean()
 
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
 
         total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
-                     + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
-                     + w_same_env * same_env_loss
+                     + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss
 
         if self.loss_history is not None:
-            weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
+            weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff]
             names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
-                     'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss']
+                     'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss']
             losses = [temp_coherence_loss, causality_loss, proportionality_loss,
-                      repeatability_loss, fixed_ref_point_loss, l1_loss, same_env_loss]
+                      repeatability_loss, fixed_ref_point_loss, l1_loss]
             for name, w, loss in zip(names, weights, losses):
                 if w > 0:
                     if len(self.loss_history[name]) > 0:
@@ -147,14 +177,13 @@ class RoboticPriorsTripletLoss(nn.Module):
         self.loss_history = loss_history
 
     @staticmethod
-    def priorsOnStates(s, next_s, same_actions_pairs, ref_point_pairs, similar_pairs, dissimilar_pairs):
+    def priorsOnStates(s, next_s, same_actions_pairs, ref_point_pairs, dissimilar_pairs):
         """
         :param s: (th Variable) states
         :param next_s: (th Variable) next states
         :param dissimilar_pairs: (th tensor)
         :param same_actions_pairs: (th tensor)
         :param ref_point_pairs: (th tensor)
-        :param similar_pairs: (th tensor)
         """
 
         state_diff = next_s - s
@@ -172,7 +201,6 @@ class RoboticPriorsTripletLoss(nn.Module):
                                                                                                    dim=1) ** 2).mean()
 
         w_fixed_point, fixed_ref_point_loss = 0, 0
-        w_same_env, same_env_loss = 0, 0
         if len(ref_point_pairs) > 0:
             # Apply reference point prior
             # It assumes all sequences in the dataset share
@@ -182,17 +210,12 @@ class RoboticPriorsTripletLoss(nn.Module):
             same_pos_states_diff_norm = same_pos_states_diff.norm(2, dim=1)
             w_fixed_point = 1
             fixed_ref_point_loss = (same_pos_states_diff_norm ** 2).mean()
-        elif len(similar_pairs) > 0:
-            # Same Env prior
-            w_same_env = 1
-            same_env_loss = ((s[similar_pairs[:, 1]] - s[similar_pairs[:, 0]]).norm(2, dim=1) ** 2).mean()
-        return temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss, same_env_loss, \
-               fixed_ref_point_loss, w_same_env, w_fixed_point
+        return temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss, fixed_ref_point_loss, w_fixed_point
 
     # Override in the case of use of Time-Contrastive Triplet Loss
     def forward(self, states, p_states, n_states, next_states, next_p_st,
                 dissimilar_pairs, same_actions_pairs, ref_point_pairs,
-                similar_pairs, alpha=0.2, no_priors=False):
+                alpha=0.2, no_priors=False):
         """
         :param alpha: (float) margin that is enforced between positive & neg observation (TCN Triplet Loss)
         :param states: (th Variable) states for the anchor obs
@@ -203,7 +226,6 @@ class RoboticPriorsTripletLoss(nn.Module):
         :param dissimilar_pairs: (th Tensor)
         :param same_actions_pairs: (th Tensor)
         :param ref_point_pairs: (th Tensor)
-        :param similar_pairs: (th Tensor)
         :param alpha: (float) gap value in the triplet loss
         :param no_priors: (bool) no use of priors in the loss/ Only triplets
         :return: (th Variable)
@@ -213,39 +235,34 @@ class RoboticPriorsTripletLoss(nn.Module):
 
         # Applying the priors on the 1st view
         temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss, \
-        same_env_loss, fixed_ref_point_loss, w_same_env, w_fixed_point = self.priorsOnStates(states, next_states,
-                                                                                             same_actions_pairs,
-                                                                                             ref_point_pairs,
-                                                                                             similar_pairs,
-                                                                                             dissimilar_pairs)
+             fixed_ref_point_loss, w_fixed_point = self.priorsOnStates(states, next_states,
+                                                                       same_actions_pairs,
+                                                                       ref_point_pairs,
+                                                                       dissimilar_pairs)
 
         # Applying the priors on the 2nd view
         temp_coherence_loss_2, causality_loss_2, proportionality_loss_2, repeatability_loss_2, \
-        same_env_loss_2, fixed_ref_point_loss_2, w_same_env_2, w_fixed_point_2 = self.priorsOnStates(p_states,
-                                                                                                     next_p_st,
-                                                                                                     same_actions_pairs,
-                                                                                                     ref_point_pairs,
-                                                                                                     similar_pairs,
-                                                                                                     dissimilar_pairs)
+            fixed_ref_point_loss_2, w_fixed_point_2 = self.priorsOnStates(p_states,
+                                                                          next_p_st,
+                                                                          same_actions_pairs,
+                                                                          ref_point_pairs,
+                                                                          dissimilar_pairs)
 
         temp_coherence_loss += temp_coherence_loss_2
         causality_loss += causality_loss_2
         proportionality_loss += proportionality_loss_2
         repeatability_loss += repeatability_loss_2
-        same_env_loss += same_env_loss_2
         fixed_ref_point_loss += fixed_ref_point_loss_2
 
         if not no_priors:
             total_loss += 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
-                          + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss \
-                          + w_same_env * same_env_loss
-
+                          + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss
             if self.loss_history is not None:
-                weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
+                weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff]
                 names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
-                         'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss']
+                         'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss']
                 losses = [temp_coherence_loss, causality_loss, proportionality_loss,
-                          repeatability_loss, fixed_ref_point_loss, l1_loss, same_env_loss]
+                          repeatability_loss, fixed_ref_point_loss, l1_loss]
                 for name, w, loss in zip(names, weights, losses):
                     if w > 0:
                         if len(self.loss_history[name]) > 0:
@@ -316,8 +333,7 @@ class SRL4robotics(BaseLearner):
         self.no_priors = no_priors
 
     def learn(self, images_path, actions, rewards,
-              episode_starts, is_ref_point_list=None,
-              apply_same_env_prior=False):
+              episode_starts, is_ref_point_list=None):
         """
         Learn a state representation
         :param images_path: (numpy 1D array)
@@ -328,7 +344,6 @@ class SRL4robotics(BaseLearner):
         :param is_ref_point_list: (numpy 1D array) Boolean array where True values represent observations
                                 that correspond to the reference position
                                 (when using the reference prior)
-        :param apply_same_env_prior: (bool) whether to apply same env prior
         :return: (numpy tensor) the learned states for the given observations
         """
 
@@ -356,71 +371,12 @@ class SRL4robotics(BaseLearner):
         # Number of minibatches used for validation:
         n_val_batches = np.round(VALIDATION_SIZE * len(minibatchlist)).astype(np.int64)
         val_indices = np.random.permutation(len(minibatchlist))[:n_val_batches]
+        # Print some info
+        print("{} minibatches for training, {} samples".format(len(minibatchlist) - n_val_batches,
+                                                               (len(minibatchlist) - n_val_batches) * BATCH_SIZE))
         print("{} minibatches for validation, {} samples".format(n_val_batches, n_val_batches * BATCH_SIZE))
         assert n_val_batches > 0, "Not enough sample to create a validation set"
 
-        def overSampling(batch_size, m_list, pairs, function_on_pairs):
-            """
-            Look for minibatches missing pairs of observations with the similar/dissimilar rewards (see params)
-            Sample for each of those minibatches an observation from another batch that satisfies the
-            similarity/dissimilarity with the 1rst observation.
-            return the new pairs & the modified minibatch list
-            :param batch_size: (int)
-            :param m_list: (list) mini-batch list
-            :param pairs: similar / dissimilar pairs
-            :param function_on_pairs: (function) either findSimilar/findDissimilar applied to pairs
-            :return: (list, list) pairs, mini-batch list modified
-            """
-            # For a each minibatch_id
-            if function_on_pairs.__name__ == "findSimilar":
-                pair_name = 'similar pairs'
-            else:
-                pair_name = 'dissimilar pairs'
-            counter = 0
-            for minibatch_id, d in enumerate(pairs):
-                do = True
-                if len(d) == 0:
-                    counter += 1
-                # Do if it contains no similar pairs of samples
-                while do and len(d) == 0:
-                    # for every minibatch & obs of a mini-batch list
-                    for m_id, minibatch in enumerate(m_list):
-                        for i in range(batch_size):
-                            # Look for similar samples j in other minibatches m_id
-                            for j in function_on_pairs(i, m_list[minibatch_id], minibatch):
-                                # Copy samples - done once
-                                if (j != i) & (minibatch_id != m_id) and do:
-                                    m_list[minibatch_id][j] = minibatch[j]
-                                    pairs[minibatch_id] = np.array([[i, j]])
-                                    do = False
-            print('Dealt with {} minibatches - {}'.format(counter, pair_name))
-            return pairs, m_list
-
-        similar_pairs = []
-        if apply_same_env_prior:
-            print("Applying same env prior")
-
-            def findSimilar(index, minibatch1, minibatch2):
-                """
-                check which samples should be similar
-                because they lead to the same positive reward
-                :param index: (int)
-                :param minibatch1: (numpy array)
-                :param minibatch2: (numpy array) in the case of looking for similar obs in another minibatch
-                :return: (dict, numpy array)
-                """
-                # print('minibatch :', minibatch)
-                positive_r = rewards[minibatch2[index] + 1] > 0
-                return np.where(positive_r * (rewards[minibatch2 + 1] == rewards[minibatch1[index] + 1]))[0]
-
-            # to be modified
-            similar_pairs = [
-                np.array(
-                    [[i, j] for i in range(self.batch_size) for j in findSimilar(i, minibatch, minibatch) if j > i],
-                    dtype='int64') for minibatch in minibatchlist]
-
-            # sampling relevant pairs to have at least a pair of similar obs in every minibatches
-            similar_pairs, minibatchlist = overSampling(self.batch_size, minibatchlist, similar_pairs, findSimilar)
         ref_point_pairs = []
         if len(is_ref_point_list) > 0:
             def findRefPoint(index, minibatch):
@@ -532,9 +488,9 @@ class SRL4robotics(BaseLearner):
         minibatch_episodes = [[idx_to_episode[i] for i in minibatch] for minibatch in minibatchlist]
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
-                                        same_actions, dissimilar, ref_point_pairs,
-                                        similar_pairs, cache_capacity=100, multi_view=self.multi_view,
-                                        triplets=(self.model_type == "triplet_cnn"))
+                                       same_actions, dissimilar, ref_point_pairs, cache_capacity=100,
+                                       multi_view=self.multi_view,
+                                       triplets=(self.model_type == "triplet_cnn"))
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
         if self.model_type == "triplet_cnn":
@@ -555,14 +511,12 @@ class SRL4robotics(BaseLearner):
 
             for minibatch_num, _input in enumerate(data_loader):
                 # Unpack input
-                minibatch_idx, obs, next_obs, same, diss, is_ref_point_list, sim_pairs = _input
+                minibatch_idx, obs, next_obs, same_actions, diss_pairs, is_ref_point_list = _input
                 if self.cuda:
                     obs, next_obs = obs.cuda(), next_obs.cuda()
-                    same, diss = same.cuda(), diss.cuda()
+                    same_actions, diss_pairs = same_actions.cuda(), diss_pairs.cuda()
                     if len(is_ref_point_list) > 0:
                         is_ref_point_list = is_ref_point_list.cuda()
-                    if len(sim_pairs) > 0:
-                        sim_pairs = sim_pairs.cuda()
 
                 self.optimizer.zero_grad()
 
@@ -575,15 +529,21 @@ class SRL4robotics(BaseLearner):
                                                                                          next_obs[:, 3:6, :, :],
                                                                                          next_obs[:, 6:, :, :])
 
-                    loss = criterion(states, positive_states, negtive_states, next_states, next_positive_states, diss,
-                                     same, is_ref_point_list, sim_pairs, no_priors=self.no_priors)
+                    loss = criterion(states, positive_states, negtive_states, next_states, next_positive_states,
+                                     diss_pairs,
+                                     same_actions, is_ref_point_list, no_priors=self.no_priors)
 
                 else:
                     states, next_states = self.model(obs), self.model(next_obs)
-                    loss = criterion(states, next_states, diss, same,
-                                     is_ref_point_list, sim_pairs)
+                    loss = criterion(states, next_states, diss_pairs, same_actions,
+                                     is_ref_point_list)
                     if self.episode_prior:
-                        # lambda_ from 0 to 1
+                        # The "episode prior" idea is really close to http://proceedings.mlr.press/v37/ganin15.pdf and GANs
+                        # We train a discriminator that try to distinguish states for same/different episodes
+                        # and then use the opposite gradient to update the states in order to fool it
+
+                        # lambda_ is the weight we give to the episode prior loss
+                        # lambda_ from 0 to 1 (as in original paper)
                         # p = (minibatch_num + epoch * len(data_loader)) / (N_EPOCHS * len(data_loader))
                         # lambda_ = 2. / (1. + np.exp(-10 * p)) - 1
                         lambda_ = 1
@@ -597,14 +557,13 @@ class SRL4robotics(BaseLearner):
                         # Uniform (unbalanced) sampling
                         others_idx = np.random.permutation(len(states))
 
-                        # # balanced sampling
+                        # Balanced sampling
                         # others_idx = np.arange(len(episodes))
                         # for i in range(len(episodes)):
                         #     if np.random.rand() > 0.5:
                         #         others_idx[i] = np.random.choice(np.where(episodes != episodes[i])[0])
                         #     else:
                         #         others_idx[i] = np.random.choice(np.where(episodes == episodes[i])[0])
-
 
                         # Create input for episode discriminator
                         episode_input = th.cat((reverse_states, reverse_states[others_idx, :]), dim=1)
@@ -663,8 +622,8 @@ class SRL4robotics(BaseLearner):
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
                     plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
-                                        add_colorbar=epoch == 0,
-                                        name="Learned State Representation (Training Data)")
+                                       add_colorbar=epoch == 0,
+                                       name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
@@ -699,8 +658,6 @@ if __name__ == '__main__':
                         help='Folder within logs/ where the experiment model and plots will be saved')
     parser.add_argument('--ref-prior', action='store_true', default=False,
                         help='Use Fixed Reference Point Prior (cannot be used at the same time as SameEnv prior)')
-    parser.add_argument('--same-env-prior', action='store_true', default=False,
-                        help='Enable same env prior (disables ref prior)')
     parser.add_argument('--multi-view', action='store_true', default=False,
                         help='Enable use of multiple camera')
     parser.add_argument('--episode-prior', action='store_true', default=False,
@@ -715,7 +672,7 @@ if __name__ == '__main__':
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     VALIDATION_SIZE = args.val_size
-    APPLY_5TH_PRIOR = args.ref_prior and not args.same_env_prior
+    APPLY_5TH_PRIOR = args.ref_prior
     plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
 
     print('Log folder: {}'.format(args.log_folder))
@@ -754,7 +711,7 @@ if __name__ == '__main__':
 
     loss_history, learned_states = srl.learn(images_path, actions,
                                              rewards, episode_starts,
-                                             is_ref_point_list, args.same_env_prior)
+                                             is_ref_point_list)
     # Save losses losses history
     np.savez('{}/loss_history.npz'.format(args.log_folder), **loss_history)
     # Save plot

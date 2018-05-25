@@ -107,13 +107,6 @@ def stateRepresentationLearningCall(exp_config):
         if "Reference" in exp_config["priors"]:
             args.extend(['--ref-prior'])
 
-        if "SameEnv" in exp_config["priors"]:
-            args.extend(['--same-env-prior'])
-
-    # TODO: Remove as soon as possible (only here for backward compatibility)
-    if 'training-set-size' not in exp_config.keys():
-        exp_config['training-set-size'] = -1
-
     for arg in ['learning-rate', 'l1-reg', 'batch-size',
                 'state-dim', 'epochs', 'seed', 'model-type',
                 'log-folder', 'data-folder', 'training-set-size']:

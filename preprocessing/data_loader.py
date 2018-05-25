@@ -109,7 +109,6 @@ class CustomDataLoader(object):
     :param same_actions: [numpy matrix]
     :param dissimilar: [numpy matrix]
     :param ref_point_pairs: [numpy matrix]
-    :param similar_pairs: [numpy matrix]
     :param test_batch_size: (int)
     :param cache_capacity: (int) number of images that can be cached
     :param multi_view: (bool) enables dual camera mode
@@ -121,7 +120,7 @@ class CustomDataLoader(object):
     """
 
     def __init__(self, minibatchlist, images_path, same_actions,
-                 dissimilar, ref_point_pairs=None, similar_pairs=None,
+                 dissimilar, ref_point_pairs=None,
                  test_batch_size=512, cache_capacity=5000,
                  n_workers=5, auto_cleanup=True, multi_view=False, triplets=False):
         super(CustomDataLoader, self).__init__()
@@ -134,17 +133,15 @@ class CustomDataLoader(object):
         self.minibatchlist = np.array(minibatchlist[:])
         # Copy useful array to avoid side effects
         self.images_path = images_path[:]
-        self.dissimilar = np.array(dissimilar[:])
+        self.dissimilar_pairs = np.array(dissimilar[:])
         self.same_actions = np.array(same_actions[:])
         self.ref_point_pairs = np.array(ref_point_pairs[:]) if ref_point_pairs is not None else np.array([])
-        self.similar_pairs = np.array(similar_pairs[:]) if similar_pairs is not None else np.array([])
         # Save minibatches original order
         self.minibatches_indices = np.arange(len(minibatchlist), dtype=np.int64)
         self.original_minibatchlist = self.minibatchlist.copy()
         self.original_same_actions = self.same_actions.copy()
-        self.original_dissimilar = self.dissimilar.copy()
+        self.original_dissimilar_pairs = self.dissimilar_pairs.copy()
         self.original_ref_point_pairs = self.ref_point_pairs.copy()
-        self.original_similar_pairs = self.similar_pairs.copy()
 
         # Index of the minibatch in the iterator
         self.current_idx = 0
@@ -214,9 +211,8 @@ class CustomDataLoader(object):
         self.minibatches_indices = np.arange(len(self.minibatchlist), dtype=np.int64)
         self.minibatchlist = self.original_minibatchlist.copy()
         self.same_actions = self.original_same_actions.copy()
-        self.dissimilar = self.original_dissimilar.copy()
+        self.dissimilar_pairs = self.original_dissimilar_pairs.copy()
         self.ref_point_pairs = self.original_ref_point_pairs.copy()
-        self.similar_pairs = self.original_similar_pairs.copy()
         # Reset the iterator
         self.resetIterator()
 
@@ -309,12 +305,9 @@ class CustomDataLoader(object):
         self.minibatches_indices = indices
         self.minibatchlist = self.minibatchlist[indices]
         self.same_actions = self.same_actions[indices]
-        self.dissimilar = self.dissimilar[indices]
+        self.dissimilar_pairs = self.dissimilar_pairs[indices]
         if len(self.ref_point_pairs) > 0:
             self.ref_point_pairs = self.ref_point_pairs[indices]
-
-        if len(self.similar_pairs) > 0:
-            self.similar_pairs = self.similar_pairs[indices]
 
     def resetQueues(self):
         """
@@ -430,20 +423,15 @@ class CustomDataLoader(object):
         # If we are training we need addional tensors
         # (next obs, dissimilar and similar pairs)
         if self.is_training:
-            diss = self.dissimilar[i][np.random.permutation(self.dissimilar[i].shape[0])]
-            same = self.same_actions[i][np.random.permutation(self.same_actions[i].shape[0])]
+            diss_pairs = self.dissimilar_pairs[i][np.random.permutation(self.dissimilar_pairs[i].shape[0])]
+            same_actions = self.same_actions[i][np.random.permutation(self.same_actions[i].shape[0])]
             # Convert to torch tensor
-            diss, same = th.from_numpy(diss), th.from_numpy(same)
+            diss_pairs, same_actions = th.from_numpy(diss_pairs), th.from_numpy(same_actions)
 
             ref_point_pairs = th.zeros(0)  # Empty tensor
             if len(self.ref_point_pairs) > 0:
                 ref_point_pairs = self.ref_point_pairs[i][np.random.permutation(self.ref_point_pairs[i].shape[0])]
                 ref_point_pairs = th.from_numpy(ref_point_pairs)
-
-            similar_pairs = th.zeros(0)  # Empty tensor
-            if len(self.similar_pairs) > 0:
-                similar_pairs = self.similar_pairs[i][np.random.permutation(self.similar_pairs[i].shape[0])]
-                similar_pairs = th.from_numpy(similar_pairs)
 
             # Retrieve observations
             # Define a dict to modify it in the for loop
@@ -457,8 +445,7 @@ class CustomDataLoader(object):
 
         if self.is_training:
             self.preprocess_result = self.minibatches_indices[i], obs_dict['obs'], obs_dict['next_obs'],\
-                                     diss.clone(), same.clone(),\
-                                     ref_point_pairs.clone(), similar_pairs.clone()
+                                     diss_pairs.clone(), same_actions.clone(), ref_point_pairs.clone()
         else:
             self.preprocess_result = obs_dict['obs']
 
