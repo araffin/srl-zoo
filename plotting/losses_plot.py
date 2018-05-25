@@ -22,7 +22,7 @@ def plotLosses(loss_history, path=None):
     plt.figure("Losses")
     for key in keys:
         # check if the loss was averaged by epoch or not yet
-        if len(loss_history[key].shape) > 1:
+        if isinstance(loss_history[key], np.ndarray) and len(loss_history[key].shape) > 1:
             # the axis here means every axis but the first, so average over every dim, except dim 0
             loss_hist_key = np.mean(loss_history[key], axis=tuple(range(1, len(loss_history[key].shape))))
         else:
