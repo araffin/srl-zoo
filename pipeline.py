@@ -70,23 +70,14 @@ def printConfigOnError(return_code, exp_config, step_name):
     print("End of " + step_name)
 
 
-def preprocessingCall(exp_config, force=False):
+def preprocessingCheck(exp_config):
     """
-    Preprocess the data, if the data are already preprocessed
-    (i.e. the file preprocessed_data.npz exists) it will skip it
-    unless you set the `force` flag to True
+    Check that the data are already preprocessed
+    (i.e. the file preprocessed_data.npz exists)
     :param exp_config: (dict)
-    :param force: (bool)
     """
     preprocessed_file_exist = os.path.isfile('data/{}/preprocessed_data.npz'.format(exp_config['data-folder']))
-    if not force and preprocessed_file_exist:
-        printYellow('Dataset already preprocessed, skipping...')
-        return
-
-    printGreen("\nPreprocessing dataset...")
-    args = ['--data-folder', exp_config['data-folder'], '--no-warnings']
-    ok = subprocess.call(['python', '-m', 'preprocessing.preprocess'] + args)
-    printConfigOnError(ok, exp_config, "preprocessing")
+    assert preprocessed_file_exist, "Dataset must be preprocessed"
 
 
 def stateRepresentationLearningCall(exp_config):
@@ -286,8 +277,8 @@ if __name__ == '__main__':
         # are NOT currently taken into account for baselines
         base_config = exp_config.copy()
         createFolder("logs/{}/baselines".format(exp_config['data-folder']), "Baseline folder already exist")
-        # Preprocessing if needed
-        preprocessingCall(exp_config)
+        # Check that the dataset is already preprocessed
+        preprocessingCheck(exp_config)
 
         # Grid search for baselines
         for seed in [1]:
@@ -339,8 +330,8 @@ if __name__ == '__main__':
         exp_config['relative-pos'] = useRelativePosition(data_folder)
         # Save config in log folder
         saveConfig(exp_config)
-        # Preprocess data if needed
-        preprocessingCall(exp_config)
+        # Check that the dataset is already preprocessed
+        preprocessingCheck(exp_config)
         # Learn a state representation and plot it
         ok = stateRepresentationLearningCall(exp_config)
         if ok:
@@ -359,8 +350,8 @@ if __name__ == '__main__':
         createFolder("logs/{}".format(exp_config['data-folder']), "Dataset log folder already exist")
         createFolder("logs/{}/baselines".format(exp_config['data-folder']), "Baseline folder already exist")
 
-        # Preprocessing
-        preprocessingCall(exp_config)
+        # Check that the dataset is already preprocessed
+        preprocessingCheck(exp_config)
 
         # Grid search
         for seed in [0]:
