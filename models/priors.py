@@ -17,12 +17,7 @@ class SRLConvolutionalNetwork(BaseModelSRL):
     def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
         super(SRLConvolutionalNetwork, self).__init__()
         self.resnet = models.resnet18(pretrained=False)
-        # TODO: add squeezeNet support
-        # self.squeezeNet = models.squeezenet1_0(pretrained=True)
-        # TODO: freeze less layers
-        # Freeze params
-        # for param in self.resnet.parameters():
-        #     param.requires_grad = False
+
         # Replace the last fully-connected layer
         n_units = self.resnet.fc.in_features
         print("{} units in the last layer".format(n_units))
@@ -103,15 +98,27 @@ class SRLDenseNetwork(BaseModelSRL):
 
 # From https://github.com/fungtion/DANN
 class ReverseLayerF(Function):
-
+    """
+    Fonction to backpropagate the opposite of the gradient
+    scaled by a constant
+    """
     @staticmethod
     def forward(ctx, x, lambda_):
+        """
+        :param x: (PyTorch Tensor)
+        :param lambda_: (float) scaling factor
+        :return: (PyTorch Tensor)
+        """
         ctx.lambda_ = lambda_
         # Equivalent to return x ?
         return x.view_as(x)
 
     @staticmethod
     def backward(ctx, grad_output):
+        """
+        :param grad_output: (PyTorch Tensor)
+        :return: (PyTorch Tensor, None)
+        """
         # Compute the opposite of the gradient
         output = grad_output.neg() * ctx.lambda_
         return output, None
@@ -119,6 +126,7 @@ class ReverseLayerF(Function):
 
 class Discriminator(nn.Module):
     """
+    Discriminator network to distinguish states from two different episodes
     :input_dim: (int) input_dim = 2 * state_dim
     """
     def __init__(self, input_dim):

@@ -70,22 +70,6 @@ python pipeline.py -c path/to/exp_config.json
 ```
 
 
-### Preprocessing
-
-```
-python -m preprocessing.preprocess [--data-folder DATA_FOLDER] [--mode MODE] [--no-warnings]
-
---data-folder DATA_FOLDER
-                      Dataset folder name
---mode MODE           Preprocessing mode: One of "image_net", "tf".
---no-warnings         disables warnings
-```
-
-e.g.
-```
-python -m preprocessing.preprocess --data-folder staticButtonSimplest
-```
-
 ### Learn a state representation
 
 Usage:

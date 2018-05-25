@@ -30,7 +30,7 @@ class DenseNetwork(BaseModelSRL):
 
 class ConvolutionalNetwork(BaseModelSRL):
     """
-    Convolutional Neural Network using pretrained ResNet
+    Convolutional Neural Network using ResNet
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
     :param state_dim: (int)
     :param cuda: (bool)

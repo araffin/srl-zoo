@@ -1,7 +1,8 @@
 {
+  "max_dist": "0.28",
   "bound-inf": [0.42,-0.1,-0.11],
   "bound-sup": [0.75,0.60,0.35],
   "fixed-ref-point": [0.598, 0.300, -0.143],
   "fixed-ref-point-threshold": 0.04,
-  "relative-pos": false
+  "relative_pos": false
 }
