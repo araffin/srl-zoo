@@ -347,7 +347,7 @@ class SRL4robotics(BaseLearner):
         # split indices into minibatches. minibatchlist is a list of lists; each
         # list is the id of the observation preserved through the training
         minibatchlist = [np.array(sorted(indices[start_idx:start_idx + self.batch_size]))
-                         for start_idx in range(0, indices.shape[0], self.batch_size)]
+                         for start_idx in range(0, len(indices) - self.batch_size + 1, self.batch_size)]
 
         if len(minibatchlist[-1]) < self.batch_size:
             printYellow("Removing last minibatch of size {} < batch_size".format(len(minibatchlist[-1])))

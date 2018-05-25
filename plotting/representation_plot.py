@@ -233,7 +233,7 @@ def plot_against(states, rewards, title="Representation", fit_pca=False, cmap='c
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Plotting script for representation')
-    parser.add_argument('-i', '--input_file', type=str, default="",
+    parser.add_argument('-i', '--input-file', type=str, default="",
                         help='Path to a npz file containing states and rewards')
     parser.add_argument('--data-folder', type=str, default="",
                         help='Path to a dataset folder, it will plot ground truth states')
@@ -299,4 +299,4 @@ if __name__ == '__main__':
         input('\nPress any key to exit.')
 
     else:
-        print("You must specify one of --input_file or --data-folder")
+        print("You must specify one of --input-file or --data-folder")

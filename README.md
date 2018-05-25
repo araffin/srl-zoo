@@ -1,6 +1,18 @@
-# State Representation Learning with Robotic Priors in PyTorch
+# State Representation Learning Zoo with PyTorch
 
-Related papers:
+A collection of state representation learning methods, written using PyTorch.
+
+Availables methods:
+
+- SRL with Robotic Priors + extensions (stereovision, additional priors)
+- Denoising Autoencoder (DAE)
+- Variational Autoencoder (VAE) and beta-VAE
+- PCA and t-SNE
+- Supervised Learning
+- Forward, inverse models
+- Triplet Network (for stereovision only)
+
+Related papers (robotic priors):
 - "Learning State Representations with Robotic Priors" (Jonschkowski and Brock, 2015), paper: [http://tinyurl.com/gly9sma](http://tinyurl.com/gly9sma)
 - "Unsupervised state representation learning with robotic priors: a robustness benchmark" (Lesort, Seurin et al., 2017), paper: [https://arxiv.org/pdf/1709.05185.pdf](https://arxiv.org/pdf/1709.05185.pdf)
 
@@ -26,7 +38,9 @@ You have to edit `$data_folder` and make sure of the parameters for knn evaluati
 ```
 
 ### Pipeline Script
-It preprocess data, learn a state representation and evaluate it using knn.
+It learns state representations and evaluates them using knn-mse.
+
+To generate data for Kuka and Mobile Robot environment, please see the RL repo: [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl).
 
 Baxter data used in the paper are not public yet. However you can generate new data using [Baxter Simulator](https://github.com/araffin/arm_scenario_simulator) and [Baxter Experiments](https://github.com/NataliaDiaz/arm_scenario_experiments)
 
@@ -335,7 +349,7 @@ For display enhancement:
 ### Example Data
 You can reproduce Rico Jonschkowski's results by downloading npz files from the original [github repository](https://github.com/tu-rbo/learning-state-representations-with-robotic-priors) and placing them in the `data/` folder.
 
-It was tested with the following commit (checkout this one to be sure it will work): [https://github.com/araffin/srl-robotic-priors-pytorch/commit/5175b88a891c240f393b717dd1866435c73ebbda](https://github.com/araffin/srl-robotic-priors-pytorch/commit/5175b88a891c240f393b717dd1866435c73ebbda)
+It was tested with the following commit (checkout this one to be sure it will work): [https://github.com/araffin/srl-zoo/commit/5175b88a891c240f393b717dd1866435c73ebbda](https://github.com/araffin/srl-zoo/commit/5175b88a891c240f393b717dd1866435c73ebbda)
 
 Then run (for example):
 ```

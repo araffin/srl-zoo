@@ -194,6 +194,9 @@ def knnCall(exp_config):
     if exp_config.get('multi-view', False):
         args.extend(['--multi-view'])
 
+    if exp_config.get('relative-pos', False):
+        args.extend(['--relative-pos'])
+
     for arg in ['log-folder', 'n-neighbors', 'n-to-plot']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
