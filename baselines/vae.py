@@ -256,6 +256,8 @@ if __name__ == '__main__':
         images_path = images_path[:limit]
         rewards = rewards[:limit]
 
+    print("{} samples".format(len(images_path)))
+
     print('Learning a state representation ... ')
     srl = VAELearning(args.state_dim, model_type=args.model_type, seed=args.seed,
                       log_folder=log_folder, learning_rate=args.learning_rate,

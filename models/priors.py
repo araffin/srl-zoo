@@ -25,6 +25,7 @@ class SRLConvolutionalNetwork(BaseModelSRL):
         if cuda:
             self.resnet.cuda()
         self.fc = nn.Sequential(
+            nn.ReLU(inplace=True),
             nn.Linear(64, 64),
             nn.ReLU(inplace=True),
             nn.Linear(64, 64),
