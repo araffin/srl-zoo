@@ -68,8 +68,8 @@ class RoboticPriorsLoss(nn.Module):
     def forward(self, states, next_states,
                 dissimilar_pairs, same_actions_pairs, ref_point_pairs,
                 similar_pairs, rewards_st=None, rewards_st_pred=None,
-                next_states_pred=None, actions_st=None, actions_pred=None, weight_forward=0.,
-                weight_inverse=0., ):
+                next_states_pred=None, actions_st=None, actions_pred=None,
+                weight_forward=2.,weight_inverse=1.):
         """
         :param states: (th Variable)
         :param next_states: (th Variable)
@@ -121,7 +121,7 @@ class RoboticPriorsLoss(nn.Module):
                          + 1 * repeatability_loss + w_fixed_point * fixed_ref_point_loss + self.l1_coeff * l1_loss \
                          + w_same_env * same_env_loss
 
-        weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
+        #weights = [1, 1, 1, 1, w_fixed_point, self.l1_coeff, w_same_env]
         # names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
         #          'repeatability_loss', 'fixed_ref_point_loss', 'l1_loss', 'same_env_loss']
         # losses = [temp_coherence_loss, causality_loss, proportionality_loss,
@@ -133,7 +133,7 @@ class RoboticPriorsLoss(nn.Module):
         if next_states_pred is not None:
             forward_loss = F.mse_loss(next_states_pred, next_states, size_average=True)
             total_loss += weight_forward * forward_loss
-            total_loss += F.mse_loss(rewards_st_pred, rewards_st, size_average=True)
+
             weights.append(weight_forward)
             names.append('forward_loss')
             losses.append(forward_loss)
@@ -142,16 +142,21 @@ class RoboticPriorsLoss(nn.Module):
         if actions_pred is not None:
             lss = nn.CrossEntropyLoss()
             inverse_loss = lss(actions_pred, actions_st.squeeze(1))
-            reward_loss = F.mse_loss(rewards_st_pred, rewards_st, size_average=True)
-            total_loss += weight_inverse * inverse_loss + 1. * reward_loss
+            total_loss += weight_inverse * inverse_loss
 
             #inverse loss
             weights.append(weight_inverse)
             names.append('inverse_loss')
             losses.append(inverse_loss)
 
+        # Reward prediction loss
+        if rewards_st is not None and rewards_st_pred is not None:
+            rewards_coeff = 20. #20 inv #2.*20. # 20 *2.5 too big
+            reward_loss = F.mse_loss(rewards_st_pred, rewards_st, size_average=True)
+            total_loss += rewards_coeff * reward_loss
+
             # reward loss
-            weights.append(1)
+            weights.append(rewards_coeff)
             names.append('reward_loss')
             losses.append(reward_loss)
 
@@ -641,6 +646,8 @@ class SRL4robotics(BaseLearner):
                                      actions_st=actions_st, actions_pred=actions_pred,
                                      rewards_st=rewards_st, rewards_st_pred=rewards_st_pred)
 
+                    print("rewards' gradient :",rewards_st_pred.grad)
+
                 elif 'fwd_inv_model' in self.model_type:
                     states_t, states_t_plus = self.model(obs), self.model(next_obs)                    
                     actions_st = actions[minibatchlist[minibatch_idx]]
@@ -650,9 +657,16 @@ class SRL4robotics(BaseLearner):
                         actions_st = actions_st.cuda()
                     states_t_plus_pred = self.model.forward_extra(states_t, actions_st)
                     actions_pred = self.model.inverse(states_t, states_t_plus)
+
+                    rewards_st = rewards[minibatchlist[minibatch_idx]]
+                    rewards_st = th.autograd.Variable(th.from_numpy(rewards_st).float().cuda()).view(b_size, 1)
+                    rewards_st_pred = self.model.reward(states_t, actions_st)
+
                     loss = criterion(states_t, states_t_plus, diss, same,
                                      is_ref_point_list, sim_pairs, next_states_pred=states_t_plus_pred,
-                                     actions_st=actions_st, actions_pred=actions_pred)
+                                     actions_st=actions_st, actions_pred=actions_pred,
+                                     rewards_st=rewards_st, rewards_st_pred=rewards_st_pred)
+                    #
                 else:
                     states, next_states = self.model(obs), self.model(next_obs)
                     loss = criterion(states, next_states, diss, same,

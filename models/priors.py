@@ -74,16 +74,10 @@ class SRLCustomForward(BaseModelSRL):
         self.cnn = CustomCNN(state_dim)
 
         self.forward_layer = nn.Linear(state_dim + action_dim, state_dim)
-        self.reward_layers = nn.Sequential(nn.Linear(state_dim + action_dim, 32),
-                                           nn.ReLU(),
-                                           nn.Linear(32, 16),
-                                           nn.ReLU(),
-                                           nn.Linear(16, 1))
 
         if cuda:
             self.cnn.cuda()
             self.forward_layer.cuda()
-            self.reward_layer.cuda()
 
     def forward(self, x):
         return self.cnn(x)
@@ -106,25 +100,9 @@ class SRLCustomForward(BaseModelSRL):
         concat = torch.cat((s_t, a_one_hot),1)
         return s_t + self.forward_layer(concat)
 
-    def reward(self, s_t, a_t):
-        """
-        #TODO: add bias to for
-        :param s_t: s(t)
-        :param a_t: a(t)
-        :return: s(t+1)
-        """
-
-        # Onehot encoding of the action
-        a_one_hot = torch.Tensor(a_t.shape[0], 6).zero_()
-        if a_t.is_cuda:
-            a_one_hot = a_one_hot.cuda()
-        a_one_hot = torch.autograd.Variable(a_one_hot.scatter_(1, a_t.data, 1.))
-        # Forward pass
-        concat = torch.cat((s_t, a_one_hot),1)
-        return self.reward_layers(concat)
 
 class SRLCustomInverse(BaseModelSRL):
-    def __init__(self, state_dim=2, action_dim=6, cuda=False, noise_std=1e-6, type='linear'):
+    def __init__(self, state_dim=2, action_dim=6, cuda=False):
         """
         :param state_dim:
         :param action_dim:
@@ -134,18 +112,11 @@ class SRLCustomInverse(BaseModelSRL):
         """
         super(SRLCustomInverse, self).__init__()
         self.cnn = CustomCNN(state_dim)
-
-        self.inverse_l1 = nn.Linear(state_dim * 2, action_dim)
-        self.reward_layers = nn.Sequential(nn.Linear(state_dim + action_dim, 32),
-                                           nn.ReLU(),
-                                           nn.Linear(32, 16),
-                                           nn.ReLU(),
-                                           nn.Linear(16, 1))
+        self.inverse_layer = nn.Linear(state_dim * 2, action_dim)
 
         if cuda:
             self.cnn.cuda()
-            self.inverse_l1.cuda()
-            self.reward_layers.cuda()
+            self.inverse_layer.cuda()
 
     def forward(self, x):
         return self.cnn(x)
@@ -158,28 +129,11 @@ class SRLCustomInverse(BaseModelSRL):
         :return: probability of a_t
         """
         concat = torch.cat((s_t, s_t_plus), 1)
-        return self.inverse_l1(concat)
-
-    def reward(self, s_t, a_t):
-        """
-        #TODO: add bias to for
-        :param s_t: s(t)
-        :param a_t: a(t)
-        :return: s(t+1)
-        """
-
-        # Onehot encoding of the action
-        a_one_hot = torch.Tensor(a_t.shape[0], 6).zero_()
-        if a_t.is_cuda:
-            a_one_hot = a_one_hot.cuda()
-        a_one_hot = torch.autograd.Variable(a_one_hot.scatter_(1, a_t.data, 1.))
-        # Forward pass
-        concat = torch.cat((s_t, a_one_hot),1)
-        return self.reward_layers(concat)
+        return self.inverse_layer(concat)
 
 
-class SRLCustomForwardInverse(SRLCustomForward):
-    def __init__(self, state_dim=2, action_dim=6, cuda=False, noise_std=1e-6, type='linear'):
+class SRLCustomForwardInverse(SRLCustomForward, SRLCustomInverse):
+    def __init__(self, state_dim=2, action_dim=6, cuda=False):
         """
         :param state_dim:
         :param action_dim:
@@ -190,24 +144,37 @@ class SRLCustomForwardInverse(SRLCustomForward):
         super(SRLCustomForwardInverse, self).__init__()
         self.cnn = CustomCNN(state_dim)
 
-        self.forward_l1 = nn.Linear(state_dim + action_dim, state_dim)
-        self.inverse_l1 = nn.Linear(state_dim * 2, action_dim)
+        self.forward_layer = nn.Linear(state_dim + action_dim, state_dim)
+        self.inverse_layer = nn.Linear(state_dim * 2, action_dim)
+        self.reward_layers = nn.Sequential(nn.Linear(state_dim + action_dim, 32),
+                                           nn.ReLU(),
+                                           nn.Linear(32, 16),
+                                           nn.ReLU(),
+                                           nn.Linear(16, 1))
 
         if cuda:
             self.cnn.cuda()
-            self.forward_l1.cuda()
-            self.inverse_l1.cuda()
+            self.forward_layer.cuda()
+            self.inverse_layer.cuda()
+            self.reward_layers.cuda()
 
-    def inverse(self, s_t, s_t_plus):
+    def reward(self, s_t, a_t):
         """
         #TODO: add bias to for
         :param s_t: s(t)
-        :param s_t_plus: s(t+1)
-        :return: probability of a_t
+        :param a_t: a(t)
+        :return: r(t+1)
         """
-        concat = torch.cat((s_t, s_t_plus), 1)
-        return self.inverse_l1(concat)
-    
+
+        # Onehot encoding of the action
+        a_one_hot = torch.Tensor(a_t.shape[0], 6).zero_()
+        if a_t.is_cuda:
+            a_one_hot = a_one_hot.cuda()
+        a_one_hot = torch.autograd.Variable(a_one_hot.scatter_(1, a_t.data, 1.))
+        # Forward pass
+        concat = torch.cat((s_t, a_one_hot), 1)
+        return self.reward_layers(concat)
+
 class SRLDenseNetwork(BaseModelSRL):
     """
     Dense Neural Net for State Representation Learning (SRL)
