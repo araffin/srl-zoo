@@ -16,6 +16,46 @@ Related papers (robotic priors):
 - "Learning State Representations with Robotic Priors" (Jonschkowski and Brock, 2015), paper: [http://tinyurl.com/gly9sma](http://tinyurl.com/gly9sma)
 - "Unsupervised state representation learning with robotic priors: a robustness benchmark" (Lesort, Seurin et al., 2017), paper: [https://arxiv.org/pdf/1709.05185.pdf](https://arxiv.org/pdf/1709.05185.pdf)
 
+
+Table of Contents
+=================
+
+  * [Config Files](#config-files)
+    * [Base Config](#base-config)
+    * [Dataset config](#dataset-config)
+    * [Experiment Config](#experiment-config)
+  * [Dataset Format](#dataset-format)
+  * [Launch script](#launch-script)
+  * [Pipeline Script](#pipeline-script)
+    * [Examples](#examples)
+  * [Learn a state representation](#learn-a-state-representation)
+  * [Multiple Cameras](#multiple-cameras)
+    * [Stacked Observations](#stacked-observations)
+    * [Triplets of Observations](#triplets-of-observations)
+  * [Evaluation and Plotting](#evaluation-and-plotting)
+  * [Learned Space Visualization](#learned-space-visualization)
+    * [Create a report](#create-a-report)
+    * [Plot a Learned Representation](#plot-a-learned-representation)
+    * [Interactive Plot](#interactive-plot)
+    * [Create a KNN Plot and Compute KNN-MSE](#create-a-knn-plot-and-compute-knn-mse)
+  * [Baselines](#baselines)
+    * [Supervised Learning](#supervised-learning)
+    * [Autoencoder](#autoencoder)
+    * [VAE](#vae)
+    * [PCA and t-SNE](#pca-and-t-sne)
+  * [SRL Server for Reinforcement Learning](#srl-server-for-reinforcement-learning)
+  * [Running Tests](#running-tests)
+  * [Installation: Dependencies](#installation-dependencies)
+    * [Recommended Method: Use saved conda environment](#recommended-method-use-saved-conda-environment)
+    * [Python 3](#python-3)
+    * [Python 2](#python-2)
+    * [Dependencies details](#dependencies-details)
+  * [Example Data](#example-data)
+* [Troubleshooting](#troubleshooting)
+  * [CUDA out of memory error](#cuda-out-of-memory-error)
+
+
+
 ### Config Files
 
 #### Base Config
@@ -291,19 +331,19 @@ Download test dataset [here](https://drive.google.com/open?id=154qMJHgUnzk0J_Hxm
 
 ### Installation: Dependencies
 
-Recommended configuration: Ubuntu 16.04 with python 2.7 or 3.6
+Recommended configuration: Ubuntu 16.04 with python 2.7 or >= 3.5
 
-#### Recommended Method: Use saved conda environment
+#### Recommended Method: Anaconda Environment
 
 [WARNING] There is one dependency that cannot be installed with a package manager (for now):
 [https://github.com/DmitryUlyanov/Multicore-TSNE](https://github.com/DmitryUlyanov/Multicore-TSNE)
 You have to clone the repo and run `pip install .`.
 
-### Python 3
+#### Python 3
 Please see `environment.yml` file from [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl)
 (Instructions are in the README)
 
-### Python 2
+#### Python 2
 
 Create the new environment `srl` from `environment.yml` file:
 ```
