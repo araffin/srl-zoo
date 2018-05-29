@@ -14,7 +14,7 @@
     "Proportionality",
     "Temporal",
     "Causality",
-    "Repeatability",
+    "Repeatability"
   ],
   "multi-view": true,
   "use-continuous": false,

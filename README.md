@@ -82,11 +82,10 @@ The dataset format is as followed:
 0. You must provide a dataset config file (see previous section) that contains at least if the ground truth is the relative position or not
 1. Image are grouped by episode in different folders (`record_{03d}/` folders)
 2. At the root of the dataset folder, preprocessed_data.npz contains numpy arrays ('episode_starts', 'rewards', 'actions')
-3. At the root of the dataset folder, ground_truth.npz contains numpy arrays ('button_positions', 'arm_states', 'images_path')
+3. At the root of the dataset folder, ground_truth.npz contains numpy arrays ('target_positions', 'ground_truth_states', 'images_path')
 
 The exact format for each numpy array can be found in the example dataset (or in the [RL Repo](https://github.com/araffin/robotics-rl-srl)).
-
-TODO: replace 'arm_states' with 'ground_truth' and 'button_positions' with 'target_positions'
+Note: the variables 'arm_states' and 'button_positions' were renamed 'ground_truth_states' and 'target_positions'
 
 
 ### Launch script

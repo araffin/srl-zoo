@@ -261,10 +261,11 @@ if __name__ == '__main__':
         print("Plotting ground truth...")
         training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
         ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
-        true_states = ground_truth['arm_states']
+        # Backward compatibility with previous names
+        true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
+        target_positions = ground_truth['target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
         name = "Ground Truth States - {}".format(args.data_folder)
         episode_starts, rewards = training_data['episode_starts'], training_data['rewards']
-        button_positions = ground_truth['button_positions']
         with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
             relative_pos = json.load(f).get('relative_pos', False)
 
@@ -274,7 +275,7 @@ if __name__ == '__main__':
             for i in range(len(episode_starts)):
                 if episode_starts[i] == 1:
                     button_idx += 1
-                true_states[i] -= button_positions[button_idx]
+                true_states[i] -= target_positions[button_idx]
 
         if args.color_episode:
             rewards = colorPerEpisode(episode_starts)

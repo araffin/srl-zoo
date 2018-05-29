@@ -214,8 +214,9 @@ if __name__ == '__main__':
 
     # TODO: normalize true states
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
-    true_states = ground_truth['arm_states']
-    button_positions = ground_truth['button_positions']
+    # Backward compatibility with previous names
+    true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
+    target_positions = ground_truth['target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
 
     if args.relative_pos:
         print("Using relative position")
@@ -223,7 +224,7 @@ if __name__ == '__main__':
         for i in range(len(episode_starts)):
             if episode_starts[i] == 1:
                 button_idx += 1
-            true_states[i] -= button_positions[button_idx]
+            true_states[i] -= target_positions[button_idx]
 
     images_path = ground_truth['images_path']
     state_dim = true_states.shape[1]

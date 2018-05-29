@@ -195,7 +195,9 @@ if __name__ == '__main__':
     else:
 
         print("Plotting ground truth...")
-        states = np.load('data/{}/ground_truth.npz'.format(args.data_folder))['arm_states']
+        # TODO: support relative pos
+        ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
+        states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
         images_path = np.load('data/{}/ground_truth.npz'.format(args.data_folder))['images_path']
         rewards = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['rewards']
         name = "Ground Truth States - {}".format(args.data_folder)
