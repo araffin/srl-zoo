@@ -16,7 +16,5 @@
     "Causality",
     "Repeatability"
   ],
-  "multi-view": true,
-  "use-continuous": false,
-  "-comment": "You can add or remove 'Reference' to the list of priors"
+  "multi-view": true
 }
