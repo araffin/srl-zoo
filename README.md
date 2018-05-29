@@ -136,7 +136,7 @@ python train.py [-h] [--epochs N] [--seed S] [--state-dim STATE_DIM]
                 [-bs BATCH_SIZE] [--training-set-size TRAINING_SET_SIZE]
                 [-lr LEARNING_RATE] [--l1-reg L1_REG] [--no-cuda] [--no-plots]
                 [--model-type MODEL_TYPE] --data-folder DATA_FOLDER
-                [--log-folder LOG_FOLDER] [--ref-prior]
+                [--log-folder LOG_FOLDER]
 
   -h, --help            show this help message and exit
   --epochs N            number of epochs to train (default: 50)
@@ -159,7 +159,6 @@ python train.py [-h] [--epochs N] [--seed S] [--state-dim STATE_DIM]
   --log-folder LOG_FOLDER
                         Folder within logs/ where the experiment model and
                         plots will be saved
-  --ref-prior           Use Fixed Reference Point Prior
   --multi-view          Enable use of multiple camera (two)
   --no-priors           Disable use of priors - in case of triplet loss
 

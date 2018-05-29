@@ -41,14 +41,7 @@ def getLogFolderName(exp_config):
     if len(exp_config["priors"]) > 0:
         srl_str = priorsToString(exp_config['priors']) + "_" + srl_str
 
-    if exp_config['use-continuous']:
-        raise NotImplementedError("Continous actions not supported yet")
-        # continuous_str = "_cont_MCD{}_S{}".format(MAX_COS_DIST_AMONG_ACTIONS_THRESHOLD, CONTINUOUS_ACTION_SIGMA)
-        # continuous_str = continuous_str.replace(".", "_")  # replace decimal points by '_' for folder naming
-    else:
-        continuous_str = ""
-
-    experiment_name = "{}{}{}{}_{}".format(date, model_str, continuous_str, srl_str, exp_config['model-approach'])
+    experiment_name = "{}{}{}_{}".format(date, model_str, srl_str, exp_config['model-approach'])
 
     printBlue("\nExperiment: {}\n".format(experiment_name))
     log_folder = "logs/{}/{}".format(exp_config['data-folder'], experiment_name)
@@ -94,9 +87,6 @@ def stateRepresentationLearningCall(exp_config):
 
     if len(exp_config["priors"]) == 0:
         args.extend(['--no-priors'])
-    else:
-        if "Reference" in exp_config["priors"]:
-            args.extend(['--ref-prior'])
 
     for arg in ['learning-rate', 'l1-reg', 'batch-size',
                 'state-dim', 'epochs', 'seed', 'model-type',

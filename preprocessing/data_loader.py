@@ -101,14 +101,13 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
 
 class CustomDataLoader(object):
     """
-    Data loader for effeciently loading images on the fly.
+    Data loader for efficiently loading images on the fly.
     It uses workers, a prefetch thread and cache the data for efficiency.
 
     :param minibatchlist: [[int]] list of list of int (observations ids)
     :param images_path: (numpy 1D array of str)
     :param same_actions: [numpy matrix]
     :param dissimilar: [numpy matrix]
-    :param ref_point_pairs: [numpy matrix]
     :param test_batch_size: (int)
     :param cache_capacity: (int) number of images that can be cached
     :param multi_view: (bool) enables dual camera mode
@@ -120,8 +119,7 @@ class CustomDataLoader(object):
     """
 
     def __init__(self, minibatchlist, images_path, same_actions,
-                 dissimilar, ref_point_pairs=None,
-                 test_batch_size=512, cache_capacity=5000,
+                 dissimilar, test_batch_size=512, cache_capacity=5000,
                  n_workers=5, auto_cleanup=True, multi_view=False, triplets=False):
         super(CustomDataLoader, self).__init__()
 
@@ -135,13 +133,11 @@ class CustomDataLoader(object):
         self.images_path = images_path[:]
         self.dissimilar_pairs = np.array(dissimilar[:])
         self.same_actions = np.array(same_actions[:])
-        self.ref_point_pairs = np.array(ref_point_pairs[:]) if ref_point_pairs is not None else np.array([])
         # Save minibatches original order
         self.minibatches_indices = np.arange(len(minibatchlist), dtype=np.int64)
         self.original_minibatchlist = self.minibatchlist.copy()
         self.original_same_actions = self.same_actions.copy()
         self.original_dissimilar_pairs = self.dissimilar_pairs.copy()
-        self.original_ref_point_pairs = self.ref_point_pairs.copy()
 
         # Index of the minibatch in the iterator
         self.current_idx = 0
@@ -197,7 +193,8 @@ class CustomDataLoader(object):
         # and a common output_queue
         self.workers = []
         for i in range(self.n_workers):
-            w = mp.Process(target=imageWorker, args=(self.image_queues[i], self.output_queue, self.exit_event, self.multi_view, self.triplets))
+            w = mp.Process(target=imageWorker, args=(self.image_queues[i], self.output_queue,
+                                                     self.exit_event, self.multi_view, self.triplets))
             w.daemon = True  # ensure that the worker exits on process exit
             w.start()
             self.workers.append(w)
@@ -212,7 +209,6 @@ class CustomDataLoader(object):
         self.minibatchlist = self.original_minibatchlist.copy()
         self.same_actions = self.original_same_actions.copy()
         self.dissimilar_pairs = self.original_dissimilar_pairs.copy()
-        self.ref_point_pairs = self.original_ref_point_pairs.copy()
         # Reset the iterator
         self.resetIterator()
 
@@ -306,8 +302,6 @@ class CustomDataLoader(object):
         self.minibatchlist = self.minibatchlist[indices]
         self.same_actions = self.same_actions[indices]
         self.dissimilar_pairs = self.dissimilar_pairs[indices]
-        if len(self.ref_point_pairs) > 0:
-            self.ref_point_pairs = self.ref_point_pairs[indices]
 
     def resetQueues(self):
         """
@@ -428,11 +422,6 @@ class CustomDataLoader(object):
             # Convert to torch tensor
             diss_pairs, same_actions = th.from_numpy(diss_pairs), th.from_numpy(same_actions)
 
-            ref_point_pairs = th.zeros(0)  # Empty tensor
-            if len(self.ref_point_pairs) > 0:
-                ref_point_pairs = self.ref_point_pairs[i][np.random.permutation(self.ref_point_pairs[i].shape[0])]
-                ref_point_pairs = th.from_numpy(ref_point_pairs)
-
             # Retrieve observations
             # Define a dict to modify it in the for loop
             obs_dict = {'obs': None, 'next_obs': None}
@@ -445,7 +434,7 @@ class CustomDataLoader(object):
 
         if self.is_training:
             self.preprocess_result = self.minibatches_indices[i], obs_dict['obs'], obs_dict['next_obs'],\
-                                     diss_pairs.clone(), same_actions.clone(), ref_point_pairs.clone()
+                                     diss_pairs.clone(), same_actions.clone()
         else:
             self.preprocess_result = obs_dict['obs']
 

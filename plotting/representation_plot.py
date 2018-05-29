@@ -48,7 +48,7 @@ def pauseOrClose(fig):
 
 
 def plotTSNE(states, rewards, name="T-SNE of Learned States", add_colorbar=True, path=None,
-              n_components=3, perplexity=100.0, learning_rate=200.0, n_iter=1000, cmap="coolwarm"):
+             n_components=3, perplexity=100.0, learning_rate=200.0, n_iter=1000, cmap="coolwarm"):
     """
     :param states: (numpy array)
     :param rewards: (numpy 1D array)
@@ -69,7 +69,7 @@ def plotTSNE(states, rewards, name="T-SNE of Learned States", add_colorbar=True,
 
 
 def plotRepresentation(states, rewards, name="Learned State Representation",
-                        add_colorbar=True, path=None, fit_pca=False, cmap='coolwarm'):
+                       add_colorbar=True, path=None, fit_pca=False, cmap='coolwarm'):
     """
     Plot learned state representation using rewards for coloring
     :param states: (numpy array)
@@ -99,7 +99,7 @@ def plotRepresentation(states, rewards, name="Learned State Representation",
 
 
 def plot2dRepresentation(states, rewards, name="Learned State Representation",
-                           add_colorbar=True, path=None, cmap='coolwarm'):
+                         add_colorbar=True, path=None, cmap='coolwarm'):
     updateDisplayMode()
     fig = plt.figure(name)
     plt.clf()
@@ -116,7 +116,7 @@ def plot2dRepresentation(states, rewards, name="Learned State Representation",
 
 
 def plot3dRepresentation(states, rewards, name="Learned State Representation",
-                           add_colorbar=True, path=None, cmap='coolwarm'):
+                         add_colorbar=True, path=None, cmap='coolwarm'):
     updateDisplayMode()
     fig = plt.figure(name)
     plt.clf()
@@ -213,7 +213,6 @@ def plotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='co
             if i == n - 1:
                 ax.xaxis.set_ticks_position('bottom')
 
-
     plt.suptitle(title, fontsize=16)
     plt.show()
 
@@ -232,8 +231,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     cmap = "tab20" if args.color_episode else "coolwarm"
-    assert not (args.color_episode and args.data_folder == ""),\
-           "You must specify a datafolder when using per-episode color"
+    assert not (args.color_episode and args.data_folder == ""), \
+        "You must specify a datafolder when using per-episode color"
     # Remove `data/` from the path if needed
     if "data/" in args.data_folder:
         args.data_folder = args.data_folder.split('data/')[1].strip("/")
@@ -262,8 +261,10 @@ if __name__ == '__main__':
         training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
         ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
         # Backward compatibility with previous names
-        true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
-        target_positions = ground_truth['target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
+        true_states = ground_truth[
+            'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
+        target_positions = ground_truth[
+            'target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
         name = "Ground Truth States - {}".format(args.data_folder)
         episode_starts, rewards = training_data['episode_starts'], training_data['rewards']
         with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:

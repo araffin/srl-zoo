@@ -97,12 +97,14 @@ class SRLDenseNetwork(BaseModelSRL):
             x = self.noise(x)
         return x
 
+
 # From https://github.com/fungtion/DANN
 class ReverseLayerF(Function):
     """
     Fonction to backpropagate the opposite of the gradient
     scaled by a constant
     """
+
     @staticmethod
     def forward(ctx, x, lambda_):
         """
@@ -130,6 +132,7 @@ class Discriminator(nn.Module):
     Discriminator network to distinguish states from two different episodes
     :input_dim: (int) input_dim = 2 * state_dim
     """
+
     def __init__(self, input_dim):
         super(Discriminator, self).__init__()
         self.net = nn.Sequential(

@@ -50,7 +50,7 @@ def createInteractivePlot(fig, ax, states, rewards, images_path, view=0):
 
 
 def plot2dRepresentation(states, rewards, images_path, name="Learned State Representation",
-                           add_colorbar=True):
+                         add_colorbar=True):
     plt.ion()
     fig = plt.figure(name)
     plt.clf()
@@ -68,7 +68,7 @@ def plot2dRepresentation(states, rewards, images_path, name="Learned State Repre
 
 
 def plot3dRepresentation(states, rewards, images_path, name="Learned State Representation",
-                           add_colorbar=True, multi_view=False):
+                         add_colorbar=True, multi_view=False):
     plt.ion()
     fig = plt.figure(name)
     plt.clf()
@@ -93,7 +93,7 @@ def plot3dRepresentation(states, rewards, images_path, name="Learned State Repre
 
 
 def plotRepresentation(states, rewards, images_path, name="Learned State Representation",
-                        add_colorbar=True, fit_pca=True, multi_view=False):
+                       add_colorbar=True, fit_pca=True, multi_view=False):
     """
     :param states: (numpy array)
     :param rewards: (numpy 1D array)
@@ -188,7 +188,7 @@ if __name__ == '__main__':
         states_rewards = np.load(args.input_file)
         images_path = np.load('data/{}/ground_truth.npz'.format(args.data_folder))['images_path']
         plotRepresentation(states_rewards['states'], states_rewards['rewards'], images_path,
-                            multi_view=args.multi_view)
+                           multi_view=args.multi_view)
 
         input('\nPress any key to exit.')
 
