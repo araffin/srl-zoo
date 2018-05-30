@@ -38,7 +38,15 @@ def getLogFolderName(exp_config):
 
     srl_str = "ST_DIM{}_SEED{}".format(exp_config['state-dim'],
                                        exp_config['seed'])
-    if len(exp_config["priors"]) > 0:
+
+    # baselines
+    if "priors" not in exp_config:
+        for name in ['vae', 'autoencoder', 'supervised']:
+            if name in exp_config['log-folder']:
+                srl_str = "_" + name + "_" + srl_str
+                break
+    # priors
+    elif len(exp_config["priors"]) > 0:
         srl_str = priorsToString(exp_config['priors']) + "_" + srl_str
 
     experiment_name = "{}{}{}_{}".format(date, model_str, srl_str, exp_config['model-approach'])
@@ -121,7 +129,7 @@ def baselineCall(exp_config, baseline="supervised"):
 
     args = ['--no-plots']
     config_args = ['epochs', 'seed', 'model-type',
-                   'data-folder', 'training-set-size']
+                   'data-folder', 'training-set-size', 'log-folder']
 
     if baseline in ["autoencoder", "vae"]:
         config_args += ['state-dim']
@@ -310,7 +318,14 @@ if __name__ == '__main__':
             exp_config = json.load(f)
 
         print("\n Pipeline using json config file: {} \n".format(args.exp_config))
-        experiment_name = exp_config['experiment-name']
+        exp_config = {k.replace('_', '-'): v for k, v in exp_config.items()}
+
+        baseline = None
+        for name in ['vae', 'autoencoder', 'supervised']:
+            if name in exp_config['log-folder']:
+                baseline = name
+                break
+
         data_folder = exp_config['data-folder']
         printGreen("\nDataset folder: {}".format(data_folder))
         # Update and save config
@@ -322,12 +337,16 @@ if __name__ == '__main__':
         saveConfig(exp_config)
         # Check that the dataset is already preprocessed
         preprocessingCheck(exp_config)
-        # Learn a state representation and plot it
-        ok = stateRepresentationLearningCall(exp_config)
-        if ok:
-            # Evaluate the representation with kNN
-            knnCall(exp_config)
 
+        if baseline is None:
+            # Learn a state representation and plot it
+            ok = stateRepresentationLearningCall(exp_config)
+            if ok:
+                # Evaluate the representation with kNN
+                knnCall(exp_config)
+        else:
+            baselineCall(exp_config, baseline)
+            evaluateBaseline(exp_config)
 
     # Grid on State Representation Learning with Priors
     # If using multi_view=true with custom_cnn : make sure you set N_CHANNELS to 6 in preprocess.py
