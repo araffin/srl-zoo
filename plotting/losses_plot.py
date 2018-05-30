@@ -18,7 +18,6 @@ def plotLosses(loss_history, path=None):
     """
     keys = list(loss_history.keys())
     keys.sort()
-
     plt.figure("Losses")
     for key in keys:
         # check if the loss was averaged by epoch or not yet

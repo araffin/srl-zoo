@@ -130,6 +130,7 @@ class VAELearning(BaseLearner):
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.data[0]
+                epoch_train_loss[epoch].append(loss.data[0])
                 pbar.update(1)
             pbar.close()
 
@@ -168,7 +169,7 @@ class VAELearning(BaseLearner):
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
                     plotRepresentation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
-                                        name="Learned State Representation (Training Data)")
+                                       name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
@@ -177,7 +178,7 @@ class VAELearning(BaseLearner):
         # save loss
         np.savez(self.log_folder + "/loss.npz", train=epoch_train_loss, val=epoch_val_loss)
         # Save plot
-        plotLosses({"train":epoch_train_loss, "val":epoch_val_loss}, self.log_folder)
+        plotLosses({"train": epoch_train_loss, "val": epoch_val_loss}, self.log_folder)
         # return predicted states for training observations
         return self.predStatesWithDataLoader(data_loader)
 

@@ -141,7 +141,7 @@ class SupervisedLearning(BaseLearner):
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
                     plotRepresentation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
-                                        name="Learned State Representation (Training Data)")
+                                       name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
@@ -150,7 +150,7 @@ class SupervisedLearning(BaseLearner):
         # save loss
         np.savez(self.log_folder + "/loss.npz", train=epoch_train_loss, val=epoch_val_loss)
         # Save plot
-        plotLosses({"train":epoch_train_loss, "val":epoch_val_loss}, self.log_folder)
+        plotLosses({"train": epoch_train_loss, "val": epoch_val_loss}, self.log_folder)
         # return predicted states for training observations
         return self.predStatesWithDataLoader(data_loader)
 
@@ -197,7 +197,8 @@ if __name__ == '__main__':
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model-type', type=str, default="resnet", help='Model architecture (default: "resnet")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
-    parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
+    parser.add_argument('--training-set-size', type=int, default=-1,
+                        help='Limit size of the training set (default: -1)')
     parser.add_argument('--relative-pos', action='store_true', default=False,
                         help='Use relative position as ground_truth')
     parser.add_argument('--log-folder', type=str, default='', help='Override the default log-folder')
@@ -228,7 +229,8 @@ if __name__ == '__main__':
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
     # Backward compatibility with previous names
     true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
-    target_positions = ground_truth['target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
+    target_positions = ground_truth[
+        'target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
 
     if args.relative_pos:
         print("Using relative position")
