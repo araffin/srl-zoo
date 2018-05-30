@@ -21,10 +21,9 @@ class SRLConvolutionalNetwork(BaseModelSRL):
         # Replace the last fully-connected layer
         n_units = self.resnet.fc.in_features
         print("{} units in the last layer".format(n_units))
-        self.resnet.fc = nn.Linear(n_units, 64)
-        if cuda:
-            self.resnet.cuda()
-        self.fc = nn.Sequential(
+
+        self.resnet.fc = nn.Sequential(
+            nn.Linear(n_units, 64),
             nn.ReLU(inplace=True),
             nn.Linear(64, 64),
             nn.ReLU(inplace=True),
@@ -32,13 +31,14 @@ class SRLConvolutionalNetwork(BaseModelSRL):
             nn.ReLU(inplace=True),
             nn.Linear(64, state_dim),
         )
+        if cuda:
+            self.resnet.cuda()
         # This variant does not require the batch_size
         self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
         # self.noise = GaussianNoise(batch_size, state_dim, noise_std, cuda=cuda)
 
     def forward(self, x):
         x = self.resnet(x)
-        x = self.fc(x)
         if self.training:
             x = self.noise(x)
         return x
