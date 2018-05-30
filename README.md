@@ -63,7 +63,7 @@ Config common to all dataset can found in [configs/default.json](configs/default
 
 #### Dataset config
 All dataset must be placed in the `data/` folder.
-Each datasetmust contain a `dataset_config.json` file, an example can be found [here](configs/example_dataset_config.json).
+Each dataset must contain a `dataset_config.json` file, an example can be found [here](configs/example_dataset_config.json).
 This config file describes variables specifics to this dataset.
 
 
