@@ -29,7 +29,7 @@ def testPriorTrain():
         args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
                 '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
                 '--seed', SEED, '--val-size', 0.1, '--log-folder', LOG_FOLDER,
-                '--state-dim', STATE_DIM, '--model-type', model_type]
+                '--state-dim', STATE_DIM, '--model-type', model_type, '-bs', 128]
         args = list(map(str, args))
 
         ok = subprocess.call(['python', 'train.py'] + args)

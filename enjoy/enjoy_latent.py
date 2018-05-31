@@ -62,14 +62,14 @@ def main():
     # is this a valid model
     assert srl_model_type in VALID_MODEL, "Error: '{}' model is not supported."
 
+    data = json.load(open(args.log_dir + 'image_to_state.json'))
+    state_dim = len(list(data.values())[0])
+
     # model param and info
     if srl_model_type != 'priors':
         assert os.path.exists(
             args.log_dir + "exp_config.json"), "Error: could not find 'exp_config.json' in '{}'".format(
             args.log_dir)
-
-        data = json.load(open(args.log_dir + 'exp_config.json'))
-        state_dim = data["state_dim"]
 
         # loading the model
         if srl_model_type == "autoencoder":
@@ -82,8 +82,7 @@ def main():
             srl_model.cuda()
 
     else:
-        data = json.load(open(args.log_dir + 'image_to_state.json'))
-        state_dim = len(list(data.values())[0])
+
         srl_model_knn = KNeighborsClassifier()
 
         # Load all the points and images, find bounds and train KNN model
@@ -111,7 +110,7 @@ def main():
         if k == 27:
             break
 
-        # make the image 
+        # make the image
         mu = []
         for i in range(state_dim):
             mu.append(cv2.getTrackbarPos(str(i), 'sliders'))
@@ -121,6 +120,8 @@ def main():
         else:
             # rescale for the bounds of the priors representation, and find nearest image
             img_path = y[srl_model_knn.predict([(np.array(mu) / 100) * (max_X - min_X) + min_X])[0]]
+            # Remove trailing .jpg if present
+            img_path = img_path.split('.jpg')[0]
             img = cv2.imread("data/" + img_path + ".jpg")
 
         # stop if user closed a window

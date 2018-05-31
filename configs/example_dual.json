@@ -14,10 +14,7 @@
     "Proportionality",
     "Temporal",
     "Causality",
-    "Repeatability",
-    "SameEnv"
+    "Repeatability"
   ],
-  "multi-view": true,
-  "use-continuous": false,
-  "-comment": "You can add or remove 'Reference|SameEnv' to the list of priors"
+  "multi-view": true
 }

@@ -38,17 +38,18 @@ def getLogFolderName(exp_config):
 
     srl_str = "ST_DIM{}_SEED{}".format(exp_config['state-dim'],
                                        exp_config['seed'])
-    if len(exp_config["priors"]) > 0:
+
+    # baselines
+    if "priors" not in exp_config:
+        for name in ['vae', 'autoencoder', 'supervised']:
+            if name in exp_config['log-folder']:
+                srl_str = "_" + name + "_" + srl_str
+                break
+    # priors
+    elif len(exp_config["priors"]) > 0:
         srl_str = priorsToString(exp_config['priors']) + "_" + srl_str
 
-    if exp_config['use-continuous']:
-        raise NotImplementedError("Continous actions not supported yet")
-        # continuous_str = "_cont_MCD{}_S{}".format(MAX_COS_DIST_AMONG_ACTIONS_THRESHOLD, CONTINUOUS_ACTION_SIGMA)
-        # continuous_str = continuous_str.replace(".", "_")  # replace decimal points by '_' for folder naming
-    else:
-        continuous_str = ""
-
-    experiment_name = "{}{}{}{}_{}".format(date, model_str, continuous_str, srl_str, exp_config['model-approach'])
+    experiment_name = "{}{}{}_{}".format(date, model_str, srl_str, exp_config['model-approach'])
 
     printBlue("\nExperiment: {}\n".format(experiment_name))
     log_folder = "logs/{}/{}".format(exp_config['data-folder'], experiment_name)
@@ -70,23 +71,14 @@ def printConfigOnError(return_code, exp_config, step_name):
     print("End of " + step_name)
 
 
-def preprocessingCall(exp_config, force=False):
+def preprocessingCheck(exp_config):
     """
-    Preprocess the data, if the data are already preprocessed
-    (i.e. the file preprocessed_data.npz exists) it will skip it
-    unless you set the `force` flag to True
+    Check that the data are already preprocessed
+    (i.e. the file preprocessed_data.npz exists)
     :param exp_config: (dict)
-    :param force: (bool)
     """
     preprocessed_file_exist = os.path.isfile('data/{}/preprocessed_data.npz'.format(exp_config['data-folder']))
-    if not force and preprocessed_file_exist:
-        printYellow('Dataset already preprocessed, skipping...')
-        return
-
-    printGreen("\nPreprocessing dataset...")
-    args = ['--data-folder', exp_config['data-folder'], '--no-warnings']
-    ok = subprocess.call(['python', '-m', 'preprocessing.preprocess'] + args)
-    printConfigOnError(ok, exp_config, "preprocessing")
+    assert preprocessed_file_exist, "Dataset must be preprocessed"
 
 
 def stateRepresentationLearningCall(exp_config):
@@ -103,16 +95,6 @@ def stateRepresentationLearningCall(exp_config):
 
     if len(exp_config["priors"]) == 0:
         args.extend(['--no-priors'])
-    else:
-        if "Reference" in exp_config["priors"]:
-            args.extend(['--ref-prior'])
-
-        if "SameEnv" in exp_config["priors"]:
-            args.extend(['--same-env-prior'])
-
-    # TODO: Remove as soon as possible (only here for backward compatibility)
-    if 'training-set-size' not in exp_config.keys():
-        exp_config['training-set-size'] = -1
 
     for arg in ['learning-rate', 'l1-reg', 'batch-size',
                 'state-dim', 'epochs', 'seed', 'model-type',
@@ -147,7 +129,7 @@ def baselineCall(exp_config, baseline="supervised"):
 
     args = ['--no-plots']
     config_args = ['epochs', 'seed', 'model-type',
-                   'data-folder', 'training-set-size']
+                   'data-folder', 'training-set-size', 'log-folder']
 
     if baseline in ["autoencoder", "vae"]:
         config_args += ['state-dim']
@@ -193,6 +175,9 @@ def knnCall(exp_config):
 
     if exp_config.get('multi-view', False):
         args.extend(['--multi-view'])
+
+    if exp_config.get('relative-pos', False):
+        args.extend(['--relative-pos'])
 
     for arg in ['log-folder', 'n-neighbors', 'n-to-plot']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
@@ -290,8 +275,8 @@ if __name__ == '__main__':
         # are NOT currently taken into account for baselines
         base_config = exp_config.copy()
         createFolder("logs/{}/baselines".format(exp_config['data-folder']), "Baseline folder already exist")
-        # Preprocessing if needed
-        preprocessingCall(exp_config)
+        # Check that the dataset is already preprocessed
+        preprocessingCheck(exp_config)
 
         # Grid search for baselines
         for seed in [1]:
@@ -307,14 +292,14 @@ if __name__ == '__main__':
             # Autoencoder and VAE
             exp_config['model-type'] = "cnn"
             for baseline in ['autoencoder', 'vae']:
-                for state_dim in [3, 6, 12, 32]:
+                for state_dim in [2, 3, 6, 12, 32]:
                     # Update config
                     exp_config['state-dim'] = state_dim
                     baselineCall(exp_config, baseline)
                     evaluateBaseline(base_config)
 
         # PCA
-        for state_dim in [6, 12, 32]:
+        for state_dim in [2, 6, 12, 32]:
             # Update config
             exp_config['state-dim'] = state_dim
             dimReductionCall(exp_config, 'pca')
@@ -333,7 +318,14 @@ if __name__ == '__main__':
             exp_config = json.load(f)
 
         print("\n Pipeline using json config file: {} \n".format(args.exp_config))
-        experiment_name = exp_config['experiment-name']
+        exp_config = {k.replace('_', '-'): v for k, v in exp_config.items()}
+
+        baseline = None
+        for name in ['vae', 'autoencoder', 'supervised']:
+            if name in exp_config['log-folder']:
+                baseline = name
+                break
+
         data_folder = exp_config['data-folder']
         printGreen("\nDataset folder: {}".format(data_folder))
         # Update and save config
@@ -343,14 +335,18 @@ if __name__ == '__main__':
         exp_config['relative-pos'] = useRelativePosition(data_folder)
         # Save config in log folder
         saveConfig(exp_config)
-        # Preprocess data if needed
-        preprocessingCall(exp_config)
-        # Learn a state representation and plot it
-        ok = stateRepresentationLearningCall(exp_config)
-        if ok:
-            # Evaluate the representation with kNN
-            knnCall(exp_config)
+        # Check that the dataset is already preprocessed
+        preprocessingCheck(exp_config)
 
+        if baseline is None:
+            # Learn a state representation and plot it
+            ok = stateRepresentationLearningCall(exp_config)
+            if ok:
+                # Evaluate the representation with kNN
+                knnCall(exp_config)
+        else:
+            baselineCall(exp_config, baseline)
+            evaluateBaseline(exp_config)
 
     # Grid on State Representation Learning with Priors
     # If using multi_view=true with custom_cnn : make sure you set N_CHANNELS to 6 in preprocess.py
@@ -363,13 +359,13 @@ if __name__ == '__main__':
         createFolder("logs/{}".format(exp_config['data-folder']), "Dataset log folder already exist")
         createFolder("logs/{}/baselines".format(exp_config['data-folder']), "Baseline folder already exist")
 
-        # Preprocessing
-        preprocessingCall(exp_config)
+        # Check that the dataset is already preprocessed
+        preprocessingCheck(exp_config)
 
         # Grid search
         for seed in [0]:
             exp_config['seed'] = seed
-            for state_dim in [10]: #[3, 4, 6, 10]:
+            for state_dim in [2, 3, 4, 6, 10]:
                 # Update config
                 exp_config['state-dim'] = state_dim
                 log_folder, experiment_name = getLogFolderName(exp_config)
