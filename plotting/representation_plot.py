@@ -121,6 +121,7 @@ def plot3dRepresentation(states, rewards, name="Learned State Representation",
     fig = plt.figure(name)
     plt.clf()
     ax = fig.add_subplot(111, projection='3d')
+    print('reward', rewards.shape, states.shape)
     im = ax.scatter(states[:, 0], states[:, 1], states[:, 2],
                     s=7, c=rewards, cmap=cmap, linewidths=0.1)
     ax.set_xlabel('State dimension 1')
@@ -240,11 +241,12 @@ if __name__ == '__main__':
     if args.input_file != "":
         print("Loading {}...".format(args.input_file))
         states_rewards = np.load(args.input_file)
+        print(states_rewards.keys())
         rewards = states_rewards['rewards']
         if args.color_episode:
             episode_starts = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['episode_starts']
             rewards = colorPerEpisode(episode_starts)[:len(rewards)]
-
+            print('episodes starts: ', episode_starts.shape)
         if args.t_sne:
             print("Using t-SNE...")
             plotTSNE(states_rewards['states'], rewards, cmap=cmap)
@@ -252,7 +254,50 @@ if __name__ == '__main__':
             print("Plotting against")
             plotAgainst(states_rewards['states'], rewards, cmap=cmap)
         else:
-            plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
+            button_pos_ = []
+            print('rewards shape:' ,rewards.shape)
+            ### TEMPORARY TO VISUALIZE CORR BETWEEN STATES & BUTTON POS
+            if args.data_folder != "":
+                print("Plotting ground truth...")
+                training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
+                ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
+                true_states = ground_truth['arm_states']
+                name = "Ground Truth States - {}".format(args.data_folder)
+                episode_starts_gd, rewards_ground = training_data['episode_starts'], training_data['rewards']
+                button_positions = ground_truth['button_positions']
+                print('button pos shape: ', button_positions.shape)
+                with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
+                    relative_pos = json.load(f).get('relative_pos', False)
+                if args.color_episode:
+                    rewards_ground = colorPerEpisode(episode_starts_gd)
+                # True state is the relative position to the button
+                if relative_pos:
+                    button_idx = -1
+                    for i in range(len(episode_starts)):
+                        if episode_starts[i] == 1:
+                            button_idx += 1
+                        #true_states[i] -= button_positions[button_idx]
+                        true_states[i] -= button_positions[button_idx]
+                        button_pos_.append(button_positions[button_idx])
+                button_pos_ = np.array(button_pos_[:len(rewards)]) #+ 0.00001
+                #states_rewards['states'] += 0.00001
+                print('ground_truth s reward s shape:', rewards_ground.shape)
+                #plotRepresentation(true_states, rewards_ground, name, fit_pca=False, cmap=cmap)
+                #input('\nPress any key to exit.')
+                #plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
+                #input('\nPress any key to exit.')
+
+
+                corr_x = np.corrcoef(button_pos_[:,0].reshape((20000, 1)) + 0.00001 ,
+                                     states_rewards['states'][:,0].reshape((20000, 1)) + 0.0001 )
+                corr_y = np.corrcoef(button_pos_[:, 1].reshape((20000, 1)) + 0.00001 ,
+                                     states_rewards['states'][:, 1].reshape((20000, 1)) + 0.0001 )
+
+                #print(button_pos_.shape, states_rewards['states'].shape, 'corr shape ',corr.shape,button_pos_[:,0].reshape((20000, 1)).shape)
+                plt.matshow(corr_x, cmap=cmap)
+                plt.show()
+            ###########################################################
+            #plot_representation(states_rewards['states'], rewards, cmap=cmap)
         input('\nPress any key to exit.')
 
     elif args.data_folder != "":
@@ -267,6 +312,9 @@ if __name__ == '__main__':
             'target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
         name = "Ground Truth States - {}".format(args.data_folder)
         episode_starts, rewards = training_data['episode_starts'], training_data['rewards']
+
+        button_positions = ground_truth['button_positions']
+        print('button pos shape: ',button_positions.shape, button_positions)
         with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
             relative_pos = json.load(f).get('relative_pos', False)
 
