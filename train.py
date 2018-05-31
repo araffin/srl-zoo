@@ -25,7 +25,7 @@ from tqdm import tqdm
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
 from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet, Discriminator, \
-                   SRLCustomForward, SRLCustomInverse, SRLCustomForwardInverse
+    SRLCustomForward, SRLCustomInverse, SRLCustomForwardInverse
 from models.priors import ReverseLayerF
 from plotting.representation_plot import plotRepresentation, plt
 from plotting.losses_plot import plotLosses
@@ -111,7 +111,7 @@ class RoboticPriorsLoss(nn.Module):
 
     def forward(self, states, next_states,
                 dissimilar_pairs, same_actions_pairs,
-                rewards_st=None, rewards_st_pred=None,
+                rewards_st=None, rewards_pred=None,
                 next_states_pred=None, actions_st=None, actions_pred=None,
                 weight_forward=2., weight_inverse=1.):
         """
@@ -164,15 +164,15 @@ class RoboticPriorsLoss(nn.Module):
             inverse_loss = lss(actions_pred, actions_st.squeeze(1))
             total_loss += weight_inverse * inverse_loss
 
-            #inverse loss
+            # inverse loss
             weights.append(weight_inverse)
             names.append('inverse_loss')
             losses.append(inverse_loss)
 
         # Reward prediction loss
-        if rewards_st is not None and rewards_st_pred is not None:
-            rewards_coeff = 20. #20 inv #2.*20. # 20 *2.5 too big
-            reward_loss = F.mse_loss(rewards_st_pred, rewards_st, size_average=True)
+        if rewards_st is not None and rewards_pred is not None:
+            rewards_coeff = 20.  # 20 inv #2.*20. # 20 *2.5 too big
+            reward_loss = F.mse_loss(rewards_pred, rewards_st, size_average=True)
             total_loss += rewards_coeff * reward_loss
 
             # reward loss
@@ -311,6 +311,9 @@ class SRL4robotics(BaseLearner):
 
         self.multi_view = multi_view
         self.episode_prior = episode_prior
+        self.use_forward_loss = False
+        self.use_inverse_loss = False
+        self.use_reward_loss = False
 
         if model_type == "resnet":
             self.model = SRLConvolutionalNetwork(self.state_dim, cuda, noise_std=NOISE_STD)
@@ -322,10 +325,14 @@ class SRL4robotics(BaseLearner):
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         elif model_type == "forward_model":
             self.model = SRLCustomForward(state_dim=self.state_dim, cuda=cuda)
+            self.use_forward_loss = True
         elif model_type == "inverse_model":
             self.model = SRLCustomInverse(state_dim=self.state_dim, cuda=cuda)
+            self.use_inverse_loss = True
         elif model_type == "fwd_inv_model":
             self.model = SRLCustomForwardInverse(state_dim=self.state_dim, cuda=cuda)
+            self.use_forward_loss, self.use_inverse_loss = True, True
+            self.use_reward_loss = True
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -388,6 +395,20 @@ class SRL4robotics(BaseLearner):
         print("{} minibatches for validation, {} samples".format(n_val_batches, n_val_batches * BATCH_SIZE))
         assert n_val_batches > 0, "Not enough sample to create a validation set"
 
+        # Stats about actions
+        action_set = set(actions)
+        n_actions = np.max(actions) + 1
+        print("{} unique actions / {} actions".format(len(action_set), n_actions))
+        n_pairs_per_action = np.zeros(n_actions, dtype=np.int64)
+        n_obs_per_action = np.zeros(n_actions, dtype=np.int64)
+
+        for i in range(n_actions):
+            n_obs_per_action[i] = np.sum(actions == i)
+
+        print("Number of observations per action")
+        print(n_obs_per_action)
+
+        # TODO: compute pairs only when needed
         def findDissimilar(index, minibatch1, minibatch2):
             """
             check which samples should be dissimilar
@@ -400,12 +421,14 @@ class SRL4robotics(BaseLearner):
             return np.where((actions[minibatch2] == actions[minibatch1[index]]) *
                             (rewards[minibatch2 + 1] != rewards[minibatch1[index] + 1]))[0]
 
-        dissimilar = [
-            np.array([[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch, minibatch) if j > i],
-                     dtype='int64') for minibatch in minibatchlist]
+        dissimilar_pairs = [
+            np.array(
+                [[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch, minibatch) if j > i],
+                dtype='int64') for minibatch in minibatchlist]
 
         # sampling relevant pairs to have at least a pair of dissimilar obs in every minibatches
-        dissimilar, minibatchlist = overSampling(self.batch_size, minibatchlist, dissimilar, findDissimilar)
+        dissimilar_pairs, minibatchlist = overSampling(self.batch_size, minibatchlist, dissimilar_pairs,
+                                                       findDissimilar)
 
         def findSameActions(index, minibatch):
             """
@@ -422,28 +445,16 @@ class SRL4robotics(BaseLearner):
             np.array([[i, j] for i in range(self.batch_size) for j in findSameActions(i, minibatch) if j > i],
                      dtype='int64') for minibatch in minibatchlist]
 
-        # Stats about pairs
-        action_set = set(actions)
-        n_actions = np.max(actions) + 1
-        print("{} unique actions / {} actions".format(len(action_set), n_actions))
-        n_pairs_per_action = np.zeros(n_actions, dtype=np.int64)
-        n_obs_per_action = np.zeros(n_actions, dtype=np.int64)
-
-        for i in range(n_actions):
-            n_obs_per_action[i] = np.sum(actions == i)
-
-        print("Number of observations per action")
-        print(n_obs_per_action)
-
         for pair, minibatch in zip(same_actions, minibatchlist):
             for i in range(n_actions):
                 n_pairs_per_action[i] += np.sum(actions[minibatch[pair[:, 0]]] == i)
 
+        # Stats about pairs
         print("Number of pairs per action:")
         print(n_pairs_per_action)
         print("Pairs of {} unique actions".format(np.sum(n_pairs_per_action > 0)))
 
-        for item in same_actions + dissimilar:
+        for item in same_actions + dissimilar_pairs:
             if len(item) == 0:
                 msg = "No same actions or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
                     BATCH_SIZE)
@@ -451,19 +462,20 @@ class SRL4robotics(BaseLearner):
                 printRed(msg)
                 sys.exit(NO_PAIRS_ERROR)
 
+
         # For episode prior
         idx_to_episode = {idx: episode_idx for idx, episode_idx in enumerate(np.cumsum(episode_starts))}
         minibatch_episodes = [[idx_to_episode[i] for i in minibatch] for minibatch in minibatchlist]
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
-                                       same_actions, dissimilar, cache_capacity=100,
+                                       same_actions, dissimilar_pairs, cache_capacity=100,
                                        multi_view=self.multi_view,
                                        triplets=(self.model_type == "triplet_cnn"))
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
         if self.model_type == "triplet_cnn":
             criterion = RoboticPriorsTripletLoss(self.model, self.l1_reg, loss_history)
-        #elif self.model_type == "forward_model":
+        # elif self.model_type == "forward_model":
         #    pass
         else:
             criterion = RoboticPriorsLoss(self.model, self.l1_reg, loss_history)
@@ -473,7 +485,6 @@ class SRL4robotics(BaseLearner):
         self.model.train()
         start_time = time.time()
 
-        actions_st_prev = None
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             epoch_loss, epoch_batches = 0, 0
@@ -501,65 +512,41 @@ class SRL4robotics(BaseLearner):
 
                     loss = criterion(states, positive_states, negative_states, next_states, next_positive_states,
                                      diss_pairs, same_actions, no_priors=self.no_priors)
-
-                elif 'forward_model' in self.model_type:
-                    states_t, states_t_plus = self.model(obs), self.model(next_obs)
-                    actions_st = actions[minibatchlist[minibatch_idx]]
-                    b_size = actions_st.shape[0]
-                    actions_st = th.autograd.Variable(th.from_numpy(actions_st).cuda()).view(b_size, 1)
-
-                    states_t_plus_pred = self.model.forward_extra(states_t, actions_st)
-
-                    rewards_st = rewards[minibatchlist[minibatch_idx]]
-                    rewards_st = th.autograd.Variable(th.from_numpy(rewards_st).float().cuda()).view(b_size, 1)
-                    rewards_st_pred = self.model.reward(states_t, actions_st)
-
-                    loss = criterion(states_t, states_t_plus, diss, same,
-                                     is_ref_point_list, sim_pairs, next_states_pred=states_t_plus_pred,
-                                     rewards_st=rewards_st, rewards_st_pred=rewards_st_pred)
-
-                elif 'inverse_model' in self.model_type:
-                    states_t, states_t_plus = self.model(obs), self.model(next_obs)
-                    actions_st = actions[minibatchlist[minibatch_idx]]
-                    b_size = actions_st.shape[0]
-                    actions_st = th.autograd.Variable(th.from_numpy(actions_st), requires_grad=False).view(b_size, 1)
-                    if states_t_plus.is_cuda:
-                        actions_st = actions_st.cuda()
-                    actions_pred = self.model.inverse(states_t, states_t_plus)
-
-                    rewards_st = rewards[minibatchlist[minibatch_idx]]
-                    rewards_st = th.autograd.Variable(th.from_numpy(rewards_st).float().cuda()).view(b_size, 1)
-                    rewards_st_pred = self.model.reward(states_t, actions_st)
-
-                    loss = criterion(states_t, states_t_plus, diss, same,
-                                     is_ref_point_list, sim_pairs, next_states_pred=None,
-                                     actions_st=actions_st, actions_pred=actions_pred,
-                                     rewards_st=rewards_st, rewards_st_pred=rewards_st_pred)
-
-                    print("rewards' gradient :",rewards_st_pred.grad)
-
-                elif 'fwd_inv_model' in self.model_type:
-                    states_t, states_t_plus = self.model(obs), self.model(next_obs)
-                    actions_st = actions[minibatchlist[minibatch_idx]]
-                    b_size = actions_st.shape[0]
-                    actions_st = th.autograd.Variable(th.from_numpy(actions_st), requires_grad=False).view(b_size, 1)
-                    if states_t_plus.is_cuda:
-                        actions_st = actions_st.cuda()
-                    states_t_plus_pred = self.model.forward_extra(states_t, actions_st)
-                    actions_pred = self.model.inverse(states_t, states_t_plus)
-
-                    rewards_st = rewards[minibatchlist[minibatch_idx]]
-                    rewards_st = th.autograd.Variable(th.from_numpy(rewards_st).float().cuda()).view(b_size, 1)
-                    rewards_st_pred = self.model.reward(states_t, actions_st)
-
-                    loss = criterion(states_t, states_t_plus, diss, same,
-                                     is_ref_point_list, sim_pairs, next_states_pred=states_t_plus_pred,
-                                     actions_st=actions_st, actions_pred=actions_pred,
-                                     rewards_st=rewards_st, rewards_st_pred=rewards_st_pred)
-                    #
                 else:
                     states, next_states = self.model(obs), self.model(next_obs)
-                    loss = criterion(states, next_states, diss_pairs, same_actions)
+
+                    # Actions associated to the observations of the current minibatch
+                    actions_st = actions[minibatchlist[minibatch_idx]]
+                    actions_st = Variable(th.from_numpy(actions_st), requires_grad=False).view(-1, 1)
+                    # Reward associated with the observations of the current minibatch
+                    rewards_st = None
+                    # Predicted values
+                    rewards_pred, next_states_pred, actions_pred = None, None, None
+
+                    if self.cuda:
+                        actions_st = actions_st.cuda()
+
+                    if self.use_forward_loss:
+                        next_states_pred = self.model.forward_extra(states, actions_st)
+
+                    if self.use_inverse_loss:
+                        actions_pred = self.model.inverse(states, next_states)
+
+                    if self.use_reward_loss:
+                        rewards_st = rewards[minibatchlist[minibatch_idx]]
+                        rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
+                        if self.cuda:
+                            rewards_st = rewards_st.cuda()
+                        rewards_pred = self.model.reward(states, actions_st)
+                        # print("rewards' gradient :",rewards_pred.grad)
+
+                    if not np.any([self.use_forward_loss, self.use_inverse_loss, self.use_reward_loss]):
+                        actions_st = None
+
+                    loss = criterion(states, next_states, diss_pairs, same_actions,
+                                     next_states_pred=next_states_pred,
+                                     actions_st=actions_st, actions_pred=actions_pred,
+                                     rewards_st=rewards_st, rewards_pred=rewards_pred)
 
                     if self.episode_prior:
                         # The "episode prior" idea is really close
@@ -590,7 +577,6 @@ class SRL4robotics(BaseLearner):
                         else:
                             # Uniform (unbalanced) sampling
                             others_idx = np.random.permutation(len(states))
-
 
                         # Create input for episode discriminator
                         episode_input = th.cat((reverse_states, reverse_states[others_idx, :]), dim=1)
@@ -678,7 +664,8 @@ if __name__ == '__main__':
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model-type', type=str, default="custom_cnn",
-                        choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn', 'forward_model', 'inverse_model', 'fwd_inv_model'],
+                        choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn', 'forward_model', 'inverse_model',
+                                 'fwd_inv_model'],
                         help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log-folder', type=str, default='logs/default_folder',
@@ -691,7 +678,6 @@ if __name__ == '__main__':
                         help='Force balanced sampling for episode independent prior instead of uniform')
     parser.add_argument('--no-priors', action='store_true', default=False,
                         help='Disable use of priors - in case of triplet loss')
-
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
