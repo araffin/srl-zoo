@@ -261,7 +261,8 @@ if __name__ == '__main__':
                 true_states = ground_truth['arm_states']
                 name = "Ground Truth States - {}".format(args.data_folder)
                 episode_starts, rewards_ground = training_data['episode_starts'], training_data['rewards']
-                button_positions = ground_truth['button_positions']
+                
+                button_positions =ground_truth['button_positions']
                 with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
                     relative_pos = json.load(f).get('relative_pos', False)
 
@@ -275,19 +276,27 @@ if __name__ == '__main__':
                         button_pos_.append(button_positions[button_idx])
                 button_pos_ = np.array(button_pos_[:len(rewards)])
 
+                if args.color_episode:
+                    rewards = colorPerEpisode(episode_starts)
+
+                # Correlation matrix: Button pos vs. States predicted
                 plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
-                # Correlation matrix
-                corr = np.corrcoef(x=button_pos_ + 0.00001, y=states_rewards['states']+ 0.00001, rowvar=False)
-                fig = plt.figure(figsize=(8, 6))
-                ax = fig.add_subplot(111)
-                labels = ['b_' + str(i_) for i_ in range(button_pos_.shape[1])]
-                labels += ['st_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
-                cax = ax.matshow(corr, cmap=plt.cm.BuPu_r)
-                ax.set_xticklabels(['']+labels)
-                ax.set_yticklabels(['']+labels)
-                plt.title('Correlation Matrix: Predicted states vs. Button Position')
-                fig.colorbar(cax,label='correlation coefficient')
-                plt.show()
+                for fg in ["Ground_truth", "Button Position"]:
+                    if fg == "Ground_truth":
+                        X = ground_truth['arm_states'][:len(rewards)]
+                    else:
+                        X = button_pos_
+                    corr = np.corrcoef(x=X + 1e-4, y=states_rewards['states']+ 1e-4, rowvar=False)
+                    fig = plt.figure(figsize=(8, 6))
+                    ax = fig.add_subplot(111)
+                    labels = ['x_' + str(i_) for i_ in range(button_pos_.shape[1])]
+                    labels += ['st_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
+                    cax = ax.matshow(corr, cmap=plt.cm.BuPu_r)
+                    ax.set_xticklabels(['']+labels)
+                    ax.set_yticklabels(['']+labels)
+                    plt.title('Correlation Matrix: Predicted states vs. X=' + fg)
+                    fig.colorbar(cax,label='correlation coefficient')
+                    plt.show()
 
         input('\nPress any key to exit.')
 
