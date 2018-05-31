@@ -228,6 +228,9 @@ if __name__ == '__main__':
                         help='Color states per episodes instead of reward')
     parser.add_argument('--plot-against', action='store_true', default=False,
                         help='Plot against each dimension')
+    parser.add_argument('--correlation', action='store_true', default=False,
+                        help='Plot correlation coeff against each dimension')
+
     args = parser.parse_args()
 
     cmap = "tab20" if args.color_episode else "coolwarm"
@@ -244,7 +247,6 @@ if __name__ == '__main__':
         if args.color_episode:
             episode_starts = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['episode_starts']
             rewards = colorPerEpisode(episode_starts)[:len(rewards)]
-
         if args.t_sne:
             print("Using t-SNE...")
             plotTSNE(states_rewards['states'], rewards, cmap=cmap)
@@ -252,7 +254,41 @@ if __name__ == '__main__':
             print("Plotting against")
             plotAgainst(states_rewards['states'], rewards, cmap=cmap)
         else:
-            plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
+            button_pos_ = []
+            if args.data_folder != "" and args.correlation:
+                training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
+                ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
+                true_states = ground_truth['arm_states']
+                name = "Ground Truth States - {}".format(args.data_folder)
+                episode_starts, rewards_ground = training_data['episode_starts'], training_data['rewards']
+                button_positions = ground_truth['button_positions']
+                with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
+                    relative_pos = json.load(f).get('relative_pos', False)
+
+                # True state is the relative position to the button
+                if relative_pos:
+                    button_idx = -1
+                    for i in range(len(episode_starts)):
+                        if episode_starts[i] == 1:
+                            button_idx += 1
+                        true_states[i] -= button_positions[button_idx]
+                        button_pos_.append(button_positions[button_idx])
+                button_pos_ = np.array(button_pos_[:len(rewards)])
+
+                plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
+                # Correlation matrix
+                corr = np.corrcoef(x=button_pos_ + 0.00001, y=states_rewards['states']+ 0.00001, rowvar=False)
+                fig = plt.figure(figsize=(8, 6))
+                ax = fig.add_subplot(111)
+                labels = ['b_' + str(i_) for i_ in range(button_pos_.shape[1])]
+                labels += ['st_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
+                cax = ax.matshow(corr, cmap=plt.cm.BuPu_r)
+                ax.set_xticklabels(['']+labels)
+                ax.set_yticklabels(['']+labels)
+                plt.title('Correlation Matrix: Predicted states vs. Button Position')
+                fig.colorbar(cax,label='correlation coefficient')
+                plt.show()
+
         input('\nPress any key to exit.')
 
     elif args.data_folder != "":
@@ -267,6 +303,9 @@ if __name__ == '__main__':
             'target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
         name = "Ground Truth States - {}".format(args.data_folder)
         episode_starts, rewards = training_data['episode_starts'], training_data['rewards']
+
+        button_positions = ground_truth['button_positions']
+        print('button pos shape: ',button_positions.shape, button_positions)
         with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
             relative_pos = json.load(f).get('relative_pos', False)
 
