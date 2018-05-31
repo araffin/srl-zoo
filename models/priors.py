@@ -5,6 +5,8 @@ from torch.autograd import Function
 from .models import *
 import torch
 import torch.nn.functional as F
+
+
 class SRLConvolutionalNetwork(BaseModelSRL):
     """
     Convolutional Neural Net for State Representation Learning (SRL)
@@ -87,7 +89,7 @@ class SRLCustomForward(BaseModelSRL):
 
     def forward(self, x):
         return self.cnn(x)
-        
+
     def forward_extra(self, s_t, a_t):
         """
         #TODO: add bias to for

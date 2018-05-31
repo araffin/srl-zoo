@@ -25,12 +25,13 @@ from tqdm import tqdm
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
 from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet, Discriminator, \
-    SRLCustomForward, SRLCustomInverse, SRLCustomForwardInverse
+    SRLCustomForward, SRLCustomInverse, SRLCustomForwardInverse, SRLInverseAutoEncoder
 from models.priors import ReverseLayerF
-from plotting.representation_plot import plotRepresentation, plt
+from plotting.representation_plot import plotRepresentation, plt, plotImage
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import CustomDataLoader
 from preprocessing.preprocess import INPUT_DIM
+from preprocessing.utils import deNormalize
 from utils import parseDataFolder, printRed, printYellow
 from pipeline import NO_PAIRS_ERROR, NAN_ERROR
 
@@ -317,6 +318,7 @@ class SRL4robotics(BaseLearner):
         self.use_forward_loss = False
         self.use_inverse_loss = False
         self.use_reward_loss = False
+        self.use_autoencoder = False
 
         if model_type == "resnet":
             self.model = SRLConvolutionalNetwork(self.state_dim, cuda, noise_std=NOISE_STD)
@@ -336,6 +338,10 @@ class SRL4robotics(BaseLearner):
             self.model = SRLCustomForwardInverse(state_dim=self.state_dim, cuda=cuda)
             self.use_forward_loss, self.use_inverse_loss = True, True
             self.use_reward_loss = True
+        elif model_type == "ae_inverse":
+            self.model = SRLInverseAutoEncoder(self.state_dim)
+            self.use_inverse_loss = True
+            self.use_autoencoder = True
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -477,6 +483,11 @@ class SRL4robotics(BaseLearner):
                                        triplets=(self.model_type == "triplet_cnn"))
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
+        # reconstructionLoss = nn.MSELoss(size_average=True)
+        # Redefine MSE otherwise PyTorch won't less us compute gradient w.r.t. input
+        def reconstructionLoss(_input, target):
+            return th.sum((_input - target)**2) / _input.data.nelement()
+
         if self.model_type == "triplet_cnn":
             criterion = RoboticPriorsTripletLoss(self.model, self.l1_reg, loss_history)
         # elif self.model_type == "forward_model":
@@ -520,7 +531,11 @@ class SRL4robotics(BaseLearner):
                     loss = criterion(states, positive_states, negative_states, next_states, next_positive_states,
                                      diss_pairs, same_actions, no_priors=self.no_priors)
                 else:
-                    states, next_states = self.model(obs), self.model(next_obs)
+                    if self.use_autoencoder:
+                        (states, decoded_obs), (next_states, decoded_next_obs) = self.model(obs), self.model(next_obs)
+                    else:
+                        states, next_states = self.model(obs), self.model(next_obs)
+                        decoded_obs, decoded_next_obs = None, None
 
                     # Actions associated to the observations of the current minibatch
                     actions_st = actions[minibatchlist[minibatch_idx]]
@@ -554,6 +569,10 @@ class SRL4robotics(BaseLearner):
                                      next_states_pred=next_states_pred,
                                      actions_st=actions_st, actions_pred=actions_pred,
                                      rewards_st=rewards_st, rewards_pred=rewards_pred)
+
+                    if self.use_autoencoder:
+                        weight_ae = 1
+                        loss += weight_ae * (reconstructionLoss(obs, decoded_obs) + reconstructionLoss(next_obs, decoded_next_obs))
 
                     if self.episode_prior:
                         # The "episode prior" idea is really close
@@ -644,6 +663,10 @@ class SRL4robotics(BaseLearner):
                     plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
                                        add_colorbar=epoch == 0,
                                        name="Learned State Representation (Training Data)")
+                    if self.use_autoencoder:
+                        # Plot Reconstructed Image
+                        plotImage(deNormalize(obs[0].data.cpu().numpy()), "Input Image (Train)")
+                        plotImage(deNormalize(decoded_obs[0].data.cpu().numpy()), "Reconstructed Image")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
@@ -672,7 +695,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model-type', type=str, default="custom_cnn",
                         choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn', 'forward_model', 'inverse_model',
-                                 'fwd_inv_model'],
+                                 'fwd_inv_model', 'ae_inverse'],
                         help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log-folder', type=str, default='logs/default_folder',
