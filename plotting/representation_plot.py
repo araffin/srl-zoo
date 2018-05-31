@@ -234,8 +234,8 @@ if __name__ == '__main__':
     assert not (args.color_episode and args.data_folder == ""), \
         "You must specify a datafolder when using per-episode color"
     # Remove `data/` from the path if needed
-    if "data/" in args.data_folder:
-        args.data_folder = args.data_folder.split('data/')[1].strip("/")
+    if args.data_folder.startswith('data/'):
+        args.data_folder = args.data_folder[5:]
 
     if args.input_file != "":
         print("Loading {}...".format(args.input_file))
