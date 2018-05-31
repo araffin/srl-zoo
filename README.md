@@ -64,7 +64,7 @@ Config common to all dataset can found in [configs/default.json](configs/default
 #### Dataset config
 All dataset must be placed in the `data/` folder.
 Each dataset must contain a `dataset_config.json` file, an example can be found [here](configs/example_dataset_config.json).
-This config file describes variables specifics to this dataset.
+This config file describes specific variables to this dataset.
 
 
 #### Experiment Config
@@ -80,7 +80,7 @@ NOTE: If you use data generated with the [RL Repo](https://github.com/araffin/ro
 The dataset format is as followed:
 
 0. You must provide a dataset config file (see previous section) that contains at least if the ground truth is the relative position or not
-1. Image are grouped by episode in different folders (`record_{03d}/` folders)
+1. Images are grouped by episode in different folders (`record_{03d}/` folders)
 2. At the root of the dataset folder, preprocessed_data.npz contains numpy arrays ('episode_starts', 'rewards', 'actions')
 3. At the root of the dataset folder, ground_truth.npz contains numpy arrays ('target_positions', 'ground_truth_states', 'images_path')
 
@@ -89,7 +89,7 @@ Note: the variables 'arm_states' and 'button_positions' were renamed 'ground_tru
 
 
 ### Launch script
-Located [here](launch.sh), it is a shell script that launches multiple grid searches, train the baselines and call the report script.
+Located [here](launch.sh), it is a shell script that launches multiple grid searches, trains the baselines and calls the report script.
 You have to edit `$data_folder` and make sure of the parameters for knn evaluation before running it:
 ```
 ./launch.sh

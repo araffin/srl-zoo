@@ -50,6 +50,9 @@ BATCH_SIZE = 256  #
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 VALIDATION_SIZE = 0.2  # 20% of training data for validation
 
+# Experimental: episode independent prior
+BALANCED_SAMPLING = False  # Whether to do Uniform (default) or balanced sampling
+
 
 def overSampling(batch_size, m_list, pairs, function_on_pairs):
     """
@@ -471,16 +474,18 @@ class SRL4robotics(BaseLearner):
                         episodes = np.array(minibatch_episodes[minibatch_idx])
 
                         # Sample other states
-                        # Uniform (unbalanced) sampling
-                        others_idx = np.random.permutation(len(states))
+                        if BALANCED_SAMPLING:
+                            # Balanced sampling
+                            others_idx = np.arange(len(episodes))
+                            for i in range(len(episodes)):
+                                if np.random.rand() > 0.5:
+                                    others_idx[i] = np.random.choice(np.where(episodes != episodes[i])[0])
+                                else:
+                                    others_idx[i] = np.random.choice(np.where(episodes == episodes[i])[0])
+                        else:
+                            # Uniform (unbalanced) sampling
+                            others_idx = np.random.permutation(len(states))
 
-                        # Balanced sampling
-                        # others_idx = np.arange(len(episodes))
-                        # for i in range(len(episodes)):
-                        #     if np.random.rand() > 0.5:
-                        #         others_idx[i] = np.random.choice(np.where(episodes != episodes[i])[0])
-                        #     else:
-                        #         others_idx[i] = np.random.choice(np.where(episodes == episodes[i])[0])
 
                         # Create input for episode discriminator
                         episode_input = th.cat((reverse_states, reverse_states[others_idx, :]), dim=1)
@@ -560,9 +565,9 @@ if __name__ == '__main__':
                         help='random seed (default: 1)')
     parser.add_argument('--state-dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('-bs', '--batch-size', type=int, default=256, help='batch_size (default: 256)')
-    parser.add_argument('--val-size', type=float, default=0.2, help='Validation set size (default: 0.2)')
+    parser.add_argument('--val-size', type=float, default=0.2, help='Validation set size in percentage (default: 0.2)')
     parser.add_argument('--training-set-size', type=int, default=-1,
-                        help='Limit size of the training set (default: -1)')
+                        help='Limit size (number of samples) of the training set (default: -1)')
     parser.add_argument('-lr', '--learning-rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1-reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
@@ -577,8 +582,11 @@ if __name__ == '__main__':
                         help='Enable use of multiple camera')
     parser.add_argument('--episode-prior', action='store_true', default=False,
                         help='Enable episode independent prior')
+    parser.add_argument('--balanced-sampling', action='store_true', default=False,
+                        help='Force balanced sampling for episode independent prior instead of uniform')
     parser.add_argument('--no-priors', action='store_true', default=False,
                         help='Disable use of priors - in case of triplet loss')
+
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -587,6 +595,7 @@ if __name__ == '__main__':
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     VALIDATION_SIZE = args.val_size
+    BALANCED_SAMPLING = args.balanced_sampling
     plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
 
     print('Log folder: {}'.format(args.log_folder))
