@@ -108,12 +108,18 @@ class RoboticPriorsLoss(nn.Module):
         n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
         self.l1_coeff = (l1_reg / n_params)
         self.loss_history = loss_history
+        self.names, self.weights, self.losses = [], [], []
+
+    def addToLosses(self, name, weight, loss_value):
+        self.names.append(name)
+        self.weights.append(weight)
+        self.losses.append(loss_value)
 
     def forward(self, states, next_states,
-                dissimilar_pairs, same_actions_pairs,
+                dissimilar_pairs=None, same_actions_pairs=None,
                 rewards_st=None, rewards_pred=None,
                 next_states_pred=None, actions_st=None, actions_pred=None,
-                weight_forward=2., weight_inverse=1.):
+                weight_forward=2.0, weight_inverse=1.0, weight_reward=20.0):
         """
         :param states: (th Variable)
         :param next_states: (th Variable)
@@ -123,65 +129,61 @@ class RoboticPriorsLoss(nn.Module):
         :return: (th Variable)
         """
 
-        state_diff = next_states - states
-        state_diff_norm = state_diff.norm(2, dim=1)
-        similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
-        temp_coherence_loss = (state_diff_norm ** 2).mean()
-        causality_loss = similarity(states[dissimilar_pairs[:, 0]],
-                                    states[dissimilar_pairs[:, 1]]).mean()
-        proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
-                                 state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
+        self.names, self.weights, self.losses = [], [], []
 
-        repeatability_loss = (
-                similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
-                (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2,
-                                                                                                   dim=1) ** 2).mean()
+        if same_actions_pairs is not None:
+            state_diff = next_states - states
+            state_diff_norm = state_diff.norm(2, dim=1)
+            similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
+            temp_coherence_loss = (state_diff_norm ** 2).mean()
+            causality_loss = similarity(states[dissimilar_pairs[:, 0]],
+                                        states[dissimilar_pairs[:, 1]]).mean()
+            proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
+                                     state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
 
-        l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
+            repeatability_loss = (
+                    similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
+                    (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2,
+                                                                                                       dim=1) ** 2).mean()
+            self.weights = [1, 1, 1, 1]
+            self.names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss', 'repeatability_loss']
+            self.losses = [temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss]
+
+        if self.l1_coeff > 0:
+            l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
+            self.addToLosses('l1_loss', self.l1_coeff, l1_loss)
+        else:
+            l1_loss = 0
 
         if next_states_pred is not None or actions_pred is not None:
             total_loss = self.l1_coeff * l1_loss
         else:
-            print('priors')
             total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
                          + 1 * repeatability_loss + self.l1_coeff * l1_loss
 
-        weights = []
-        names = []
-        losses = []
+
         # Forward model's loss:
         if next_states_pred is not None:
             forward_loss = F.mse_loss(next_states_pred, next_states, size_average=True)
             total_loss += weight_forward * forward_loss
-
-            weights.append(weight_forward)
-            names.append('forward_loss')
-            losses.append(forward_loss)
+            self.addToLosses('forward_loss', weight_forward, forward_loss)
 
         # Inverse model's loss:
         if actions_pred is not None:
-            lss = nn.CrossEntropyLoss()
-            inverse_loss = lss(actions_pred, actions_st.squeeze(1))
+            lossFn = nn.CrossEntropyLoss()
+            inverse_loss = lossFn(actions_pred, actions_st.squeeze(1))
             total_loss += weight_inverse * inverse_loss
-
-            # inverse loss
-            weights.append(weight_inverse)
-            names.append('inverse_loss')
-            losses.append(inverse_loss)
+            self.addToLosses('inverse_loss', weight_inverse, inverse_loss)
 
         # Reward prediction loss
         if rewards_st is not None and rewards_pred is not None:
-            rewards_coeff = 20.  # 20 inv #2.*20. # 20 *2.5 too big
             reward_loss = F.mse_loss(rewards_pred, rewards_st, size_average=True)
-            total_loss += rewards_coeff * reward_loss
+            total_loss += weight_reward * reward_loss
+            self.addToLosses('reward_loss', weight_reward, reward_loss)
 
-            # reward loss
-            weights.append(rewards_coeff)
-            names.append('reward_loss')
-            losses.append(reward_loss)
 
         if self.loss_history is not None:
-            for name, w, loss in zip(names, weights, losses):
+            for name, w, loss in zip(self.names, self.weights, self.losses):
                 if w > 0:
                     if len(self.loss_history[name]) > 0:
                         self.loss_history[name][-1] += w * loss.data[0]
@@ -408,60 +410,61 @@ class SRL4robotics(BaseLearner):
         print("Number of observations per action")
         print(n_obs_per_action)
 
-        # TODO: compute pairs only when needed
-        def findDissimilar(index, minibatch1, minibatch2):
-            """
-            check which samples should be dissimilar
-            because they lead to different rewards after the same actions
-            :param index: (int)
-            :param minibatch1: (numpy array)
-            :param minibatch2: (numpy array)
-            :return: (dict, numpy array)
-            """
-            return np.where((actions[minibatch2] == actions[minibatch1[index]]) *
-                            (rewards[minibatch2 + 1] != rewards[minibatch1[index] + 1]))[0]
+        if not self.no_priors:
+            def findDissimilar(index, minibatch1, minibatch2):
+                """
+                check which samples should be dissimilar
+                because they lead to different rewards after the same actions
+                :param index: (int)
+                :param minibatch1: (numpy array)
+                :param minibatch2: (numpy array)
+                :return: (dict, numpy array)
+                """
+                return np.where((actions[minibatch2] == actions[minibatch1[index]]) *
+                                (rewards[minibatch2 + 1] != rewards[minibatch1[index] + 1]))[0]
 
-        dissimilar_pairs = [
-            np.array(
-                [[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch, minibatch) if j > i],
-                dtype='int64') for minibatch in minibatchlist]
+            dissimilar_pairs = [
+                np.array(
+                    [[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch, minibatch) if j > i],
+                    dtype='int64') for minibatch in minibatchlist]
 
-        # sampling relevant pairs to have at least a pair of dissimilar obs in every minibatches
-        dissimilar_pairs, minibatchlist = overSampling(self.batch_size, minibatchlist, dissimilar_pairs,
-                                                       findDissimilar)
+            # sampling relevant pairs to have at least a pair of dissimilar obs in every minibatches
+            dissimilar_pairs, minibatchlist = overSampling(self.batch_size, minibatchlist, dissimilar_pairs,
+                                                           findDissimilar)
 
-        def findSameActions(index, minibatch):
-            """
-            Get observations indices where the same action was performed
-            as in a reference observation
-            :param index: (int)
-            :param minibatch: (numpy array)
-            :return: (numpy array)
-            """
-            return np.where(actions[minibatch] == actions[minibatch[index]])[0]
+            def findSameActions(index, minibatch):
+                """
+                Get observations indices where the same action was performed
+                as in a reference observation
+                :param index: (int)
+                :param minibatch: (numpy array)
+                :return: (numpy array)
+                """
+                return np.where(actions[minibatch] == actions[minibatch[index]])[0]
 
-        # same_actions: list of arrays, each containing one pair of observation ids
-        same_actions = [
-            np.array([[i, j] for i in range(self.batch_size) for j in findSameActions(i, minibatch) if j > i],
-                     dtype='int64') for minibatch in minibatchlist]
+            # same_actions: list of arrays, each containing one pair of observation ids
+            same_actions = [
+                np.array([[i, j] for i in range(self.batch_size) for j in findSameActions(i, minibatch) if j > i],
+                         dtype='int64') for minibatch in minibatchlist]
 
-        for pair, minibatch in zip(same_actions, minibatchlist):
-            for i in range(n_actions):
-                n_pairs_per_action[i] += np.sum(actions[minibatch[pair[:, 0]]] == i)
+            for pair, minibatch in zip(same_actions, minibatchlist):
+                for i in range(n_actions):
+                    n_pairs_per_action[i] += np.sum(actions[minibatch[pair[:, 0]]] == i)
 
-        # Stats about pairs
-        print("Number of pairs per action:")
-        print(n_pairs_per_action)
-        print("Pairs of {} unique actions".format(np.sum(n_pairs_per_action > 0)))
+            # Stats about pairs
+            print("Number of pairs per action:")
+            print(n_pairs_per_action)
+            print("Pairs of {} unique actions".format(np.sum(n_pairs_per_action > 0)))
 
-        for item in same_actions + dissimilar_pairs:
-            if len(item) == 0:
-                msg = "No same actions or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
-                    BATCH_SIZE)
-                msg += "=> Consider increasing the batch_size or changing the seed"
-                printRed(msg)
-                sys.exit(NO_PAIRS_ERROR)
-
+            for item in same_actions + dissimilar_pairs:
+                if len(item) == 0:
+                    msg = "No same actions or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
+                        BATCH_SIZE)
+                    msg += "=> Consider increasing the batch_size or changing the seed"
+                    printRed(msg)
+                    sys.exit(NO_PAIRS_ERROR)
+        else:
+            same_actions, dissimilar_pairs = None, None
 
         # For episode prior
         idx_to_episode = {idx: episode_idx for idx, episode_idx in enumerate(np.cumsum(episode_starts))}
@@ -498,6 +501,9 @@ class SRL4robotics(BaseLearner):
                 if self.cuda:
                     obs, next_obs = obs.cuda(), next_obs.cuda()
                     same_actions, diss_pairs = same_actions.cuda(), diss_pairs.cuda()
+
+                if self.no_priors:
+                    same_actions, diss_pairs = None, None
 
                 self.optimizer.zero_grad()
 
@@ -604,8 +610,8 @@ class SRL4robotics(BaseLearner):
                 pbar.update(1)
             pbar.close()
 
-            train_loss = epoch_loss / epoch_batches
-            val_loss /= n_val_batches
+            train_loss = epoch_loss / float(epoch_batches)
+            val_loss /= float(n_val_batches)
             # Even if loss_history is modified by RoboticPriorsLoss object
             # we make it explicit
             loss_history = criterion.loss_history

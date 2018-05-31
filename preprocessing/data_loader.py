@@ -107,7 +107,7 @@ class CustomDataLoader(object):
     :param minibatchlist: [[int]] list of list of int (observations ids)
     :param images_path: (numpy 1D array of str)
     :param same_actions: [numpy matrix]
-    :param dissimilar: [numpy matrix]
+    :param dissimilar_pairs: [numpy matrix]
     :param test_batch_size: (int)
     :param cache_capacity: (int) number of images that can be cached
     :param multi_view: (bool) enables dual camera mode
@@ -118,8 +118,8 @@ class CustomDataLoader(object):
     It may also produce deadlocks
     """
 
-    def __init__(self, minibatchlist, images_path, same_actions,
-                 dissimilar, test_batch_size=512, cache_capacity=5000,
+    def __init__(self, minibatchlist, images_path, same_actions=None,
+                 dissimilar_pairs=None, test_batch_size=512, cache_capacity=5000,
                  n_workers=5, auto_cleanup=True, multi_view=False, triplets=False):
         super(CustomDataLoader, self).__init__()
 
@@ -131,8 +131,8 @@ class CustomDataLoader(object):
         self.minibatchlist = np.array(minibatchlist[:])
         # Copy useful array to avoid side effects
         self.images_path = images_path[:]
-        self.dissimilar_pairs = np.array(dissimilar[:])
-        self.same_actions = np.array(same_actions[:])
+        self.dissimilar_pairs = np.array(dissimilar_pairs[:]) if dissimilar_pairs is not None else np.array([])
+        self.same_actions = np.array(same_actions[:]) if same_actions is not None else np.array([])
         # Save minibatches original order
         self.minibatches_indices = np.arange(len(minibatchlist), dtype=np.int64)
         self.original_minibatchlist = self.minibatchlist.copy()
@@ -300,8 +300,10 @@ class CustomDataLoader(object):
         indices = np.random.permutation(self.n_minibatches).astype(np.int64)
         self.minibatches_indices = indices
         self.minibatchlist = self.minibatchlist[indices]
-        self.same_actions = self.same_actions[indices]
-        self.dissimilar_pairs = self.dissimilar_pairs[indices]
+        if len(self.same_actions) > 0:
+            self.same_actions = self.same_actions[indices]
+        if len(self.dissimilar_pairs) > 0:
+            self.dissimilar_pairs = self.dissimilar_pairs[indices]
 
     def resetQueues(self):
         """
@@ -417,8 +419,12 @@ class CustomDataLoader(object):
         # If we are training we need addional tensors
         # (next obs, dissimilar and similar pairs)
         if self.is_training:
-            diss_pairs = self.dissimilar_pairs[i][np.random.permutation(self.dissimilar_pairs[i].shape[0])]
-            same_actions = self.same_actions[i][np.random.permutation(self.same_actions[i].shape[0])]
+            # Dummy values for PyTorch < 0.4
+            diss_pairs, same_actions = np.array([0]), np.array([0])
+            if len(self.dissimilar_pairs) > 0:
+                diss_pairs = self.dissimilar_pairs[i][np.random.permutation(self.dissimilar_pairs[i].shape[0])]
+            if len(self.same_actions) > 0:
+                same_actions = self.same_actions[i][np.random.permutation(self.same_actions[i].shape[0])]
             # Convert to torch tensor
             diss_pairs, same_actions = th.from_numpy(diss_pairs), th.from_numpy(same_actions)
 
