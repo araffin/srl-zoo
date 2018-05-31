@@ -338,8 +338,12 @@ Recommended configuration: Ubuntu 16.04 with python 2.7 or >= 3.5
 You have to clone the repo and run `pip install .`.
 
 #### Python 3
-Please see `environment.yml` file from [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl)
-(Instructions are in the README)
+Please use `environment.yml` file from [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl)
+To create a conda environment from this file:
+
+```
+conda env create -f environment.yml
+```
 
 #### Python 2
 
@@ -390,6 +394,11 @@ For display enhancement:
 You can reproduce Rico Jonschkowski's results by downloading npz files from the original [github repository](https://github.com/tu-rbo/learning-state-representations-with-robotic-priors) and placing them in the `data/` folder.
 
 It was tested with the following commit (checkout this one to be sure it will work): [https://github.com/araffin/srl-zoo/commit/5175b88a891c240f393b717dd1866435c73ebbda](https://github.com/araffin/srl-zoo/commit/5175b88a891c240f393b717dd1866435c73ebbda)
+
+You have to do:
+```
+git checkout 5175b88a891c240f393b717dd1866435c73ebbda
+```
 
 Then run (for example):
 ```
