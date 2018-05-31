@@ -121,7 +121,6 @@ def plot3dRepresentation(states, rewards, name="Learned State Representation",
     fig = plt.figure(name)
     plt.clf()
     ax = fig.add_subplot(111, projection='3d')
-    print('reward', rewards.shape, states.shape)
     im = ax.scatter(states[:, 0], states[:, 1], states[:, 2],
                     s=7, c=rewards, cmap=cmap, linewidths=0.1)
     ax.set_xlabel('State dimension 1')
@@ -229,6 +228,9 @@ if __name__ == '__main__':
                         help='Color states per episodes instead of reward')
     parser.add_argument('--plot-against', action='store_true', default=False,
                         help='Plot against each dimension')
+    parser.add_argument('--correlation', action='store_true', default=False,
+                        help='Plot correlation coeff against each dimension')
+
     args = parser.parse_args()
 
     cmap = "tab20" if args.color_episode else "coolwarm"
@@ -241,12 +243,10 @@ if __name__ == '__main__':
     if args.input_file != "":
         print("Loading {}...".format(args.input_file))
         states_rewards = np.load(args.input_file)
-        print(states_rewards.keys())
         rewards = states_rewards['rewards']
         if args.color_episode:
             episode_starts = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['episode_starts']
             rewards = colorPerEpisode(episode_starts)[:len(rewards)]
-            print('episodes starts: ', episode_starts.shape)
         if args.t_sne:
             print("Using t-SNE...")
             plotTSNE(states_rewards['states'], rewards, cmap=cmap)
@@ -255,49 +255,40 @@ if __name__ == '__main__':
             plotAgainst(states_rewards['states'], rewards, cmap=cmap)
         else:
             button_pos_ = []
-            print('rewards shape:' ,rewards.shape)
-            ### TEMPORARY TO VISUALIZE CORR BETWEEN STATES & BUTTON POS
-            if args.data_folder != "":
-                print("Plotting ground truth...")
+            if args.data_folder != "" and args.correlation:
                 training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
                 ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
                 true_states = ground_truth['arm_states']
                 name = "Ground Truth States - {}".format(args.data_folder)
-                episode_starts_gd, rewards_ground = training_data['episode_starts'], training_data['rewards']
+                episode_starts, rewards_ground = training_data['episode_starts'], training_data['rewards']
                 button_positions = ground_truth['button_positions']
-                print('button pos shape: ', button_positions.shape)
                 with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
                     relative_pos = json.load(f).get('relative_pos', False)
-                if args.color_episode:
-                    rewards_ground = colorPerEpisode(episode_starts_gd)
+
                 # True state is the relative position to the button
                 if relative_pos:
                     button_idx = -1
                     for i in range(len(episode_starts)):
                         if episode_starts[i] == 1:
                             button_idx += 1
-                        #true_states[i] -= button_positions[button_idx]
                         true_states[i] -= button_positions[button_idx]
                         button_pos_.append(button_positions[button_idx])
-                button_pos_ = np.array(button_pos_[:len(rewards)]) #+ 0.00001
-                #states_rewards['states'] += 0.00001
-                print('ground_truth s reward s shape:', rewards_ground.shape)
-                #plotRepresentation(true_states, rewards_ground, name, fit_pca=False, cmap=cmap)
-                #input('\nPress any key to exit.')
-                #plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
-                #input('\nPress any key to exit.')
+                button_pos_ = np.array(button_pos_[:len(rewards)])
 
-
-                corr_x = np.corrcoef(button_pos_[:,0].reshape((20000, 1)) + 0.00001 ,
-                                     states_rewards['states'][:,0].reshape((20000, 1)) + 0.0001 )
-                corr_y = np.corrcoef(button_pos_[:, 1].reshape((20000, 1)) + 0.00001 ,
-                                     states_rewards['states'][:, 1].reshape((20000, 1)) + 0.0001 )
-
-                #print(button_pos_.shape, states_rewards['states'].shape, 'corr shape ',corr.shape,button_pos_[:,0].reshape((20000, 1)).shape)
-                plt.matshow(corr_x, cmap=cmap)
+                plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
+                # Correlation matrix
+                corr = np.corrcoef(x=button_pos_ + 0.00001, y=states_rewards['states']+ 0.00001, rowvar=False)
+                fig = plt.figure(figsize=(8, 6))
+                ax = fig.add_subplot(111)
+                labels = ['b_' + str(i_) for i_ in range(button_pos_.shape[1])]
+                labels += ['st_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
+                cax = ax.matshow(corr, cmap=plt.cm.BuPu_r)
+                ax.set_xticklabels(['']+labels)
+                ax.set_yticklabels(['']+labels)
+                plt.title('Correlation Matrix: Predicted states vs. Button Position')
+                fig.colorbar(cax,label='correlation coefficient')
                 plt.show()
-            ###########################################################
-            #plot_representation(states_rewards['states'], rewards, cmap=cmap)
+
         input('\nPress any key to exit.')
 
     elif args.data_folder != "":
