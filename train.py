@@ -149,17 +149,18 @@ class RoboticPriorsLoss(nn.Module):
             self.names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss', 'repeatability_loss']
             self.losses = [temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss]
 
+        total_loss = 0
         if self.l1_coeff > 0:
             l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
             self.addToLosses('l1_loss', self.l1_coeff, l1_loss)
         else:
             l1_loss = 0
 
-        if next_states_pred is not None or actions_pred is not None:
-            total_loss = self.l1_coeff * l1_loss
-        else:
-            total_loss = 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
-                         + 1 * repeatability_loss + self.l1_coeff * l1_loss
+        total_loss += self.l1_coeff * l1_loss
+
+        if same_actions_pairs is not None:
+            total_loss += 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
+                         + 1 * repeatability_loss
 
 
         # Forward model's loss:
