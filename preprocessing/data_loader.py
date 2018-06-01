@@ -585,7 +585,7 @@ class SupervisedDataLoader(BaxterImageLoader):
         # Alias to improve readability
         i = self.current_preprocessed_idx
         obs_indices = self.minibatchlist[i]
-        targets = th.from_numpy(self.targets[i]).set_grad_enabled(self.is_training)
+        targets = th.from_numpy(self.targets[i]).requires_grad_(self.is_training)
 
         batch_size = len(obs_indices)
         obs_dict = {'obs': None}
@@ -669,7 +669,7 @@ class AutoEncoderDataLoader(BaxterImageLoader):
         if self.noise_factor > 0:
             noise_shape = (len(obs_indices), N_CHANNELS, IMAGE_HEIGHT, IMAGE_WIDTH)
             noise = self.noise_factor * np.random.normal(loc=0.0, scale=1.0, size=noise_shape).astype(np.float32)
-            noise = th.from_numpy(noise).set_grad_enabled(self.is_training)
+            noise = th.from_numpy(noise).requires_grad_(self.is_training)
 
         batch_size = len(obs_indices)
         obs_dict = {'obs': None}
