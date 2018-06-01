@@ -107,7 +107,7 @@ class SupervisedLearning(BaseLearner):
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.item()
-                epoch_train_loss[epoch].append(loss.data[0])
+                epoch_train_loss[epoch].append(loss.item())
                 pbar.update(1)
             pbar.close()
 
@@ -122,7 +122,7 @@ class SupervisedLearning(BaseLearner):
                 pred_states = self.model(obs)
                 loss = criterion(pred_states, target_states)
                 val_loss += loss.item()
-                epoch_val_loss[epoch].append(loss.data[0])
+                epoch_val_loss[epoch].append(loss.item())
 
             val_loss /= len(val_loader)
             self.model.train()  # Restore train mode

@@ -401,7 +401,7 @@ class BaxterImageLoader(object):
                 self.n_received += 1
             # Channel first
             obs = np.transpose(obs, (0, 3, 2, 1))
-            obs_dict[key] = th.from_numpy(obs).set_grad_enabled(self.is_training)
+            obs_dict[key] = th.from_numpy(obs).requires_grad_(self.is_training)
             # Free memory
             del obs
 

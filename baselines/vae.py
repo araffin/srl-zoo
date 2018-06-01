@@ -30,7 +30,7 @@ DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 32
 NOISE_FACTOR = 0
-TEST_BATCH_SIZE = 512
+TEST_BATCH_SIZE = 32
 
 
 class VAELearning(BaseLearner):
@@ -57,7 +57,7 @@ class VAELearning(BaseLearner):
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
+        self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
 
         self.model.to(self.device)
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
@@ -130,7 +130,7 @@ class VAELearning(BaseLearner):
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.item()
-                epoch_train_loss[epoch].append(loss.data[0])
+                epoch_train_loss[epoch].append(loss.item())
                 pbar.update(1)
             pbar.close()
 
@@ -145,7 +145,7 @@ class VAELearning(BaseLearner):
                 decoded, mu, logvar = self.model(noisy_obs)
                 loss = VAELearning._lossFunction(decoded, obs, mu, logvar, self.beta)
                 val_loss += loss.item()
-                epoch_val_loss[epoch].append(loss.data[0])
+                epoch_val_loss[epoch].append(loss.item())
 
             val_loss /= len(val_loader)
             if DISPLAY_PLOTS:

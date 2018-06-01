@@ -47,7 +47,7 @@ class BaseLearner(object):
         if cuda:
             th.cuda.manual_seed(seed)
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
+        self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
 
     def _predFn(self, observations, restore_train=True):
         """
