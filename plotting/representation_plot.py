@@ -291,9 +291,13 @@ if __name__ == '__main__':
                     ax = fig.add_subplot(111)
                     labels = ['x_' + str(i_) for i_ in range(button_pos_.shape[1])]
                     labels += ['st_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
-                    cax = ax.matshow(corr, cmap=plt.cm.BuPu_r)
+                    cax = ax.matshow(corr, cmap=cmap)
                     ax.set_xticklabels(['']+labels)
                     ax.set_yticklabels(['']+labels)
+                    #####
+                    ax.grid(False)
+                    ##########
+
                     plt.title('Correlation Matrix: Predicted states vs. X=' + fg)
                     fig.colorbar(cax,label='correlation coefficient')
                     plt.show()

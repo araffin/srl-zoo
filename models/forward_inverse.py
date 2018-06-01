@@ -14,10 +14,11 @@ class BaseForwardModel(BaseModelSRL):
         """
         super(BaseForwardModel, self).__init__()
 
-    def initForwardNet(self, state_dim, action_dim):
+    def initForwardNet(self, state_dim, action_dim, ratio):
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.forward_net = nn.Linear(state_dim + action_dim, state_dim)
+        self.forward_net = nn.Linear(int(state_dim * ratio) + action_dim, state_dim)
+        self.ratio = ratio
 
     def forward(self, x):
         raise NotImplementedError()
@@ -30,7 +31,7 @@ class BaseForwardModel(BaseModelSRL):
         :return: (th Variable)
         """
         # Predict the delta between the next state and current state
-        concat = torch.cat((state, encodeOneHot(action, self.action_dim)), 1)
+        concat = torch.cat((state[:, :int(self.state_dim*self.ratio)], encodeOneHot(action, self.action_dim)), 1)
         return state + self.forward_net(concat)
 
 
@@ -42,10 +43,11 @@ class BaseInverseModel(BaseModelSRL):
         """
         super(BaseInverseModel, self).__init__()
 
-    def initInverseNet(self, state_dim, action_dim):
-        self.inverse_net = nn.Linear(state_dim * 2, action_dim)
+    def initInverseNet(self, state_dim, action_dim, ratio):
+        self.inverse_net = nn.Linear(int(state_dim * ratio) * 2, action_dim)
         self.state_dim = state_dim
         self.action_dim = action_dim
+        self.ratio = ratio
 
     def forward(self, x):
         raise NotImplementedError()
@@ -57,7 +59,7 @@ class BaseInverseModel(BaseModelSRL):
         :param next_state: (th Variable)
         :return: probability of each action
         """
-        return self.inverse_net(th.cat((state, next_state), 1))
+        return self.inverse_net(th.cat((state[:, :int(self.state_dim*self.ratio)], next_state[:, :int(self.state_dim*self.ratio)]), 1))
 
 
 class BaseRewardModel(BaseModelSRL):
@@ -68,26 +70,27 @@ class BaseRewardModel(BaseModelSRL):
         """
         super(BaseRewardModel, self).__init__()
 
-    def initRewardNet(self, state_dim, action_dim):
+    def initRewardNet(self, state_dim, action_dim, ratio):
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.reward_net = nn.Sequential(nn.Linear(state_dim + action_dim, 32),
+        self.reward_net = nn.Sequential(nn.Linear(int(state_dim *ratio) * 2 + action_dim, 32),
                                         nn.ReLU(),
                                         nn.Linear(32, 16),
                                         nn.ReLU(),
                                         nn.Linear(16, 1))
+        self.ratio = ratio
 
     def forward(self, x):
         raise NotImplementedError()
 
-    def rewardModel(self, state, action):
+    def rewardModel(self, state, action, next_state):
         """
         Predict reward given current state and action
         :param state: (th Variable)
         :param action: (th Tensor)
         :return: (th Variable)
         """
-        return self.reward_net(torch.cat((state, encodeOneHot(action, self.action_dim)), 1))
+        return self.reward_net(torch.cat((state[:, int(self.state_dim*self.ratio):], encodeOneHot(action, self.action_dim), next_state[:, int(self.state_dim*self.ratio):]), 1))
 
 
 class SRLInverseAutoEncoder(CNNAutoEncoder, BaseInverseModel):
@@ -134,7 +137,7 @@ class SRLCustomInverse(BaseInverseModel):
 
 
 class SRLCustomForwardInverse(BaseForwardModel, BaseInverseModel, BaseRewardModel):
-    def __init__(self, state_dim=2, action_dim=6, cuda=False):
+    def __init__(self, state_dim=2, action_dim=6, ratio=1, cuda=False):
         """
         :param state_dim:
         :param action_dim:
@@ -144,9 +147,9 @@ class SRLCustomForwardInverse(BaseForwardModel, BaseInverseModel, BaseRewardMode
         BaseInverseModel.__init__(self)
         BaseRewardModel.__init__(self)
 
-        self.initForwardNet(state_dim, action_dim)
-        self.initInverseNet(state_dim, action_dim)
-        self.initRewardNet(state_dim, action_dim)
+        self.initForwardNet(state_dim, action_dim, ratio)
+        self.initInverseNet(state_dim, action_dim, ratio)
+        self.initRewardNet(state_dim, action_dim, ratio)
 
         self.cnn = CustomCNN(state_dim)
 

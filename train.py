@@ -332,7 +332,9 @@ class SRL4robotics(BaseLearner):
             self.model = SRLCustomInverse(state_dim=self.state_dim, cuda=cuda)
             self.use_inverse_loss = True
         elif model_type == "fwd_inv_model":
-            self.model = SRLCustomForwardInverse(state_dim=self.state_dim, cuda=cuda)
+            # RATIO of states to backward on:
+            ratio = 0.5
+            self.model = SRLCustomForwardInverse(state_dim=self.state_dim, cuda=cuda, ratio=ratio)
             self.use_forward_loss, self.use_inverse_loss = True, True
             self.use_reward_loss = True
         elif model_type == "ae_inverse":
@@ -534,7 +536,7 @@ class SRL4robotics(BaseLearner):
                     else:
                         states, next_states = self.model(obs), self.model(next_obs)
                         decoded_obs, decoded_next_obs = None, None
-
+                    #print(states.shape)
                     # Actions associated to the observations of the current minibatch
                     actions_st = actions[minibatchlist[minibatch_idx]]
                     actions_st = Variable(th.from_numpy(actions_st), requires_grad=False).view(-1, 1)
@@ -557,7 +559,7 @@ class SRL4robotics(BaseLearner):
                         rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
                         if self.cuda:
                             rewards_st = rewards_st.cuda()
-                        rewards_pred = self.model.rewardModel(states, actions_st)
+                        rewards_pred = self.model.rewardModel(states, actions_st, next_states)
                         # print("rewards' gradient :",rewards_pred.grad)
 
                     if not np.any([self.use_forward_loss, self.use_inverse_loss, self.use_reward_loss]):
@@ -662,6 +664,10 @@ class SRL4robotics(BaseLearner):
                     plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
                                        add_colorbar=epoch == 0,
                                        name="Learned State Representation (Training Data)")
+                    #plt.clf()
+                    #plt.pause(0.001)
+                    #plotLosses(loss_history, args.log_folder)
+
                     if self.use_autoencoder:
                         # Plot Reconstructed Image
                         plotImage(deNormalize(obs[0].data.cpu().numpy()), "Input Image (Train)")
