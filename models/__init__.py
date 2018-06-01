@@ -1,8 +1,7 @@
 from .models import CustomCNN
-from .priors import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, Discriminator, \
-                    SRLCustomForward, SRLCustomInverse, SRLCustomForwardInverse
+from .priors import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, Discriminator
 from .supervised import ConvolutionalNetwork, DenseNetwork
 from .triplet import TripletNet
 from .autoencoders import LinearAutoEncoder, DenseAutoEncoder, CNNAutoEncoder
 from .vae import DenseVAE, CNNVAE
-from .forward_inverse import SRLInverseAutoEncoder
+from .forward_inverse import SRLInverseAutoEncoder, SRLCustomForward, SRLCustomInverse, SRLCustomForwardInverse

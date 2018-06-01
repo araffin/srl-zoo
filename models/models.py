@@ -226,3 +226,16 @@ def conv3x3(in_planes, out_planes, stride=1):
     """
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
+
+
+def encodeOneHot(tensor, n_dim):
+    """
+    One hot encoding for a given tensor
+    :param tensor: (th Tensor)
+    :param n_dim: (int) Number of dimensions
+    :return: (th Variable)
+    """
+    encoded_tensor = th.Tensor(tensor.shape[0], n_dim).zero_()
+    if tensor.is_cuda:
+        encoded_tensor = encoded_tensor.cuda()
+    return Variable(encoded_tensor.scatter_(1, tensor.data, 1.))

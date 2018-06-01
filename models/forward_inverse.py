@@ -1,28 +1,149 @@
 from __future__ import print_function, division, absolute_import
 
 import torch
-import torch.nn.functional as F
 
 from .models import *
 from .autoencoders import CNNAutoEncoder
 
 
-class SRLInverseAutoEncoder(CNNAutoEncoder):
+class BaseForwardModel(BaseModelSRL):
     def __init__(self, state_dim=2, action_dim=6):
+        """
+        :param state_dim: (int)
+        :param action_dim: (int)
+        """
+        super(BaseForwardModel, self).__init__()
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.forward_net = nn.Linear(state_dim + action_dim, state_dim)
+
+    def forward(self, x):
+        raise NotImplementedError()
+
+    def forwardModel(self, state, action):
+        """
+        Predict next state given current state and action
+        :param state: (th Variable)
+        :param action: (th Tensor)
+        :return: (th Variable)
+        """
+        # Predict the delta between the next state and current state
+        concat = torch.cat((state, encodeOneHot(action, self.action_dim)), 1)
+        return state + self.forward_net(concat)
+
+
+class BaseInverseModel(BaseModelSRL):
+    def __init__(self, state_dim=2, action_dim=6):
+        """
+        :param state_dim: (int)
+        :param action_dim: (int)
+        """
+        super(BaseInverseModel, self).__init__()
+        self.inverse_net = nn.Linear(state_dim * 2, action_dim)
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+
+    def forward(self, x):
+        raise NotImplementedError()
+
+    def inverseModel(self, state, next_state):
+        """
+        Predict action given current state and next state
+        :param state: (th Variable)
+        :param next_state: (th Variable)
+        :return: probability of each action
+        """
+        return self.inverse_net(th.cat((state, next_state), 1))
+
+
+class BaseRewardModel(BaseModelSRL):
+    def __init__(self, state_dim=2, action_dim=6):
+        """
+        :param state_dim: (int)
+        :param action_dim: (int)
+        """
+        super(BaseRewardModel, self).__init__()
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.reward_net = nn.Sequential(nn.Linear(state_dim + action_dim, 32),
+                                        nn.ReLU(),
+                                        nn.Linear(32, 16),
+                                        nn.ReLU(),
+                                        nn.Linear(16, 1))
+
+    def forward(self, x):
+        raise NotImplementedError()
+
+    def rewardModel(self, state, action):
+        """
+        Predict reward given current state and action
+        :param state: (th Variable)
+        :param action: (th Tensor)
+        :return: (th Variable)
+        """
+        return self.reward_net(torch.cat((state, encodeOneHot(action, self.action_dim)), 1))
+
+
+class SRLInverseAutoEncoder(CNNAutoEncoder, BaseInverseModel):
+    def __init__(self, state_dim=2, action_dim=6):
+        """
+        :param state_dim: (int)
+        :param action_dim: (int)
+        """
+        CNNAutoEncoder.__init__(self, state_dim)
+        BaseInverseModel.__init__(self, state_dim, action_dim)
+        self.inverse_layer = nn.Linear(state_dim * 2, action_dim)
+
+
+class SRLCustomForward(BaseForwardModel):
+    def __init__(self, state_dim=2, action_dim=6, cuda=False):
+        """
+        :param state_dim: (int)
+        :param action_dim: (int)
+        :param cuda: (bool)
+        """
+        super(SRLCustomForward, self).__init__(state_dim, action_dim)
+        self.cnn = CustomCNN(state_dim)
+
+        if cuda:
+            self.cnn.cuda()
+
+    def forward(self, x):
+        return self.cnn(x)
+
+
+class SRLCustomInverse(BaseInverseModel):
+    def __init__(self, state_dim=2, action_dim=6, cuda=False):
         """
         :param state_dim:
         :param action_dim:
         :param cuda:
-        :param noise_std:
-        :param type:
         """
-        super(SRLInverseAutoEncoder, self).__init__(state_dim)
-        self.inverse_layer = nn.Linear(state_dim * 2, action_dim)
+        super(SRLCustomInverse, self).__init__(state_dim, action_dim)
+        self.cnn = CustomCNN(state_dim)
 
-    def inverse(self, state, next_state):
+        if cuda:
+            self.cnn.cuda()
+
+    def forward(self, x):
+        return self.cnn(x)
+
+
+class SRLCustomForwardInverse(BaseForwardModel, BaseInverseModel, BaseRewardModel):
+    def __init__(self, state_dim=2, action_dim=6, cuda=False):
         """
-        :param state:
-        :param next_state:
-        :return: probability of a_t
+        :param state_dim:
+        :param action_dim:
+        :param cuda:
         """
-        return self.inverse_layer(torch.cat((state, next_state), 1))
+        BaseForwardModel.__init__(self, state_dim, action_dim)
+        BaseInverseModel.__init__(self, state_dim, action_dim)
+        BaseRewardModel.__init__(self, state_dim, action_dim)
+
+        self.cnn = CustomCNN(state_dim)
+
+        if cuda:
+            self.cnn.cuda()
+
+    def forward(self, x):
+        return self.cnn(x)

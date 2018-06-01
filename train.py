@@ -160,9 +160,7 @@ class RoboticPriorsLoss(nn.Module):
         total_loss += self.l1_coeff * l1_loss
 
         if same_actions_pairs is not None:
-            total_loss += 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
-                         + 1 * repeatability_loss
-
+            total_loss += sum([self.weights[i] * self.losses[i] for i in range(len(self.losses) - 1)])
 
         # Forward model's loss:
         if next_states_pred is not None:
@@ -182,7 +180,6 @@ class RoboticPriorsLoss(nn.Module):
             reward_loss = F.mse_loss(rewards_pred, rewards_st, size_average=True)
             total_loss += weight_reward * reward_loss
             self.addToLosses('reward_loss', weight_reward, reward_loss)
-
 
         if self.loss_history is not None:
             for name, w, loss in zip(self.names, self.weights, self.losses):
@@ -483,10 +480,11 @@ class SRL4robotics(BaseLearner):
                                        triplets=(self.model_type == "triplet_cnn"))
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
+
         # reconstructionLoss = nn.MSELoss(size_average=True)
         # Redefine MSE otherwise PyTorch won't less us compute gradient w.r.t. input
         def reconstructionLoss(_input, target):
-            return th.sum((_input - target)**2) / _input.data.nelement()
+            return th.sum((_input - target) ** 2) / _input.data.nelement()
 
         if self.model_type == "triplet_cnn":
             criterion = RoboticPriorsTripletLoss(self.model, self.l1_reg, loss_history)
@@ -549,17 +547,17 @@ class SRL4robotics(BaseLearner):
                         actions_st = actions_st.cuda()
 
                     if self.use_forward_loss:
-                        next_states_pred = self.model.forward_extra(states, actions_st)
+                        next_states_pred = self.model.forwardModel(states, actions_st)
 
                     if self.use_inverse_loss:
-                        actions_pred = self.model.inverse(states, next_states)
+                        actions_pred = self.model.inverseModel(states, next_states)
 
                     if self.use_reward_loss:
                         rewards_st = rewards[minibatchlist[minibatch_idx]]
                         rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
                         if self.cuda:
                             rewards_st = rewards_st.cuda()
-                        rewards_pred = self.model.reward(states, actions_st)
+                        rewards_pred = self.model.rewardModel(states, actions_st)
                         # print("rewards' gradient :",rewards_pred.grad)
 
                     if not np.any([self.use_forward_loss, self.use_inverse_loss, self.use_reward_loss]):
@@ -572,7 +570,8 @@ class SRL4robotics(BaseLearner):
 
                     if self.use_autoencoder:
                         weight_ae = 1
-                        loss += weight_ae * (reconstructionLoss(obs, decoded_obs) + reconstructionLoss(next_obs, decoded_next_obs))
+                        loss += weight_ae * (reconstructionLoss(obs, decoded_obs) + reconstructionLoss(next_obs,
+                                                                                                       decoded_next_obs))
 
                     if self.episode_prior:
                         # The "episode prior" idea is really close
