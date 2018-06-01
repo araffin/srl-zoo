@@ -7,12 +7,14 @@ from .autoencoders import CNNAutoEncoder
 
 
 class BaseForwardModel(BaseModelSRL):
-    def __init__(self, state_dim=2, action_dim=6):
+    def __init__(self):
         """
         :param state_dim: (int)
         :param action_dim: (int)
         """
         super(BaseForwardModel, self).__init__()
+
+    def initForwardNet(self, state_dim, action_dim):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.forward_net = nn.Linear(state_dim + action_dim, state_dim)
@@ -33,12 +35,14 @@ class BaseForwardModel(BaseModelSRL):
 
 
 class BaseInverseModel(BaseModelSRL):
-    def __init__(self, state_dim=2, action_dim=6):
+    def __init__(self):
         """
         :param state_dim: (int)
         :param action_dim: (int)
         """
         super(BaseInverseModel, self).__init__()
+
+    def initInverseNet(self, state_dim, action_dim):
         self.inverse_net = nn.Linear(state_dim * 2, action_dim)
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -63,6 +67,8 @@ class BaseRewardModel(BaseModelSRL):
         :param action_dim: (int)
         """
         super(BaseRewardModel, self).__init__()
+
+    def initRewardNet(self, state_dim, action_dim):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.reward_net = nn.Sequential(nn.Linear(state_dim + action_dim, 32),
@@ -85,15 +91,13 @@ class BaseRewardModel(BaseModelSRL):
 
 
 class SRLInverseAutoEncoder(CNNAutoEncoder, BaseInverseModel):
-    def __init__(self, state_dim=2, action_dim=6):
+    def __init__(self, state_dim, action_dim):
         """
         :param state_dim: (int)
         :param action_dim: (int)
         """
         CNNAutoEncoder.__init__(self, state_dim)
-        BaseInverseModel.__init__(self, state_dim, action_dim)
-        self.inverse_layer = nn.Linear(state_dim * 2, action_dim)
-
+        self.initInverseNet(state_dim, action_dim)
 
 class SRLCustomForward(BaseForwardModel):
     def __init__(self, state_dim=2, action_dim=6, cuda=False):
@@ -136,9 +140,13 @@ class SRLCustomForwardInverse(BaseForwardModel, BaseInverseModel, BaseRewardMode
         :param action_dim:
         :param cuda:
         """
-        BaseForwardModel.__init__(self, state_dim, action_dim)
-        BaseInverseModel.__init__(self, state_dim, action_dim)
-        BaseRewardModel.__init__(self, state_dim, action_dim)
+        BaseForwardModel.__init__(self)
+        BaseInverseModel.__init__(self)
+        BaseRewardModel.__init__(self)
+
+        self.initForwardNet(state_dim, action_dim)
+        self.initInverseNet(state_dim, action_dim)
+        self.initRewardNet(state_dim, action_dim)
 
         self.cnn = CustomCNN(state_dim)
 

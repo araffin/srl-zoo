@@ -336,7 +336,7 @@ class SRL4robotics(BaseLearner):
             self.use_forward_loss, self.use_inverse_loss = True, True
             self.use_reward_loss = True
         elif model_type == "ae_inverse":
-            self.model = SRLInverseAutoEncoder(self.state_dim)
+            self.model = SRLInverseAutoEncoder(self.state_dim, action_dim=6)
             self.use_inverse_loss = True
             self.use_autoencoder = True
         else:
