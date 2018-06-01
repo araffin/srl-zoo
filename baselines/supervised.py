@@ -14,6 +14,7 @@ from models.base_learner import BaseLearner
 from models import ConvolutionalNetwork, DenseNetwork, CustomCNN
 from pipeline import saveConfig
 from plotting.representation_plot import plot_representation, plt
+from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import INPUT_DIM
 from utils import parseDataFolder, createFolder
@@ -90,6 +91,8 @@ class SupervisedLearning(BaseLearner):
 
         self.model.train()
         start_time = time.time()
+        epoch_train_loss = [[] for _ in range(N_EPOCHS)]
+        epoch_val_loss = [[] for _ in range(N_EPOCHS)]
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             train_loss, val_loss = 0, 0
@@ -104,6 +107,7 @@ class SupervisedLearning(BaseLearner):
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.item()
+                epoch_train_loss[epoch].append(loss.data[0])
                 pbar.update(1)
             pbar.close()
 
@@ -118,6 +122,7 @@ class SupervisedLearning(BaseLearner):
                 pred_states = self.model(obs)
                 loss = criterion(pred_states, target_states)
                 val_loss += loss.item()
+                epoch_val_loss[epoch].append(loss.data[0])
 
             val_loss /= len(val_loader)
             self.model.train()  # Restore train mode
@@ -141,6 +146,10 @@ class SupervisedLearning(BaseLearner):
 
         # Load best model before predicting states
         self.model.load_state_dict(th.load(best_model_path))
+        # save loss
+        np.savez(self.log_folder + "/loss.npz", train=epoch_train_loss, val=epoch_val_loss)
+        # Save plot
+        plotLosses({"train":epoch_train_loss, "val":epoch_val_loss}, self.log_folder)
         # return predicted states for training observations
         return self.predStatesWithDataLoader(data_loader)
 
@@ -190,6 +199,7 @@ if __name__ == '__main__':
     parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
     parser.add_argument('--relative-pos', action='store_true', default=False,
                         help='Use relative position as ground_truth')
+    parser.add_argument('--log-folder', type=str, default='', help='Override the default log-folder')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -198,8 +208,10 @@ if __name__ == '__main__':
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     args.data_folder = parseDataFolder(args.data_folder)
-    name = getModelName(args)
-    log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
+    log_folder = args.log_folder
+    if log_folder == '':
+        name = getModelName(args)
+        log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
     createFolder(log_folder, "supervised folder already exist")
 
     folder_path = '{}/NearestNeighbors/'.format(log_folder)

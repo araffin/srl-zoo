@@ -51,8 +51,10 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
         if multi_view:
 
             images = []
-            for idx in range(2):
-                im = cv2.imread("{}_{}.jpg".format(image_path, idx + 1))
+            for i in range(2):
+                im = cv2.imread("{}_{}.jpg".format(image_path, i + 1))
+                if im is None:
+                    raise ValueError("tried to load {}_{}.jpg, but it was not found".format(image_path, i + 1))
                 images.append(preprocessImage(im))
 
             ####################
@@ -75,9 +77,11 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                 # negative timestep by random sampling
                 length_set_steps = len(all_frame_steps)
                 negative = all_frame_steps[random.randint(0, length_set_steps-1)]
-                negative_path = '{}_{:06d}'.format(image_path[:-6], negative)
+                negative_path = '{}{:06d}'.format(image_path[:-6], negative)
 
                 im3 = cv2.imread(negative_path + "_1.jpg")
+                if im3 is None:
+                    raise ValueError("tried to load {}_{}.jpg, but it was not found".format(negative_path, 1))
                 im3 = preprocessImage(im3)
                 # stacking along channels
                 images.append(im3)
@@ -86,6 +90,8 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
 
         else:
             im = cv2.imread(image_path + ".jpg")
+            if im is None:
+                raise ValueError("tried to load {}.jpg, but it was not found".format(image_path))
             im = preprocessImage(im)
 
         output_queue.put((idx, im))
