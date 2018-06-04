@@ -329,7 +329,7 @@ class SRL4robotics(BaseLearner):
             self.model = SRLCustomForward(state_dim=self.state_dim, cuda=cuda)
             self.use_forward_loss = True
         elif model_type == "inverse_model":
-            self.model = SRLCustomInverse(state_dim=self.state_dim, cuda=cuda)
+            self.model = SRLCustomInverse(state_dim=self.state_dim, cuda=cuda, action_dim=6)
             self.use_inverse_loss = True
         elif model_type == "fwd_inv_model":
             # RATIO of states to backward on:
