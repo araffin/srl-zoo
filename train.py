@@ -554,13 +554,13 @@ class SRL4robotics(BaseLearner):
                     if self.use_inverse_loss:
                         actions_pred = self.model.inverseModel(states, next_states)
 
-                    if self.use_reward_loss:
-                        rewards_st = rewards[minibatchlist[minibatch_idx]]
-                        rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
-                        if self.cuda:
-                            rewards_st = rewards_st.cuda()
-                        rewards_pred = self.model.rewardModel(states, actions_st, next_states)
-                        # print("rewards' gradient :",rewards_pred.grad)
+                    # if self.use_reward_loss:
+                    #     rewards_st = rewards[minibatchlist[minibatch_idx]]
+                    #     rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
+                    #     if self.cuda:
+                    #         rewards_st = rewards_st.cuda()
+                    #     rewards_pred = self.model.rewardModel(states, actions_st, next_states)
+                    #     # print("rewards' gradient :",rewards_pred.grad)
 
                     if not np.any([self.use_forward_loss, self.use_inverse_loss, self.use_reward_loss]):
                         actions_st = None
@@ -572,8 +572,17 @@ class SRL4robotics(BaseLearner):
 
                     if self.use_autoencoder:
                         weight_ae = 1
-                        loss += weight_ae * (reconstructionLoss(obs, decoded_obs) + reconstructionLoss(next_obs,
-                                                                                                       decoded_next_obs))
+                        loss += weight_ae * (reconstructionLoss(obs, decoded_obs) + reconstructionLoss(next_obs, decoded_next_obs))
+
+                    if True:
+                        rewards_st = rewards[minibatchlist[minibatch_idx]]
+                        rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
+                        if self.cuda:
+                            rewards_st = rewards_st.cuda()
+                        reward_weight = 1
+                        concat_var = torch.cat((rewards_st, actions_st), 1)
+                        reward_loss = th.mean(th.mm((concat_var - th.mean(concat_var, dim=0)), (states - th.mean(states, dim=0)).t()))
+                        loss += reward_weight * th.exp(-reward_loss)
 
                     if self.episode_prior:
                         # The "episode prior" idea is really close
