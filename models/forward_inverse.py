@@ -43,7 +43,7 @@ class BaseInverseModel(BaseModelSRL):
         """
         super(BaseInverseModel, self).__init__()
 
-    def initInverseNet(self, state_dim, action_dim, ratio):
+    def initInverseNet(self, state_dim, action_dim, ratio=1):
         self.inverse_net = nn.Linear(int(state_dim * ratio) * 2, action_dim)
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -126,7 +126,8 @@ class SRLCustomInverse(BaseInverseModel):
         :param action_dim:
         :param cuda:
         """
-        super(SRLCustomInverse, self).__init__(state_dim, action_dim)
+        super(SRLCustomInverse, self).__init__()
+        self.initInverseNet(state_dim, action_dim)
         self.cnn = CustomCNN(state_dim)
 
         if cuda:

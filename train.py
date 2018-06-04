@@ -580,7 +580,7 @@ class SRL4robotics(BaseLearner):
                         if self.cuda:
                             rewards_st = rewards_st.cuda()
                         reward_weight = 1
-                        concat_var = torch.cat((rewards_st, actions_st), 1)
+                        concat_var = th.cat((rewards_st, actions_st.float()), 1)
                         reward_loss = th.mean(th.mm((concat_var - th.mean(concat_var, dim=0)), (states - th.mean(states, dim=0)).t()))
                         loss += reward_weight * th.exp(-reward_loss)
 
