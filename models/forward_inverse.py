@@ -14,7 +14,7 @@ class BaseForwardModel(BaseModelSRL):
         """
         super(BaseForwardModel, self).__init__()
 
-    def initForwardNet(self, state_dim, action_dim, ratio):
+    def initForwardNet(self, state_dim, action_dim, ratio=1):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.forward_net = nn.Linear(int(state_dim * ratio) + action_dim, state_dim)
@@ -70,7 +70,7 @@ class BaseRewardModel(BaseModelSRL):
         """
         super(BaseRewardModel, self).__init__()
 
-    def initRewardNet(self, state_dim, action_dim, ratio):
+    def initRewardNet(self, state_dim, action_dim, ratio=1):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.reward_net = nn.Sequential(nn.Linear(int(state_dim *ratio) * 2 + action_dim, 32),

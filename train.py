@@ -27,6 +27,7 @@ from models.base_learner import BaseLearner
 from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet, Discriminator, \
     SRLCustomForward, SRLCustomInverse, SRLCustomForwardInverse, SRLInverseAutoEncoder
 from models.priors import ReverseLayerF
+from models.models import encodeOneHot
 from plotting.representation_plot import plotRepresentation, plt, plotImage
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import CustomDataLoader
@@ -302,11 +303,12 @@ class SRL4robotics(BaseLearner):
     :param cuda: (bool)
     :param multi_view (bool)
     :param episode_prior (bool)
+    :param reward_prior (bool)
     """
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False,
-                 multi_view=False, no_priors=False, episode_prior=False):
+                 multi_view=False, no_priors=False, episode_prior=False, reward_prior=False):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -316,6 +318,7 @@ class SRL4robotics(BaseLearner):
         self.use_inverse_loss = False
         self.use_reward_loss = False
         self.use_autoencoder = False
+        self.reward_prior = reward_prior
 
         if model_type == "resnet":
             self.model = SRLConvolutionalNetwork(self.state_dim, cuda, noise_std=NOISE_STD)
@@ -326,17 +329,15 @@ class SRL4robotics(BaseLearner):
         elif model_type == "mlp":
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         elif model_type == "forward_model":
-            self.model = SRLCustomForward(state_dim=self.state_dim, cuda=cuda)
+            self.model = SRLCustomForward(state_dim=self.state_dim,  action_dim=6, cuda=cuda)
             self.use_forward_loss = True
         elif model_type == "inverse_model":
-            self.model = SRLCustomInverse(state_dim=self.state_dim, cuda=cuda, action_dim=6)
+            self.model = SRLCustomInverse(state_dim=self.state_dim, action_dim=6, cuda=cuda)
             self.use_inverse_loss = True
         elif model_type == "fwd_inv_model":
-            # RATIO of states to backward on:
-            ratio = 0.5
-            self.model = SRLCustomForwardInverse(state_dim=self.state_dim, cuda=cuda, ratio=ratio)
+            self.model = SRLCustomForwardInverse(state_dim=self.state_dim, cuda=cuda, ratio=1)
             self.use_forward_loss, self.use_inverse_loss = True, True
-            self.use_reward_loss = True
+            self.use_reward_loss = False
         elif model_type == "ae_inverse":
             self.model = SRLInverseAutoEncoder(self.state_dim, action_dim=6)
             self.use_inverse_loss = True
@@ -554,13 +555,13 @@ class SRL4robotics(BaseLearner):
                     if self.use_inverse_loss:
                         actions_pred = self.model.inverseModel(states, next_states)
 
-                    # if self.use_reward_loss:
-                    #     rewards_st = rewards[minibatchlist[minibatch_idx]]
-                    #     rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
-                    #     if self.cuda:
-                    #         rewards_st = rewards_st.cuda()
-                    #     rewards_pred = self.model.rewardModel(states, actions_st, next_states)
-                    #     # print("rewards' gradient :",rewards_pred.grad)
+                    if self.use_reward_loss:
+                        rewards_st = rewards[minibatchlist[minibatch_idx]]
+                        rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
+                        if self.cuda:
+                            rewards_st = rewards_st.cuda()
+                        rewards_pred = self.model.rewardModel(states, actions_st, next_states)
+                        # print("rewards' gradient :",rewards_pred.grad)
 
                     if not np.any([self.use_forward_loss, self.use_inverse_loss, self.use_reward_loss]):
                         actions_st = None
@@ -574,13 +575,13 @@ class SRL4robotics(BaseLearner):
                         weight_ae = 1
                         loss += weight_ae * (reconstructionLoss(obs, decoded_obs) + reconstructionLoss(next_obs, decoded_next_obs))
 
-                    if True:
+                    if self.reward_prior:
                         rewards_st = rewards[minibatchlist[minibatch_idx]]
                         rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
                         if self.cuda:
                             rewards_st = rewards_st.cuda()
                         reward_weight = 1
-                        concat_var = th.cat((rewards_st, actions_st.float()), 1)
+                        concat_var = th.cat((rewards_st, encodeOneHot(actions_st, n_dim=6).float()), 1)
                         reward_loss = th.mean(th.mm((concat_var - th.mean(concat_var, dim=0)).t(), (states - th.mean(states, dim=0))))
                         loss += reward_weight * th.exp(-reward_loss)
 
@@ -716,6 +717,8 @@ if __name__ == '__main__':
                         help='Folder within logs/ where the experiment model and plots will be saved')
     parser.add_argument('--multi-view', action='store_true', default=False,
                         help='Enable use of multiple camera')
+    parser.add_argument('--reward-prior', action='store_true', default=False,
+                        help='Enable reward prior (enforce correlation between states/actions and reward)')
     parser.add_argument('--episode-prior', action='store_true', default=False,
                         help='Enable episode independent prior')
     parser.add_argument('--balanced-sampling', action='store_true', default=False,
@@ -751,7 +754,7 @@ if __name__ == '__main__':
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       no_priors=args.no_priors, episode_prior=args.episode_prior)
+                       no_priors=args.no_priors, episode_prior=args.episode_prior, reward_prior=args.reward_prior)
 
     if args.training_set_size > 0:
         limit = args.training_set_size
