@@ -26,8 +26,7 @@ import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
 from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet, Discriminator, \
     SRLCustomForward, SRLCustomInverse, SRLCustomForwardInverse, SRLInverseAutoEncoder
-from models.priors import ReverseLayerF
-from models.models import encodeOneHot
+
 from plotting.representation_plot import plotRepresentation, plt, plotImage
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import CustomDataLoader
@@ -35,16 +34,13 @@ from preprocessing.preprocess import INPUT_DIM
 from preprocessing.utils import deNormalize
 from utils import parseDataFolder, printRed, printYellow
 from pipeline import NO_PAIRS_ERROR, NAN_ERROR
+from losses.losses import autoEncoderLoss, RoboticPriorsLoss, RoboticPriorsTripletLoss, findPriorsPairs, \
+    rewardModelLoss, rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss
 
 # Python 2/3 compatibility
 try:
     input = raw_input
 except NameError:
-    pass
-
-try:
-    from functools import reduce
-except ImportError:
     pass
 
 DISPLAY_PLOTS = True
@@ -55,242 +51,6 @@ VALIDATION_SIZE = 0.2  # 20% of training data for validation
 
 # Experimental: episode independent prior
 BALANCED_SAMPLING = False  # Whether to do Uniform (default) or balanced sampling
-
-
-def overSampling(batch_size, m_list, pairs, function_on_pairs):
-    """
-    Look for minibatches missing pairs of observations with the similar/dissimilar rewards (see params)
-    Sample for each of those minibatches an observation from another batch that satisfies the
-    similarity/dissimilarity with the 1rst observation.
-    return the new pairs & the modified minibatch list
-    :param batch_size: (int)
-    :param m_list: (list) mini-batch list
-    :param pairs: similar / dissimilar pairs
-    :param function_on_pairs: (function) findDissimilar applied to pairs
-    :return: (list, list) pairs, mini-batch list modified
-    """
-    # For a each minibatch_id
-    if function_on_pairs.__name__ == "findDissimilar":
-        pair_name = 'dissimilar pairs'
-    else:
-        pair_name = 'Unknown pairs'
-    counter = 0
-    for minibatch_id, d in enumerate(pairs):
-        do = True
-        if len(d) == 0:
-            counter += 1
-        # Do if it contains no similar pairs of samples
-        while do and len(d) == 0:
-            # for every minibatch & obs of a mini-batch list
-            for m_id, minibatch in enumerate(m_list):
-                for i in range(batch_size):
-                    # Look for similar samples j in other minibatches m_id
-                    for j in function_on_pairs(i, m_list[minibatch_id], minibatch):
-                        # Copy samples - done once
-                        if (j != i) & (minibatch_id != m_id) and do:
-                            m_list[minibatch_id][j] = minibatch[j]
-                            pairs[minibatch_id] = np.array([[i, j]])
-                            do = False
-    print('Dealt with {} minibatches - {}'.format(counter, pair_name))
-    return pairs, m_list
-
-
-class RoboticPriorsLoss(nn.Module):
-    """
-    :param model: (PyTorch model)
-    :param l1_reg: (float) l1 regularization coeff
-    :param loss_history: (dict) will be modified
-    """
-
-    def __init__(self, model, l1_reg=0.0, loss_history=None):
-        super(RoboticPriorsLoss, self).__init__()
-        # Retrieve only trainable and regularizable parameters (we should exclude biases)
-        self.reg_params = [param for name, param in model.named_parameters() if
-                           ".bias" not in name and param.requires_grad]
-        n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
-        self.l1_coeff = (l1_reg / n_params)
-        self.loss_history = loss_history
-        self.names, self.weights, self.losses = [], [], []
-
-    def addToLosses(self, name, weight, loss_value):
-        self.names.append(name)
-        self.weights.append(weight)
-        self.losses.append(loss_value)
-
-    def forward(self, states, next_states,
-                dissimilar_pairs=None, same_actions_pairs=None,
-                rewards_st=None, rewards_pred=None,
-                next_states_pred=None, actions_st=None, actions_pred=None,
-                weight_forward=2.0, weight_inverse=1.0, weight_reward=20.0):
-        """
-        :param states: (th Variable)
-        :param next_states: (th Variable)
-        :param dissimilar_pairs: (th tensor)
-        :param same_actions_pairs: (th tensor)
-        :param next_states_pred: (th tensor)
-        :return: (th Variable)
-        """
-
-        self.names, self.weights, self.losses = [], [], []
-
-        if same_actions_pairs is not None:
-            state_diff = next_states - states
-            state_diff_norm = state_diff.norm(2, dim=1)
-            similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
-            temp_coherence_loss = (state_diff_norm ** 2).mean()
-            causality_loss = similarity(states[dissimilar_pairs[:, 0]],
-                                        states[dissimilar_pairs[:, 1]]).mean()
-            proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
-                                     state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
-
-            repeatability_loss = (
-                    similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
-                    (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2,
-                                                                                                       dim=1) ** 2).mean()
-            self.weights = [1, 1, 1, 1]
-            self.names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss', 'repeatability_loss']
-            self.losses = [temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss]
-
-        total_loss = 0
-        if self.l1_coeff > 0:
-            l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
-            self.addToLosses('l1_loss', self.l1_coeff, l1_loss)
-        else:
-            l1_loss = 0
-
-        total_loss += self.l1_coeff * l1_loss
-
-        if same_actions_pairs is not None:
-            total_loss += sum([self.weights[i] * self.losses[i] for i in range(len(self.losses) - 1)])
-
-        # Forward model's loss:
-        if next_states_pred is not None:
-            forward_loss = F.mse_loss(next_states_pred, next_states, size_average=True)
-            total_loss += weight_forward * forward_loss
-            self.addToLosses('forward_loss', weight_forward, forward_loss)
-
-        # Inverse model's loss:
-        if actions_pred is not None:
-            lossFn = nn.CrossEntropyLoss()
-            inverse_loss = lossFn(actions_pred, actions_st.squeeze(1))
-            total_loss += weight_inverse * inverse_loss
-            self.addToLosses('inverse_loss', weight_inverse, inverse_loss)
-
-        # Reward prediction loss
-        if rewards_st is not None and rewards_pred is not None:
-            reward_loss = F.mse_loss(rewards_pred, rewards_st, size_average=True)
-            total_loss += weight_reward * reward_loss
-            self.addToLosses('reward_loss', weight_reward, reward_loss)
-
-        if self.loss_history is not None:
-            for name, w, loss in zip(self.names, self.weights, self.losses):
-                if w > 0:
-                    if len(self.loss_history[name]) > 0:
-                        self.loss_history[name][-1] += w * loss.data[0]
-                    else:
-                        self.loss_history[name].append(w * loss.data[0])
-
-        return total_loss
-
-
-class RoboticPriorsTripletLoss(nn.Module):
-    """
-    :param model: (PyTorch model)
-    :param l1_reg: (float) l1 regularization coeff
-    :param loss_history: (dict) will be modified
-    """
-
-    def __init__(self, model, l1_reg=0.0, loss_history=None):
-        super(RoboticPriorsTripletLoss, self).__init__()
-        # Retrieve only trainable and regularizable parameters (we should exclude biases)
-        self.reg_params = [param for name, param in model.named_parameters() if
-                           ".bias" not in name and param.requires_grad]
-        n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
-        self.l1_coeff = (l1_reg / n_params)
-        self.loss_history = loss_history
-
-    @staticmethod
-    def priorsOnStates(s, next_s, same_actions_pairs, dissimilar_pairs):
-        """
-        :param s: (th Variable) states
-        :param next_s: (th Variable) next states
-        :param dissimilar_pairs: (th tensor)
-        :param same_actions_pairs: (th tensor)
-        """
-
-        state_diff = next_s - s
-        state_diff_norm = state_diff.norm(2, dim=1)
-        similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
-        temp_coherence_loss = (state_diff_norm ** 2).mean()
-        causality_loss = similarity(s[dissimilar_pairs[:, 0]],
-                                    s[dissimilar_pairs[:, 1]]).mean()
-        proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
-                                 state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
-
-        repeatability_loss = (
-                similarity(s[same_actions_pairs[:, 0]], s[same_actions_pairs[:, 1]]) *
-                (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2,
-                                                                                                   dim=1) ** 2).mean()
-
-        return temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss
-
-    # Override in the case of use of Time-Contrastive Triplet Loss
-    def forward(self, states, p_states, n_states, next_states, next_p_st,
-                dissimilar_pairs, same_actions_pairs,
-                alpha=0.2, no_priors=False):
-        """
-        :param alpha: (float) margin that is enforced between positive & neg observation (TCN Triplet Loss)
-        :param states: (th Variable) states for the anchor obs
-        :param p_states: (th Variable) states for the positive obs
-        :param n_states: (th Variable) states for the negative obs
-        :param next_states: (th Variable)
-        :param next_p_st: (th Variable) next states for the positive obs
-        :param dissimilar_pairs: (th Tensor)
-        :param same_actions_pairs: (th Tensor)
-        :param alpha: (float) gap value in the triplet loss
-        :param no_priors: (bool) no use of priors in the loss/ Only triplets
-        :return: (th Variable)
-        """
-        l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
-        total_loss = self.l1_coeff * l1_loss
-
-        # Applying the priors on the 1st view
-        first_view_losses = self.priorsOnStates(states, next_states, same_actions_pairs, dissimilar_pairs)
-        temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss = first_view_losses
-
-        # Applying the priors on the 2nd view
-        second_view_losses = self.priorsOnStates(p_states, next_p_st, same_actions_pairs, dissimilar_pairs)
-        temp_coherence_loss_2, causality_loss_2, proportionality_loss_2, repeatability_loss_2 = second_view_losses
-
-        temp_coherence_loss += temp_coherence_loss_2
-        causality_loss += causality_loss_2
-        proportionality_loss += proportionality_loss_2
-        repeatability_loss += repeatability_loss_2
-
-        if not no_priors:
-            total_loss += 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
-                          + 1 * repeatability_loss
-            if self.loss_history is not None:
-                weights = [1, 1, 1, 1, self.l1_coeff]
-                names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
-                         'repeatability_loss', 'l1_loss']
-                losses = [temp_coherence_loss, causality_loss, proportionality_loss,
-                          repeatability_loss, l1_loss]
-                for name, w, loss in zip(names, weights, losses):
-                    if w > 0:
-                        if len(self.loss_history[name]) > 0:
-                            self.loss_history[name][-1] += w * loss.data[0]
-                        else:
-                            self.loss_history[name].append(w * loss.data[0])
-
-        # Time-Contrastive Triplet Loss
-        distance_positive = (states - p_states).pow(2).sum(1)
-        distance_negative = (states - n_states).pow(2).sum(1)
-        tcn_trplet_loss = F.relu(distance_positive - distance_negative + alpha)
-        tcn_trplet_loss = tcn_trplet_loss.mean()
-        total_loss += 1 * tcn_trplet_loss
-
-        return total_loss
 
 
 class SRL4robotics(BaseLearner):
@@ -329,7 +89,7 @@ class SRL4robotics(BaseLearner):
         elif model_type == "mlp":
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         elif model_type == "forward_model":
-            self.model = SRLCustomForward(state_dim=self.state_dim,  action_dim=6, cuda=cuda)
+            self.model = SRLCustomForward(state_dim=self.state_dim, action_dim=6, cuda=cuda)
             self.use_forward_loss = True
         elif model_type == "inverse_model":
             self.model = SRLCustomInverse(state_dim=self.state_dim, action_dim=6, cuda=cuda)
@@ -417,65 +177,14 @@ class SRL4robotics(BaseLearner):
         print("Number of observations per action")
         print(n_obs_per_action)
 
+        same_actions, dissimilar_pairs = None, None
         if not self.no_priors:
-            def findDissimilar(index, minibatch1, minibatch2):
-                """
-                check which samples should be dissimilar
-                because they lead to different rewards after the same actions
-                :param index: (int)
-                :param minibatch1: (numpy array)
-                :param minibatch2: (numpy array)
-                :return: (dict, numpy array)
-                """
-                return np.where((actions[minibatch2] == actions[minibatch1[index]]) *
-                                (rewards[minibatch2 + 1] != rewards[minibatch1[index] + 1]))[0]
+            same_actions, dissimilar_pairs = findPriorsPairs(self.batch_size, minibatchlist, actions, rewards,
+                                                             n_actions, n_pairs_per_action)
 
-            dissimilar_pairs = [
-                np.array(
-                    [[i, j] for i in range(self.batch_size) for j in findDissimilar(i, minibatch, minibatch) if j > i],
-                    dtype='int64') for minibatch in minibatchlist]
-
-            # sampling relevant pairs to have at least a pair of dissimilar obs in every minibatches
-            dissimilar_pairs, minibatchlist = overSampling(self.batch_size, minibatchlist, dissimilar_pairs,
-                                                           findDissimilar)
-
-            def findSameActions(index, minibatch):
-                """
-                Get observations indices where the same action was performed
-                as in a reference observation
-                :param index: (int)
-                :param minibatch: (numpy array)
-                :return: (numpy array)
-                """
-                return np.where(actions[minibatch] == actions[minibatch[index]])[0]
-
-            # same_actions: list of arrays, each containing one pair of observation ids
-            same_actions = [
-                np.array([[i, j] for i in range(self.batch_size) for j in findSameActions(i, minibatch) if j > i],
-                         dtype='int64') for minibatch in minibatchlist]
-
-            for pair, minibatch in zip(same_actions, minibatchlist):
-                for i in range(n_actions):
-                    n_pairs_per_action[i] += np.sum(actions[minibatch[pair[:, 0]]] == i)
-
-            # Stats about pairs
-            print("Number of pairs per action:")
-            print(n_pairs_per_action)
-            print("Pairs of {} unique actions".format(np.sum(n_pairs_per_action > 0)))
-
-            for item in same_actions + dissimilar_pairs:
-                if len(item) == 0:
-                    msg = "No same actions or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
-                        BATCH_SIZE)
-                    msg += "=> Consider increasing the batch_size or changing the seed"
-                    printRed(msg)
-                    sys.exit(NO_PAIRS_ERROR)
-        else:
-            same_actions, dissimilar_pairs = None, None
-
-        # For episode prior
-        idx_to_episode = {idx: episode_idx for idx, episode_idx in enumerate(np.cumsum(episode_starts))}
-        minibatch_episodes = [[idx_to_episode[i] for i in minibatch] for minibatch in minibatchlist]
+        if self.episode_prior:
+            idx_to_episode = {idx: episode_idx for idx, episode_idx in enumerate(np.cumsum(episode_starts))}
+            minibatch_episodes = [[idx_to_episode[i] for i in minibatch] for minibatch in minibatchlist]
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
                                        same_actions, dissimilar_pairs, cache_capacity=100,
@@ -484,18 +193,13 @@ class SRL4robotics(BaseLearner):
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
-        # reconstructionLoss = nn.MSELoss(size_average=True)
-        # Redefine MSE otherwise PyTorch won't less us compute gradient w.r.t. input
-        def reconstructionLoss(_input, target):
-            return th.sum((_input - target) ** 2) / _input.data.nelement()
-
         if self.model_type == "triplet_cnn":
             criterion = RoboticPriorsTripletLoss(self.model, self.l1_reg, loss_history)
         # elif self.model_type == "forward_model":
         #    pass
         else:
             criterion = RoboticPriorsLoss(self.model, self.l1_reg, loss_history)
-        criterion_episode = nn.BCELoss(size_average=False)
+
         best_error = np.inf
         best_model_path = "{}/srl_model.pth".format(self.log_folder)
         self.model.train()
@@ -532,28 +236,30 @@ class SRL4robotics(BaseLearner):
                     loss = criterion(states, positive_states, negative_states, next_states, next_positive_states,
                                      diss_pairs, same_actions, no_priors=self.no_priors)
                 else:
+                    criterion.resetLosses()
                     if self.use_autoencoder:
                         (states, decoded_obs), (next_states, decoded_next_obs) = self.model(obs), self.model(next_obs)
                     else:
                         states, next_states = self.model(obs), self.model(next_obs)
                         decoded_obs, decoded_next_obs = None, None
-                    #print(states.shape)
+                    # print(states.shape)
                     # Actions associated to the observations of the current minibatch
                     actions_st = actions[minibatchlist[minibatch_idx]]
                     actions_st = Variable(th.from_numpy(actions_st), requires_grad=False).view(-1, 1)
-                    # Reward associated with the observations of the current minibatch
-                    rewards_st = None
-                    # Predicted values
-                    rewards_pred, next_states_pred, actions_pred = None, None, None
+
+                    if not self.no_priors:
+                        criterion.forward(states, next_states, diss_pairs, same_actions)
 
                     if self.cuda:
                         actions_st = actions_st.cuda()
 
                     if self.use_forward_loss:
                         next_states_pred = self.model.forwardModel(states, actions_st)
+                        forwardModelLoss(next_states_pred, next_states, weight=2, loss_object=criterion)
 
                     if self.use_inverse_loss:
                         actions_pred = self.model.inverseModel(states, next_states)
+                        inverseModelLoss(actions_pred, actions_st, weight=1, loss_object=criterion)
 
                     if self.use_reward_loss:
                         rewards_st = rewards[minibatchlist[minibatch_idx]]
@@ -561,72 +267,25 @@ class SRL4robotics(BaseLearner):
                         if self.cuda:
                             rewards_st = rewards_st.cuda()
                         rewards_pred = self.model.rewardModel(states, actions_st, next_states)
-                        # print("rewards' gradient :",rewards_pred.grad)
-
-                    if not np.any([self.use_forward_loss, self.use_inverse_loss, self.use_reward_loss]):
-                        actions_st = None
-
-                    loss = criterion(states, next_states, diss_pairs, same_actions,
-                                     next_states_pred=next_states_pred,
-                                     actions_st=actions_st, actions_pred=actions_pred,
-                                     rewards_st=rewards_st, rewards_pred=rewards_pred)
+                        rewardModelLoss(rewards_pred, rewards_st, weight=20, loss_object=criterion)
 
                     if self.use_autoencoder:
-                        weight_ae = 1
-                        loss += weight_ae * (reconstructionLoss(obs, decoded_obs) + reconstructionLoss(next_obs, decoded_next_obs))
+                        autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_object=criterion)
 
                     if self.reward_prior:
                         rewards_st = rewards[minibatchlist[minibatch_idx]]
                         rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
                         if self.cuda:
                             rewards_st = rewards_st.cuda()
-                        reward_weight = 1
-                        concat_var = th.cat((rewards_st, encodeOneHot(actions_st, n_dim=6).float()), 1)
-                        reward_loss = th.mean(th.mm((concat_var - th.mean(concat_var, dim=0)).t(), (states - th.mean(states, dim=0))))
-                        loss += reward_weight * th.exp(-reward_loss)
+                        rewardPriorLoss(states, rewards_st, actions_st, n_actions, weight=1, loss_object=criterion)
 
                     if self.episode_prior:
-                        # The "episode prior" idea is really close
-                        # to http://proceedings.mlr.press/v37/ganin15.pdf and GANs
-                        # We train a discriminator that try to distinguish states for same/different episodes
-                        # and then use the opposite gradient to update the states in order to fool it
+                        episodePriorLoss(minibatch_idx, minibatch_episodes, states, self.discriminator,
+                                         BALANCED_SAMPLING, weight=1, loss_object=criterion, cuda=self.cuda)
+                    # Compute weighted average of losses
+                    criterion.updateLossHistory()
+                    loss = criterion.computeTotalLoss()
 
-                        # lambda_ is the weight we give to the episode prior loss
-                        # lambda_ from 0 to 1 (as in original paper)
-                        # p = (minibatch_num + epoch * len(data_loader)) / (N_EPOCHS * len(data_loader))
-                        # lambda_ = 2. / (1. + np.exp(-10 * p)) - 1
-                        lambda_ = 1
-                        # Reverse gradient
-                        reverse_states = ReverseLayerF.apply(states, lambda_)
-
-                        # Get episodes indices for current minibatch
-                        episodes = np.array(minibatch_episodes[minibatch_idx])
-
-                        # Sample other states
-                        if BALANCED_SAMPLING:
-                            # Balanced sampling
-                            others_idx = np.arange(len(episodes))
-                            for i in range(len(episodes)):
-                                if np.random.rand() > 0.5:
-                                    others_idx[i] = np.random.choice(np.where(episodes != episodes[i])[0])
-                                else:
-                                    others_idx[i] = np.random.choice(np.where(episodes == episodes[i])[0])
-                        else:
-                            # Uniform (unbalanced) sampling
-                            others_idx = np.random.permutation(len(states))
-
-                        # Create input for episode discriminator
-                        episode_input = th.cat((reverse_states, reverse_states[others_idx, :]), dim=1)
-                        episode_output = self.discriminator(episode_input)
-
-                        others_episodes = episodes[others_idx]
-                        same_episodes = Variable(th.from_numpy((episodes == others_episodes).astype(np.float32)))
-
-                        if self.cuda:
-                            same_episodes = same_episodes.cuda()
-                        # TODO: classification accuracy/loss
-                        loss_episode = criterion_episode(episode_output.squeeze(1), same_episodes)
-                        loss += 1 * loss_episode
                 # We have to call backward in both train/val
                 # to avoid memory error
                 loss.backward()
@@ -674,9 +333,9 @@ class SRL4robotics(BaseLearner):
                     plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
                                        add_colorbar=epoch == 0,
                                        name="Learned State Representation (Training Data)")
-                    #plt.clf()
-                    #plt.pause(0.001)
-                    #plotLosses(loss_history, args.log_folder)
+                    # plt.clf()
+                    # plt.pause(0.001)
+                    # plotLosses(loss_history, args.log_folder)
 
                     if self.use_autoencoder:
                         # Plot Reconstructed Image
