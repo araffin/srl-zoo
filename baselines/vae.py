@@ -177,7 +177,7 @@ class VAELearning(BaseLearner):
         # save loss
         np.savez(self.log_folder + "/loss.npz", train=epoch_train_loss, val=epoch_val_loss)
         # Save plot
-        plotLosses({"train":epoch_train_loss, "val":epoch_val_loss}, self.log_folder)
+        plotLosses({"train":np.array(epoch_train_loss), "val":np.array(epoch_val_loss)}, self.log_folder)
         # return predicted states for training observations
         return self.predStatesWithDataLoader(data_loader)
 
