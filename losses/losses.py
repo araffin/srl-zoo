@@ -322,10 +322,31 @@ def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_o
 
 
 def rewardPriorLoss(states, rewards_st, actions_st, n_actions, weight, loss_object):
+        
     concat_var = th.cat((states, encodeOneHot(actions_st, n_dim=n_actions).float()), 1)
-    reward_loss = th.mean(
-    th.mm((concat_var - th.mean(concat_var, dim=0)).t(), (rewards_st - th.mean(rewards_st, dim=0))))
-    reward_prior_loss = th.exp(-reward_loss)
+    ###### Mutual information loss
+    X = concat_var
+    Y = rewards_st
+    I = 0
+    eps = 1e-10
+    p_x  = float(1/np.sqrt(2*np.pi)) * th.exp(-th.pow(th.norm((X - th.mean(X, dim=0))/(th.std(X, dim=0)+eps), 2, dim=1), 2)/2) + eps
+    p_y  = float(1/np.sqrt(2*np.pi)) * th.exp(-th.pow(th.norm((Y - th.mean(Y, dim=0))/(th.std(Y, dim=0)+eps), 2, dim=1), 2)/2) + eps
+    for x in range(X.shape[0]):
+        for y in range(Y.shape[0]):
+             p_xy = float(1/np.sqrt(2*np.pi)) * th.exp(-th.pow(th.norm((th.cat([X[x],Y[y]]) - th.mean(th.cat([X,Y], dim=1), dim=0))/(th.std(th.cat([X,Y], dim=1), dim=0)+ eps), 2), 2) /2)  + eps
+             I += p_xy * th.log(p_xy  / (p_x[x] * p_y[y]))
+             #print('inter I:',p_xy,p_x[x],p_y[y])
+
+    #VI = - th.sum(p_x * th.log(p_x)) - th.sum(p_y * th.log(p_y)) - 2*I
+    #print('VI,I:',VI,I)
+    reward_prior_loss = th.exp(-I)
+
+    ############ Correlation loss (st+at) vs. rt
+    #concat_var = th.cat((states, encodeOneHot(actions_st, n_dim=n_actions).float()), 1)
+    #reward_loss = th.mean(
+    #th.mm((concat_var - th.mean(concat_var, dim=0)).t(), (rewards_st - th.mean(rewards_st, dim=0))))
+    #reward_prior_loss = th.exp(-reward_loss)
+    ######################
     loss_object.addToLosses('reward_prior', weight, reward_prior_loss)
     return weight * reward_prior_loss
 

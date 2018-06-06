@@ -291,7 +291,7 @@ if __name__ == '__main__':
                     ax = fig.add_subplot(111)
                     labels = ['x_' + str(i_) for i_ in range(button_pos_.shape[1])]
                     labels += ['st_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
-                    cax = ax.matshow(corr, cmap=cmap)
+                    cax = ax.matshow(corr, cmap=cmap) #set limit ?:, zlimit=[-1,1] )
                     ax.set_xticklabels(['']+labels)
                     ax.set_yticklabels(['']+labels)
                     #####

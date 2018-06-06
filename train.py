@@ -166,7 +166,7 @@ class SRL4robotics(BaseLearner):
 
         # Stats about actions
         action_set = set(actions)
-        n_actions = np.max(actions) + 1
+        n_actions = int(np.max(actions) + 1)
         print("{} unique actions / {} actions".format(len(action_set), n_actions))
         n_pairs_per_action = np.zeros(n_actions, dtype=np.int64)
         n_obs_per_action = np.zeros(n_actions, dtype=np.int64)
@@ -277,8 +277,8 @@ class SRL4robotics(BaseLearner):
                         rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
                         if self.cuda:
                             rewards_st = rewards_st.cuda()
-                        rewardPriorLoss(states, rewards_st, actions_st, n_actions, weight=1, loss_object=criterion)
-
+                        rewardPriorLoss(states, rewards_st, actions_st, n_actions, weight=10., loss_object=criterion)
+                        
                     if self.episode_prior:
                         episodePriorLoss(minibatch_idx, minibatch_episodes, states, self.discriminator,
                                          BALANCED_SAMPLING, weight=1, loss_object=criterion, cuda=self.cuda)
