@@ -1,6 +1,6 @@
 {
   "batch-size": 256,
-  "epochs": 25,
+  "epochs": 40,
   "knn-samples": 2000,
   "knn-seed": 1,
   "l1-reg": 0,
@@ -14,9 +14,6 @@
     "Proportionality",
     "Temporal",
     "Causality",
-    "Repeatability",
-    "SameEnv"
-  ],
-  "use-continuous": false,
-  "-comment": "You can add or remove 'Reference|SameEnv' to the list of priors"
+    "Repeatability"
+  ]
 }

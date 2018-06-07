@@ -17,7 +17,7 @@ from preprocessing.utils import deNormalize
 from models.base_learner import BaseLearner
 from models import LinearAutoEncoder, DenseAutoEncoder, CNNAutoEncoder
 from pipeline import saveConfig
-from plotting.representation_plot import plot_representation, plt, plot_image
+from plotting.representation_plot import plotRepresentation, plt, plotImage
 from plotting.losses_plot import plotLosses
 
 # Python 2/3 compatibility
@@ -130,8 +130,8 @@ class AutoEncoderLearning(BaseLearner):
             val_loss /= len(val_loader)
             if DISPLAY_PLOTS:
                 # Plot Reconstructed Image
-                plot_image(deNormalize(noisy_obs[0].data.cpu().numpy()), "Input Validation Image")
-                plot_image(deNormalize(decoded[0].data.cpu().numpy()), "Reconstructed Image")
+                plotImage(deNormalize(noisy_obs[0].data.cpu().numpy()), "Input Validation Image")
+                plotImage(deNormalize(decoded[0].data.cpu().numpy()), "Reconstructed Image")
 
             self.model.train()  # Restore train mode
 
@@ -147,8 +147,8 @@ class AutoEncoderLearning(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
-                    plot_representation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
-                                        name="Learned State Representation (Training Data)")
+                    plotRepresentation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
+                                       name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
@@ -209,7 +209,8 @@ if __name__ == '__main__':
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--state-dim', type=int, default=2, help='state dimension (default: 2)')
     parser.add_argument('--noise-factor', type=float, default=0.1, help='Noise factor for denoising autoencoder')
-    parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
+    parser.add_argument('--training-set-size', type=int, default=-1,
+                        help='Limit size of the training set (default: -1)')
     parser.add_argument('--log-folder', type=str, default='', help='Override the default log-folder')
 
     args = parser.parse_args()
@@ -251,7 +252,7 @@ if __name__ == '__main__':
 
     name = "Learned State Representation - {} \n Autoencoder state_dim={}".format(args.data_folder, args.state_dim)
     path = "{}/learned_states.png".format(log_folder)
-    plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
+    plotRepresentation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     if DISPLAY_PLOTS:
         input('\nPress any key to exit.')

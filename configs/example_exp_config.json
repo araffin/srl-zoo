@@ -19,6 +19,5 @@
   ],
   "seed": 1,
   "state-dim": 4,
-  "training-set-size": -1,
-  "use-continuous": false
+  "training-set-size": -1
 }
