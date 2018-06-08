@@ -5,6 +5,7 @@ import argparse
 from textwrap import fill
 
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import seaborn as sns
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
@@ -69,7 +70,7 @@ def plotTSNE(states, rewards, name="T-SNE of Learned States", add_colorbar=True,
 
 
 def plotRepresentation(states, rewards, name="Learned State Representation",
-                       add_colorbar=True, path=None, fit_pca=False, cmap='coolwarm'):
+                       add_colorbar=True, path=None, fit_pca=False, cmap='coolwarm', TRUE=None):
     """
     Plot learned state representation using rewards for coloring
     :param states: (numpy array)
@@ -86,24 +87,28 @@ def plotRepresentation(states, rewards, name="Learned State Representation",
         n_components = min(state_dim, 3)
         print("Fitting PCA with {} components".format(n_components))
         states = PCA(n_components=n_components).fit_transform(states)
-
+    print('state dim', state_dim, TRUE)
     if state_dim == 1:
         # Extend states as 2D:
         states_matrix = np.zeros((states.shape[0], 2))
         states_matrix[:, 0] = states[:, 0]
-        plot2dRepresentation(states_matrix, rewards, name, add_colorbar, path, cmap)
+        plot2dRepresentation(states_matrix, rewards, name, add_colorbar, path, cmap, TRUE=TRUE)
     elif state_dim == 2:
-        plot2dRepresentation(states, rewards, name, add_colorbar, path, cmap)
+        print(TRUE)
+        plot2dRepresentation(states, rewards, name, add_colorbar, path, cmap, TRUE=TRUE)
     else:
         plot3dRepresentation(states, rewards, name, add_colorbar, path, cmap)
 
 
 def plot2dRepresentation(states, rewards, name="Learned State Representation",
-                         add_colorbar=True, path=None, cmap='coolwarm'):
+                         add_colorbar=True, path=None, cmap='coolwarm', TRUE=None):
     updateDisplayMode()
     fig = plt.figure(name)
     plt.clf()
-    plt.scatter(states[:, 0], states[:, 1], s=7, c=rewards, cmap=cmap, linewidths=0.1)
+    if TRUE is not None:        
+        plt.scatter(TRUE[:len(states), 0], TRUE[:len(states), 1], s=7, c=states[:,0], cmap=cmap, linewidths=0.1)
+    else:
+        plt.scatter(states[:, 0], states[:, 1], s=7, c=rewards, cmap=cmap, linewidths=0.1)
     plt.xlabel('State dimension 1')
     plt.ylabel('State dimension 2')
     plt.title(fill(name, TITLE_MAX_LENGTH))
@@ -280,7 +285,8 @@ if __name__ == '__main__':
                     rewards = colorPerEpisode(episode_starts)
 
                 # Correlation matrix: Button pos vs. States predicted
-                plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
+                TRUE = true_states
+                plotRepresentation(states_rewards['states'], rewards, cmap=cmap, TRUE=TRUE)
                 for fg in ["Ground_truth", "Button Position"]:
                     if fg == "Ground_truth":
                         X = ground_truth['arm_states'][:len(rewards)]
@@ -291,7 +297,7 @@ if __name__ == '__main__':
                     ax = fig.add_subplot(111)
                     labels = ['x_' + str(i_) for i_ in range(button_pos_.shape[1])]
                     labels += ['st_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
-                    cax = ax.matshow(corr, cmap=cmap) #set limit ?:, zlimit=[-1,1] )
+                    cax = ax.matshow(corr, cmap=cmap)
                     ax.set_xticklabels(['']+labels)
                     ax.set_yticklabels(['']+labels)
                     #####
@@ -299,7 +305,7 @@ if __name__ == '__main__':
                     ##########
 
                     plt.title('Correlation Matrix: Predicted states vs. X=' + fg)
-                    fig.colorbar(cax,label='correlation coefficient')
+                    fig.colorbar(cax,label='correlation coefficient', ticks=[-1, 0, 1])
                     plt.show()
 
         input('\nPress any key to exit.')
@@ -336,7 +342,7 @@ if __name__ == '__main__':
         if args.plot_against:
             plotAgainst(true_states, rewards, cmap=cmap)
         else:
-            plotRepresentation(true_states, rewards, name, fit_pca=False, cmap=cmap)
+            plotRepresentation(true_states, rewards, name, fit_pca=False, cmap=cmap, TRUE=TRUE)
         input('\nPress any key to exit.')
 
     else:

@@ -4,7 +4,9 @@ import torch
 
 from .models import *
 from .autoencoders import CNNAutoEncoder
+from .priors import SRLLinear
 
+INPUT_DIM = 32*32*3
 
 class BaseForwardModel(BaseModelSRL):
     def __init__(self):
@@ -77,7 +79,7 @@ class BaseRewardModel(BaseModelSRL):
                                         nn.ReLU(),
                                         nn.Linear(32, 16),
                                         nn.ReLU(),
-                                        nn.Linear(16, 1))
+                                        nn.Linear(16, 3))
         self.ratio = ratio
 
     def forward(self, x):
@@ -86,11 +88,12 @@ class BaseRewardModel(BaseModelSRL):
     def rewardModel(self, state, action, next_state):
         """
         Predict reward given current state and action
-        :param state: (th Variable)
+:        :param state: (th Variable)
         :param action: (th Tensor)
         :return: (th Variable)
         """
-        return self.reward_net(torch.cat((state[:, int(self.state_dim*self.ratio):], encodeOneHot(action, self.action_dim), next_state[:, int(self.state_dim*self.ratio):]), 1))
+        #return self.reward_net(torch.cat((state[:, int(self.state_dim* ( 1 - self.ratio) ):], encodeOneHot(action, self.action_dim), next_state[:, int(self.state_dim * ( 1 - self.ratio) ):]), 1))
+        return self.reward_net(torch.cat((state, encodeOneHot(action, self.action_dim), next_state), 1))
 
 
 class SRLInverseAutoEncoder(CNNAutoEncoder, BaseInverseModel):
@@ -109,32 +112,39 @@ class SRLCustomForward(BaseForwardModel):
         :param action_dim: (int)
         :param cuda: (bool)
         """
-        super(SRLCustomForward, self).__init__(state_dim, action_dim)
-        self.cnn = CustomCNN(state_dim)
+        super(SRLCustomForward, self).__init__()
+        self.initForwardNet(state_dim, action_dim)
+        
+        self.mlp = SRLLinear(input_dim=INPUT_DIM, state_dim=state_dim, cuda=cuda)
+        #self.initRewardNet(state_dim, action_dim, ratio)
 
         if cuda:
-            self.cnn.cuda()
+            self.linear.cuda()
 
     def forward(self, x):
-        return self.cnn(x)
+        return self.linear(x.contiguous())
 
 
-class SRLCustomInverse(BaseInverseModel):
+class SRLCustomInverse(BaseInverseModel, BaseRewardModel):
     def __init__(self, state_dim=2, action_dim=6, cuda=False):
         """
         :param state_dim:
         :param action_dim:
         :param cuda:
         """
-        super(SRLCustomInverse, self).__init__()
+        #super(SRLCustomInverse, self).__init__()
+        BaseInverseModel.__init__(self)
+        BaseRewardModel.__init__(self)
+
         self.initInverseNet(state_dim, action_dim)
-        self.cnn = CustomCNN(state_dim)
+        self.linear= SRLLinear(input_dim=INPUT_DIM, state_dim=state_dim, cuda=cuda)
+        self.initRewardNet(state_dim, action_dim)
 
         if cuda:
-            self.cnn.cuda()
+            self.linear.cuda()
 
     def forward(self, x):
-        return self.cnn(x)
+        return self.linear(x.contiguous())
 
 
 class SRLCustomForwardInverse(BaseForwardModel, BaseInverseModel, BaseRewardModel):

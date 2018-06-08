@@ -51,6 +51,7 @@ def main():
 
     srl_model_type = None
     for name, filename in zip(['priors', 'vae', 'autoencoder'], ['', '_vae', '_ae']):
+
         filename = "srl{}_model.pth".format(filename)
         if os.path.exists(args.log_dir + filename):
             srl_model_type = name

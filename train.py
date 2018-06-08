@@ -37,6 +37,7 @@ from pipeline import NO_PAIRS_ERROR, NAN_ERROR
 from losses.losses import autoEncoderLoss, RoboticPriorsLoss, RoboticPriorsTripletLoss, findPriorsPairs, \
     rewardModelLoss, rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss
 
+from models.models import encodeOneHot
 # Python 2/3 compatibility
 try:
     input = raw_input
@@ -89,17 +90,18 @@ class SRL4robotics(BaseLearner):
         elif model_type == "mlp":
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         elif model_type == "forward_model":
-            self.model = SRLCustomForward(state_dim=self.state_dim, action_dim=6, cuda=cuda)
+            self.model = SRLCustomForward(state_dim=self.state_dim, action_dim=4, cuda=cuda)
             self.use_forward_loss = True
         elif model_type == "inverse_model":
-            self.model = SRLCustomInverse(state_dim=self.state_dim, action_dim=6, cuda=cuda)
+            self.model = SRLCustomInverse(state_dim=self.state_dim, action_dim=4, cuda=cuda)
             self.use_inverse_loss = True
+            self.use_reward_loss = True
         elif model_type == "fwd_inv_model":
             self.model = SRLCustomForwardInverse(state_dim=self.state_dim, cuda=cuda, ratio=1)
             self.use_forward_loss, self.use_inverse_loss = True, True
             self.use_reward_loss = False
         elif model_type == "ae_inverse":
-            self.model = SRLInverseAutoEncoder(self.state_dim, action_dim=6)
+            self.model = SRLInverseAutoEncoder(self.state_dim, action_dim=actions_dims)
             self.use_inverse_loss = True
             self.use_autoencoder = True
         else:
@@ -242,11 +244,10 @@ class SRL4robotics(BaseLearner):
                     else:
                         states, next_states = self.model(obs), self.model(next_obs)
                         decoded_obs, decoded_next_obs = None, None
-                    # print(states.shape)
                     # Actions associated to the observations of the current minibatch
                     actions_st = actions[minibatchlist[minibatch_idx]]
                     actions_st = Variable(th.from_numpy(actions_st), requires_grad=False).view(-1, 1)
-
+                    
                     if not self.no_priors:
                         criterion.forward(states, next_states, diss_pairs, same_actions)
 
@@ -263,12 +264,13 @@ class SRL4robotics(BaseLearner):
 
                     if self.use_reward_loss:
                         rewards_st = rewards[minibatchlist[minibatch_idx]]
-                        rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
+                        # to set reward  between [0, 1, 2 ] for Cross-entropy (categorical reward)
+                        rewards_st = Variable(th.from_numpy(rewards_st)).view(-1, 1) + 1
                         if self.cuda:
                             rewards_st = rewards_st.cuda()
                         rewards_pred = self.model.rewardModel(states, actions_st, next_states)
-                        rewardModelLoss(rewards_pred, rewards_st, weight=20, loss_object=criterion)
-
+                        rewardModelLoss(rewards_pred, rewards_st.long(), weight=5, loss_object=criterion)
+                        
                     if self.use_autoencoder:
                         autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_object=criterion)
 
