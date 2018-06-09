@@ -16,6 +16,9 @@ Related papers (robotic priors):
 - "Learning State Representations with Robotic Priors" (Jonschkowski and Brock, 2015), paper: [http://tinyurl.com/gly9sma](http://tinyurl.com/gly9sma)
 - "Unsupervised state representation learning with robotic priors: a robustness benchmark" (Lesort, Seurin et al., 2017), paper: [https://arxiv.org/pdf/1709.05185.pdf](https://arxiv.org/pdf/1709.05185.pdf)
 
+Wiki to get started with SRL regarding datasets, repositories, github and other practical matters at ENSTA ParisTech:
+https://docs.google.com/document/d/16d1irReSpe7PCrjhyAEOusvLT7AUC9JN9toKESHqwzU/edit?usp=sharing
+
 
 Table of Contents
 =================
