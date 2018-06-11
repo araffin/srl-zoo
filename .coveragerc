@@ -1,0 +1,11 @@
+[run]
+branch = False
+omit =
+    tests/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+
+[html]
+directory = logs/coverage/

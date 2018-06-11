@@ -82,7 +82,6 @@ dependencies:
 - pytorch=0.3.0=py27_cuda8.0.61_cudnn7.0.3hf383a3f_4
 - torchvision=0.2.0=py27hfb27419_1
 - pip:
-  - coverage
   - backports-abc==0.5
   - backports.functools-lru-cache==1.4
   - backports.shutil-get-terminal-size==1.0.0
@@ -91,6 +90,7 @@ dependencies:
   - multicoretsne==0.1
   - pandas==0.21.0
   - prompt-toolkit==1.0.15
+  - pytest-cov==2.5.1
   - pytest==3.5.0
   - pyzmq==16.0.2
   - seaborn==0.8.1
