@@ -108,17 +108,13 @@ class SRLLinear(BaseModelSRL):
     input shape : 3-channel RGB images of shape (3 x H x W) (to be consistent with CNN network)
     :param input_dim: (int) 3 x H x H
     :param state_dim: (int)
-    :param noise_std: (float)  To avoid NaN (states must be different)
-    :param batch_size: (int)
     :param cuda: (bool)
-    :param n_hidden: (int)
     """
 
-    def __init__(self, input_dim, state_dim=2, cuda=False, noise_std=1e-6):
+    def __init__(self, input_dim, state_dim=2, cuda=False):
         super(SRLLinear, self).__init__()
 
         self.fc = nn.Linear(input_dim, state_dim)
-        self.noise = GaussianNoiseVariant(noise_std, cuda=cuda)
         if cuda:
             self.fc.cuda()
             

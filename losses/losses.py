@@ -18,6 +18,7 @@ try:
 except ImportError:
     pass
 
+
 class RoboticPriorsLoss(nn.Module):
     """
     :param model: (PyTorch model)
@@ -251,6 +252,16 @@ def findSameActions(index, minibatch, actions):
 
 
 def findPriorsPairs(batch_size, minibatchlist, actions, rewards, n_actions, n_pairs_per_action):
+    """
+    
+    :param batch_size:
+    :param minibatchlist:
+    :param actions:
+    :param rewards:
+    :param n_actions:
+    :param n_pairs_per_action:
+    :return:
+    """
     dissimilar_pairs = [
         np.array(
             [[i, j] for i in range(batch_size) for j in findDissimilar(i, minibatch, minibatch, actions, rewards) if
@@ -285,12 +296,27 @@ def findPriorsPairs(batch_size, minibatchlist, actions, rewards, n_actions, n_pa
 
 
 def forwardModelLoss(next_states_pred, next_states, weight, loss_object):
+    """
+    :param next_states_pred: (th Variable)
+    :param next_states: (th Variable)
+    :param weight: coefficient to weight the loss
+    :param loss_object: loss criterion needed to log the loss value
+    :return: 
+    """
     forward_loss = F.mse_loss(next_states_pred, next_states, size_average=True)
     loss_object.addToLosses('forward_loss', weight, forward_loss)
     return weight * forward_loss
 
 
 def inverseModelLoss(actions_pred, actions_st, weight, loss_object):
+    """
+    Inverse model's loss: Cross-entropy between predicted categoriacal actions and true actions
+    :param actions_pred: (th Variable)
+    :param actions_st: (th Variable)
+    :param weight: coefficient to weight the loss
+    :param loss_object: loss criterion needed to log the loss value
+    :return:
+    """
     lossFn = nn.CrossEntropyLoss()
     inverse_loss = lossFn(actions_pred, actions_st.squeeze(1))
     loss_object.addToLosses('inverse_loss', weight, inverse_loss)
@@ -298,12 +324,27 @@ def inverseModelLoss(actions_pred, actions_st, weight, loss_object):
 
 
 def l1Loss(params, weight, loss_object):
+    """
+    L1 regularization loss
+    :param params: NN's weights to regularize
+    :param weight: coefficient to weight the loss (float)
+    :param loss_object: loss criterion needed to log the loss value
+    :return:
+    """
     l1_loss = sum([th.sum(th.abs(param)) for param in params])
     loss_object.addToLosses('l1_loss', weight, l1_loss)
     return weight * l1_loss
 
 
 def rewardModelLoss(rewards_pred, rewards_st, weight, loss_object):
+    """
+    Categorical Reward prediction Loss (Cross-entropy)
+    :param rewards_pred: predicted reward - categorical (th Variable)
+    :param rewards_st: ( int - th Variable)
+    :param weight: coefficient to weight the loss
+    :param loss_object: loss criterion needed to log the loss value
+    :return:
+    """
     lossFn = nn.CrossEntropyLoss()
     reward_loss = lossFn(rewards_pred, target=rewards_st.squeeze(1))
     loss_object.addToLosses('reward_loss', weight, reward_loss)
@@ -313,44 +354,93 @@ def rewardModelLoss(rewards_pred, rewards_st, weight, loss_object):
 # reconstructionLoss = nn.MSELoss(size_average=True)
 # Redefine MSE otherwise PyTorch won't less us compute gradient w.r.t. input
 def reconstructionLoss(_input, target):
+
+    """
+    TODO: fill out
+    :param _input:
+    :param target:
+    :return:
+    """
     return th.sum((_input - target) ** 2) / _input.data.nelement()
 
 
 def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_object):
+    """
+    TODO: fill out
+    :param obs:
+    :param decoded_obs:
+    :param next_obs:
+    :param decoded_next_obs:
+    :param weight: coefficient to weight the loss (float)
+    :param loss_object: loss criterion needed to log the loss value
+    :return:
+    """
     ae_loss = reconstructionLoss(obs, decoded_obs) + reconstructionLoss(next_obs, decoded_next_obs)
     loss_object.addToLosses('reconstruction_loss', weight, ae_loss)
     return weight * ae_loss
 
 
-def mutualInformationLoss(states, rewards_st, actions_st, n_actions, weight, loss_object):
-    concat_var = th.cat((states, encodeOneHot(actions_st, n_dim=n_actions).float()), 1)
-    X = concat_var
+def mutualInformationLoss(states, rewards_st, weight, loss_object):
+    """
+    Loss criterion to assess mutual information between predicted states and rewards
+    :param states: (th Variable)
+    :param rewards_st:(th Variable)
+    :param weight: coefficient to weight the loss (float)
+    :param loss_object: loss criterion needed to log the loss value
+    :return:
+    """
+    #concat_var = th.cat((states, encodeOneHot(actions_st, n_dim=n_actions).float()), 1)
+    X = states
     Y = rewards_st
     I = 0
     eps = 1e-10
-    p_x  = float(1/np.sqrt(2*np.pi)) * th.exp(-th.pow(th.norm((X - th.mean(X, dim=0))/(th.std(X, dim=0)+eps), 2, dim=1), 2)/2) + eps
-    p_y  = float(1/np.sqrt(2*np.pi)) * th.exp(-th.pow(th.norm((Y - th.mean(Y, dim=0))/(th.std(Y, dim=0)+eps), 2, dim=1), 2)/2) + eps
+    p_x = float(1/np.sqrt(2*np.pi)) * \
+           th.exp(-th.pow(th.norm((X - th.mean(X, dim=0))/(th.std(X, dim=0)+eps), 2, dim=1), 2)/2) + eps
+    p_y = float(1/np.sqrt(2*np.pi)) * \
+           th.exp(-th.pow(th.norm((Y - th.mean(Y, dim=0))/(th.std(Y, dim=0)+eps), 2, dim=1), 2)/2) + eps
     for x in range(X.shape[0]):
         for y in range(Y.shape[0]):
-             p_xy = float(1/np.sqrt(2*np.pi)) * th.exp(-th.pow(th.norm((th.cat([X[x],Y[y]]) - th.mean(th.cat([X,Y], dim=1), dim=0))/(th.std(th.cat([X,Y], dim=1), dim=0)+ eps), 2), 2) /2)  + eps
-             I += p_xy * th.log(p_xy  / (p_x[x] * p_y[y]))
-             
+            p_xy = float(1/np.sqrt(2*np.pi)) * \
+                   th.exp(-th.pow(th.norm((th.cat([X[x],Y[y]]) - th.mean(th.cat([X,Y], dim=1), dim=0))/
+                                          (th.std(th.cat([X,Y], dim=1), dim=0)+ eps), 2), 2) /2) + eps
+            I += p_xy * th.log(p_xy / (p_x[x] * p_y[y]))
+
     #VI = - th.sum(p_x * th.log(p_x)) - th.sum(p_y * th.log(p_y)) - 2*I
     reward_prior_loss = th.exp(-I)
     loss_object.addToLosses('reward_prior', weight, reward_prior_loss)
     return weight * reward_prior_loss
+
         
-def rewardPriorLoss(states, rewards_st, actions_st, n_actions, weight, loss_object):
+def rewardPriorLoss(states, rewards_st, weight, loss_object):
+    """
+    Loss expressing Correlation between predicted states and reward
+    :param states: (th Variable)
+    :param rewards_st: rewards at timestep t (th Variable)
+    :param weight: coefficient to weight the los s
+    :param loss_object: loss criterion needed to log the loss value
+    :return:
+    """
         
     reward_loss = th.mean(
     th.mm((states - th.mean(states, dim=0)).t(), (rewards_st - th.mean(rewards_st, dim=0))))
     reward_prior_loss = th.exp(-th.abs(reward_loss))
-    ######################
     loss_object.addToLosses('reward_prior', weight, reward_prior_loss)
     return weight * reward_prior_loss
 
 
 def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, balanced_sampling, weight, loss_object, cuda=False):
+    """
+    TODO: fill out
+    :param minibatch_idx:
+    :param minibatch_episodes:
+    :param states: (th Variable)
+    :param discriminator:
+    :param balanced_sampling:
+    :param weight: coefficient to weight the loss
+    :param loss_object: loss criterion needed to log the loss value
+    :param cuda:
+    :return:
+    """
     # The "episode prior" idea is really close
     # to http://proceedings.mlr.press/v37/ganin15.pdf and GANs
     # We train a discriminator that try to distinguish states for same/different episodes

@@ -37,7 +37,6 @@ from pipeline import NO_PAIRS_ERROR, NAN_ERROR
 from losses.losses import autoEncoderLoss, RoboticPriorsLoss, RoboticPriorsTripletLoss, findPriorsPairs, \
     rewardModelLoss, rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss
 
-from models.models import encodeOneHot
 # Python 2/3 compatibility
 try:
     input = raw_input
@@ -80,6 +79,7 @@ class SRL4robotics(BaseLearner):
         self.use_reward_loss = False
         self.use_autoencoder = False
         self.reward_prior = reward_prior
+        self.dim_action = 4
 
         if model_type == "resnet":
             self.model = SRLConvolutionalNetwork(self.state_dim, cuda, noise_std=NOISE_STD)
@@ -90,10 +90,11 @@ class SRL4robotics(BaseLearner):
         elif model_type == "mlp":
             self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
         elif model_type == "forward_model":
-            self.model = SRLCustomForward(state_dim=self.state_dim, action_dim=4, cuda=cuda)
+            self.model = SRLCustomForward(state_dim=self.state_dim, action_dim=self.dim_action, cuda=cuda)
             self.use_forward_loss = True
+            self.use_reward_loss = False
         elif model_type == "inverse_model":
-            self.model = SRLCustomInverse(state_dim=self.state_dim, action_dim=4, cuda=cuda)
+            self.model = SRLCustomInverse(state_dim=self.state_dim, action_dim=self.dim_action, cuda=cuda)
             self.use_inverse_loss = True
             self.use_reward_loss = True
         elif model_type == "fwd_inv_model":
@@ -101,7 +102,7 @@ class SRL4robotics(BaseLearner):
             self.use_forward_loss, self.use_inverse_loss = True, True
             self.use_reward_loss = False
         elif model_type == "ae_inverse":
-            self.model = SRLInverseAutoEncoder(self.state_dim, action_dim=actions_dims)
+            self.model = SRLInverseAutoEncoder(self.state_dim, action_dim=self.dim_action)
             self.use_inverse_loss = True
             self.use_autoencoder = True
         else:
@@ -256,7 +257,7 @@ class SRL4robotics(BaseLearner):
 
                     if self.use_forward_loss:
                         next_states_pred = self.model.forwardModel(states, actions_st)
-                        forwardModelLoss(next_states_pred, next_states, weight=2, loss_object=criterion)
+                        forwardModelLoss(next_states_pred, next_states, weight=1., loss_object=criterion)
 
                     if self.use_inverse_loss:
                         actions_pred = self.model.inverseModel(states, next_states)
@@ -264,12 +265,13 @@ class SRL4robotics(BaseLearner):
 
                     if self.use_reward_loss:
                         rewards_st = rewards[minibatchlist[minibatch_idx]]
-                        # to set reward  between [0, 1, 2 ] for Cross-entropy (categorical reward)
-                        rewards_st = Variable(th.from_numpy(rewards_st)).view(-1, 1) + 1
+                        # Removing negative reward
+                        rewards_st[rewards_st == -1] = 0
+                        rewards_st = Variable(th.from_numpy(rewards_st)).view(-1, 1)                        
                         if self.cuda:
                             rewards_st = rewards_st.cuda()
-                        rewards_pred = self.model.rewardModel(states, actions_st, next_states)
-                        rewardModelLoss(rewards_pred, rewards_st.long(), weight=5, loss_object=criterion)
+                        rewards_pred = self.model.rewardModel(states)
+                        rewardModelLoss(rewards_pred, rewards_st.long(), weight=2.5, loss_object=criterion)
                         
                     if self.use_autoencoder:
                         autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_object=criterion)
@@ -279,7 +281,7 @@ class SRL4robotics(BaseLearner):
                         rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
                         if self.cuda:
                             rewards_st = rewards_st.cuda()
-                        rewardPriorLoss(states, rewards_st, actions_st, n_actions, weight=10., loss_object=criterion)
+                        rewardPriorLoss(states, rewards_st, weight=10., loss_object=criterion)
                         
                     if self.episode_prior:
                         episodePriorLoss(minibatch_idx, minibatch_episodes, states, self.discriminator,
@@ -335,9 +337,6 @@ class SRL4robotics(BaseLearner):
                     plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
                                        add_colorbar=epoch == 0,
                                        name="Learned State Representation (Training Data)")
-                    # plt.clf()
-                    # plt.pause(0.001)
-                    # plotLosses(loss_history, args.log_folder)
 
                     if self.use_autoencoder:
                         # Plot Reconstructed Image

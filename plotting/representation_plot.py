@@ -70,7 +70,7 @@ def plotTSNE(states, rewards, name="T-SNE of Learned States", add_colorbar=True,
 
 
 def plotRepresentation(states, rewards, name="Learned State Representation",
-                       add_colorbar=True, path=None, fit_pca=False, cmap='coolwarm', TRUE=None):
+                       add_colorbar=True, path=None, fit_pca=False, cmap='coolwarm', gt=None):
     """
     Plot learned state representation using rewards for coloring
     :param states: (numpy array)
@@ -80,6 +80,7 @@ def plotRepresentation(states, rewards, name="Learned State Representation",
     :param path: (str)
     :param fit_pca: (bool)
     :param cmap: (str)
+    :param gt: project a 1D predicted states onto the ground_truth
     """
     state_dim = states.shape[1]
     if state_dim != 1 and (fit_pca or state_dim > 3):
@@ -87,26 +88,24 @@ def plotRepresentation(states, rewards, name="Learned State Representation",
         n_components = min(state_dim, 3)
         print("Fitting PCA with {} components".format(n_components))
         states = PCA(n_components=n_components).fit_transform(states)
-    print('state dim', state_dim, TRUE)
     if state_dim == 1:
         # Extend states as 2D:
         states_matrix = np.zeros((states.shape[0], 2))
         states_matrix[:, 0] = states[:, 0]
-        plot2dRepresentation(states_matrix, rewards, name, add_colorbar, path, cmap, TRUE=TRUE)
+        plot2dRepresentation(states_matrix, rewards, name, add_colorbar, path, cmap, gt=gt)
     elif state_dim == 2:
-        print(TRUE)
-        plot2dRepresentation(states, rewards, name, add_colorbar, path, cmap, TRUE=TRUE)
+        plot2dRepresentation(states, rewards, name, add_colorbar, path, cmap)
     else:
         plot3dRepresentation(states, rewards, name, add_colorbar, path, cmap)
 
 
 def plot2dRepresentation(states, rewards, name="Learned State Representation",
-                         add_colorbar=True, path=None, cmap='coolwarm', TRUE=None):
+                         add_colorbar=True, path=None, cmap='coolwarm', gt=None):
     updateDisplayMode()
     fig = plt.figure(name)
     plt.clf()
-    if TRUE is not None:        
-        plt.scatter(TRUE[:len(states), 0], TRUE[:len(states), 1], s=7, c=states[:,0], cmap=cmap, linewidths=0.1)
+    if gt is not None:
+        plt.scatter(gt[:len(states), 0], gt[:len(states), 1], s=7, c=states[:, 0], cmap=cmap, linewidths=0.1)
     else:
         plt.scatter(states[:, 0], states[:, 1], s=7, c=rewards, cmap=cmap, linewidths=0.1)
     plt.xlabel('State dimension 1')
@@ -235,6 +234,8 @@ if __name__ == '__main__':
                         help='Plot against each dimension')
     parser.add_argument('--correlation', action='store_true', default=False,
                         help='Plot correlation coeff against each dimension')
+    parser.add_argument('--projection', action='store_true', default=False,
+                        help='Plot 1D projection of predicted state on ground truth')
 
     args = parser.parse_args()
 
@@ -258,16 +259,22 @@ if __name__ == '__main__':
         elif args.plot_against:
             print("Plotting against")
             plotAgainst(states_rewards['states'], rewards, cmap=cmap)
+        elif args.projection:
+            training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
+            ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
+            true_states = ground_truth['ground_truth_states']
+            gt = true_states
+            plotRepresentation(states_rewards['states'], rewards, cmap=cmap, gt=gt)
         else:
             button_pos_ = []
             if args.data_folder != "" and args.correlation:
                 training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
                 ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
-                true_states = ground_truth['arm_states']
+                true_states = ground_truth['ground_truth_states']
                 name = "Ground Truth States - {}".format(args.data_folder)
                 episode_starts, rewards_ground = training_data['episode_starts'], training_data['rewards']
                 
-                button_positions =ground_truth['button_positions']
+                button_positions = ground_truth['target_positions']
                 with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
                     relative_pos = json.load(f).get('relative_pos', False)
 
@@ -284,30 +291,25 @@ if __name__ == '__main__':
                 if args.color_episode:
                     rewards = colorPerEpisode(episode_starts)
 
-                # Correlation matrix: Button pos vs. States predicted
-                TRUE = true_states
-                plotRepresentation(states_rewards['states'], rewards, cmap=cmap, TRUE=TRUE)
-                for fg in ["Ground_truth", "Button Position"]:
-                    if fg == "Ground_truth":
-                        X = ground_truth['arm_states'][:len(rewards)]
+                # Correlation matrix: Target pos/GT vs. States predicted
+                for fg in ["Real states (GT)", "Target Position"]:
+                    if fg == "Real states (GT)":
+                        X = ground_truth['ground_truth_states'][:len(rewards)]
                     else:
-                        X = button_pos_
-                    corr = np.corrcoef(x=X + 1e-4, y=states_rewards['states']+ 1e-4, rowvar=False)
+                        X = button_pos_[:len(rewards)]
+                    corr = np.corrcoef(x=X + 1e-20, y=states_rewards['states'] + 1e-20, rowvar=False)
                     fig = plt.figure(figsize=(8, 6))
                     ax = fig.add_subplot(111)
-                    labels = ['x_' + str(i_) for i_ in range(button_pos_.shape[1])]
+                    labels = ['x_' + str(i_) for i_ in range(X.shape[1])]
                     labels += ['st_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
                     cax = ax.matshow(corr, cmap=cmap)
                     ax.set_xticklabels(['']+labels)
                     ax.set_yticklabels(['']+labels)
-                    #####
                     ax.grid(False)
-                    ##########
-
                     plt.title('Correlation Matrix: Predicted states vs. X=' + fg)
-                    fig.colorbar(cax,label='correlation coefficient', ticks=[-1, 0, 1])
-                    plt.show()
-
+                    fig.colorbar(cax,label='correlation coefficient' )#, ticks=[-1, 0, 1])
+                plt.show()
+                
         input('\nPress any key to exit.')
 
     elif args.data_folder != "":
@@ -323,7 +325,7 @@ if __name__ == '__main__':
         name = "Ground Truth States - {}".format(args.data_folder)
         episode_starts, rewards = training_data['episode_starts'], training_data['rewards']
 
-        button_positions = ground_truth['button_positions']
+        button_positions = ground_truth['target_positions']
         print('button pos shape: ',button_positions.shape, button_positions)
         with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
             relative_pos = json.load(f).get('relative_pos', False)
@@ -342,7 +344,7 @@ if __name__ == '__main__':
         if args.plot_against:
             plotAgainst(true_states, rewards, cmap=cmap)
         else:
-            plotRepresentation(true_states, rewards, name, fit_pca=False, cmap=cmap, TRUE=TRUE)
+            plotRepresentation(true_states, rewards, name, fit_pca=False, cmap=cmap)
         input('\nPress any key to exit.')
 
     else:
