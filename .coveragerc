@@ -2,6 +2,7 @@
 branch = False
 omit =
     tests/*
+    server.py
 
 [report]
 exclude_lines =

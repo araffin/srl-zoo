@@ -88,7 +88,7 @@ class SRL4robotics(BaseLearner):
         elif model_type == "triplet_cnn":
             self.model = TripletNet(self.state_dim)
         elif model_type == "mlp":
-            self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, self.batch_size, cuda, noise_std=NOISE_STD)
+            self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, cuda, noise_std=NOISE_STD)
         elif model_type == "forward_model":
             self.model = SRLCustomForward(state_dim=self.state_dim, action_dim=self.dim_action, cuda=cuda)
             self.use_forward_loss = True
@@ -248,7 +248,7 @@ class SRL4robotics(BaseLearner):
                     # Actions associated to the observations of the current minibatch
                     actions_st = actions[minibatchlist[minibatch_idx]]
                     actions_st = Variable(th.from_numpy(actions_st), requires_grad=False).view(-1, 1)
-                    
+
                     if not self.no_priors:
                         criterion.forward(states, next_states, diss_pairs, same_actions)
 
@@ -267,12 +267,12 @@ class SRL4robotics(BaseLearner):
                         rewards_st = rewards[minibatchlist[minibatch_idx]]
                         # Removing negative reward
                         rewards_st[rewards_st == -1] = 0
-                        rewards_st = Variable(th.from_numpy(rewards_st)).view(-1, 1)                        
+                        rewards_st = Variable(th.from_numpy(rewards_st)).view(-1, 1)
                         if self.cuda:
                             rewards_st = rewards_st.cuda()
                         rewards_pred = self.model.rewardModel(states)
                         rewardModelLoss(rewards_pred, rewards_st.long(), weight=2.5, loss_object=criterion)
-                        
+
                     if self.use_autoencoder:
                         autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_object=criterion)
 
@@ -282,7 +282,7 @@ class SRL4robotics(BaseLearner):
                         if self.cuda:
                             rewards_st = rewards_st.cuda()
                         rewardPriorLoss(states, rewards_st, weight=10., loss_object=criterion)
-                        
+
                     if self.episode_prior:
                         episodePriorLoss(minibatch_idx, minibatch_episodes, states, self.discriminator,
                                          BALANCED_SAMPLING, weight=1, loss_object=criterion, cuda=self.cuda)
