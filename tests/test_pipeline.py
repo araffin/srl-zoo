@@ -48,6 +48,18 @@ def testbaselineTrain():
             assertEq(ok, 0)
 
 
+def testsupervisedTrain():
+    createFolders()
+    for model_type in ['custom_cnn', 'mlp', 'resnet']:
+        args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
+                '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
+                '--seed', SEED, '--model-type', model_type]
+        args = list(map(str, args))
+
+        ok = subprocess.call(['python', '-m', 'baselines.supervised'] + args)
+        assertEq(ok, 0)
+
+
 def testKnnMSE():
     createFolders()
     args = ['--seed', SEED, '--n-samples', KNN_SAMPLES,
