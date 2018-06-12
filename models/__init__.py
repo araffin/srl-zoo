@@ -4,4 +4,4 @@ from .supervised import ConvolutionalNetwork, DenseNetwork
 from .triplet import TripletNet
 from .autoencoders import LinearAutoEncoder, DenseAutoEncoder, CNNAutoEncoder
 from .vae import DenseVAE, CNNVAE
-from .forward_inverse import SRLInverseAutoEncoder, SRLCustomForward, SRLCustomInverse, SRLCustomForwardInverse
+from .forward_inverse import SRLModules

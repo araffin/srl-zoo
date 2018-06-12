@@ -24,8 +24,7 @@ from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
-from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet, Discriminator, \
-    SRLCustomForward, SRLCustomInverse, SRLCustomForwardInverse, SRLInverseAutoEncoder
+from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet, Discriminator, SRLModules
 
 from plotting.representation_plot import plotRepresentation, plt, plotImage
 from plotting.losses_plot import plotLosses
@@ -62,49 +61,37 @@ class SRL4robotics(BaseLearner):
     :param l1_reg: (float)
     :param cuda: (bool)
     :param multi_view (bool)
-    :param episode_prior (bool)
+    :param episode-prior (bool)
     :param reward_prior (bool)
     """
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False,
-                 multi_view=False, no_priors=False, episode_prior=False, reward_prior=False):
+                 multi_view=False, losses=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
         self.multi_view = multi_view
-        self.episode_prior = episode_prior
         self.use_forward_loss = False
         self.use_inverse_loss = False
         self.use_reward_loss = False
         self.use_autoencoder = False
-        self.reward_prior = reward_prior
+        self.reward_prior = False
+        self.reward_loss = False
+        self.episode_prior = False
+        self.no_priors = False
+
         self.dim_action = 4
 
-        if model_type == "resnet":
-            self.model = SRLConvolutionalNetwork(self.state_dim, cuda, noise_std=NOISE_STD)
-        elif model_type == "custom_cnn":
-            self.model = SRLCustomCNN(self.state_dim, cuda, noise_std=NOISE_STD)
-        elif model_type == "triplet_cnn":
-            self.model = TripletNet(self.state_dim)
-        elif model_type == "mlp":
-            self.model = SRLDenseNetwork(INPUT_DIM, self.state_dim, cuda, noise_std=NOISE_STD)
-        elif model_type == "forward_model":
-            self.model = SRLCustomForward(state_dim=self.state_dim, action_dim=self.dim_action, cuda=cuda)
-            self.use_forward_loss = True
-            self.use_reward_loss = False
-        elif model_type == "inverse_model":
-            self.model = SRLCustomInverse(state_dim=self.state_dim, action_dim=self.dim_action, cuda=cuda)
-            self.use_inverse_loss = True
-            self.use_reward_loss = True
-        elif model_type == "fwd_inv_model":
-            self.model = SRLCustomForwardInverse(state_dim=self.state_dim, cuda=cuda, ratio=1)
-            self.use_forward_loss, self.use_inverse_loss = True, True
-            self.use_reward_loss = False
-        elif model_type == "ae_inverse":
-            self.model = SRLInverseAutoEncoder(self.state_dim, action_dim=self.dim_action)
-            self.use_inverse_loss = True
-            self.use_autoencoder = True
+        if model_type in ["ae", "mlp", "resnet", "custom_cnn", "triplet_cnn", "linear"]:
+            self.use_forward_loss, self.use_inverse_loss = 'forward' in losses, "inverse" in losses
+            self.use_reward_loss, self.no_priors = 'reward' in losses, "priors" not in losses
+            self.use_autoencoder, self.episode_prior = model_type == "ae", "episode-prior" in losses
+            self.reward_prior = "reward-prior" in losses
+
+            self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, losses=losses, model_type=model_type, cuda=cuda)
+        elif model_type ==  "triplet_cnn":
+             self.model = TripletNet(self.state_dim)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -126,7 +113,6 @@ class SRL4robotics(BaseLearner):
         self.l1_reg = l1_reg
         self.log_folder = log_folder
         self.model_type = model_type
-        self.no_priors = no_priors
 
     def learn(self, images_path, actions, rewards, episode_starts):
         """
@@ -369,22 +355,17 @@ if __name__ == '__main__':
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model-type', type=str, default="custom_cnn",
-                        choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn', 'forward_model', 'inverse_model',
-                                 'fwd_inv_model', 'ae_inverse'],
+                        choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn', 'linear', 'ae'],
                         help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log-folder', type=str, default='logs/default_folder',
                         help='Folder within logs/ where the experiment model and plots will be saved')
     parser.add_argument('--multi-view', action='store_true', default=False,
                         help='Enable use of multiple camera')
-    parser.add_argument('--reward-prior', action='store_true', default=False,
-                        help='Enable reward prior (enforce correlation between states/actions and reward)')
-    parser.add_argument('--episode-prior', action='store_true', default=False,
-                        help='Enable episode independent prior')
     parser.add_argument('--balanced-sampling', action='store_true', default=False,
                         help='Force balanced sampling for episode independent prior instead of uniform')
-    parser.add_argument('--no-priors', action='store_true', default=False,
-                        help='Disable use of priors - in case of triplet loss')
+    parser.add_argument('--losses', type=str, nargs='+', default=["priors"], help='losses(s)',
+                        choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior"])
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -395,6 +376,9 @@ if __name__ == '__main__':
     VALIDATION_SIZE = args.val_size
     BALANCED_SAMPLING = args.balanced_sampling
     plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
+
+    # dealing with losses to use
+    losses = list(set(args.losses))
 
     print('Log folder: {}'.format(args.log_folder))
 
@@ -414,7 +398,7 @@ if __name__ == '__main__':
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       no_priors=args.no_priors, episode_prior=args.episode_prior, reward_prior=args.reward_prior)
+                       losses=losses)
 
     if args.training_set_size > 0:
         limit = args.training_set_size
