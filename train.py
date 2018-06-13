@@ -89,8 +89,8 @@ class SRL4robotics(BaseLearner):
             self.use_autoencoder, self.episode_prior = model_type == "ae", "episode-prior" in losses
             self.reward_prior = "reward-prior" in losses
 
-            self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, losses=losses, model_type=model_type, cuda=cuda)
-        elif model_type ==  "triplet_cnn":
+            self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type, cuda=cuda)
+        elif model_type == "triplet_cnn":
              self.model = TripletNet(self.state_dim)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
