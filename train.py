@@ -197,9 +197,6 @@ class SRL4robotics(BaseLearner):
             epoch_loss, epoch_batches = 0, 0
             val_loss = 0
             pbar = tqdm(total=len(minibatchlist))
-            # Temp bug fix for dataloader
-            data_loader.testMode()
-            data_loader.trainMode()
             data_loader.resetAndShuffle()
 
             for minibatch_num, _input in enumerate(data_loader):

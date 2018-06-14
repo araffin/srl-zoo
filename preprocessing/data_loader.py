@@ -199,16 +199,22 @@ class CustomDataLoader(object):
             w.start()
             self.workers.append(w)
 
+    def resetMinibatches(self):
+        """
+        Restore minibatches to their original order
+        """
+        self.minibatches_indices = np.arange(len(self.minibatchlist), dtype=np.int64)
+        self.minibatchlist = self.original_minibatchlist.copy()
+        self.same_actions = self.original_same_actions.copy()
+        self.dissimilar_pairs = self.original_dissimilar_pairs.copy()
+
     def trainMode(self):
         """
         Switch to train mode and reset the iterator
         It uses the minibatchlist pass at initialization
         """
         self.is_training = True
-        self.minibatches_indices = np.arange(len(self.minibatchlist), dtype=np.int64)
-        self.minibatchlist = self.original_minibatchlist.copy()
-        self.same_actions = self.original_same_actions.copy()
-        self.dissimilar_pairs = self.original_dissimilar_pairs.copy()
+        self.resetMinibatches()
         # Reset the iterator
         self.resetIterator()
 
@@ -297,6 +303,7 @@ class CustomDataLoader(object):
         """
         Shuffle list of minibatches
         """
+        self.resetMinibatches()
         indices = np.random.permutation(self.n_minibatches).astype(np.int64)
         self.minibatches_indices = indices
         self.minibatchlist = self.minibatchlist[indices]
@@ -543,20 +550,30 @@ class SupervisedDataLoader(CustomDataLoader):
         # (not needed when plotting or predicting states)
         self.no_targets = no_targets
         self.targets = np.array(targets)
+        self.original_targets = self.targets.copy()
 
         # Here the cache is not useful: we do not have observations
         # that are present in different minibatches
-        super(SupervisedDataLoader, self).__init__(minibatchlist, images_path, [], [],
+        super(SupervisedDataLoader, self).__init__(minibatchlist, images_path, None, None,
                                                    cache_capacity=0,
                                                    n_workers=n_workers, auto_cleanup=auto_cleanup)
         # Training mode is the default one
         if not is_training:
             self.testMode()
 
+    def resetMinibatches(self):
+        """
+        Restore minibatches to their original order
+        """
+        self.minibatchlist = self.original_minibatchlist.copy()
+        self.targets = self.original_targets.copy()
+
+
     def shuffleMinitbatchesOrder(self):
         """
         Shuffle list of minibatches and targets
         """
+        self.resetMinibatches()
         indices = np.random.permutation(self.n_minibatches).astype(np.int64)
         self.minibatchlist = self.minibatchlist[indices]
         self.targets = self.targets[indices]
@@ -626,17 +643,24 @@ class AutoEncoderDataLoader(CustomDataLoader):
 
         # Here the cache is not useful: we do not have observations
         # that are present in different minibatches
-        super(AutoEncoderDataLoader, self).__init__(minibatchlist, images_path, [], [],
+        super(AutoEncoderDataLoader, self).__init__(minibatchlist, images_path, None, None,
                                                     cache_capacity=0,
                                                     n_workers=n_workers, auto_cleanup=auto_cleanup)
         # Training mode is the default one
         if not is_training:
             self.testMode()
 
+    def resetMinibatches(self):
+        """
+        Restore minibatches to their original order
+        """
+        self.minibatchlist = self.original_minibatchlist.copy()
+
     def shuffleMinitbatchesOrder(self):
         """
         Shuffle list of minibatches
         """
+        self.resetMinibatches()
         indices = np.random.permutation(self.n_minibatches).astype(np.int64)
         self.minibatchlist = self.minibatchlist[indices]
 
