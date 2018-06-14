@@ -7,7 +7,7 @@ from .priors import SRLDenseNetwork, SRLConvolutionalNetwork
 from .autoencoders import CNNAutoEncoder
 from .priors import SRLLinear
 
-from preprocessing.preprocess import INPUT_DIM
+from ..preprocessing.preprocess import INPUT_DIM
 
 
 class BaseForwardModel(BaseModelSRL):
