@@ -176,16 +176,14 @@ class SRL4robotics(BaseLearner):
             minibatch_episodes = [[idx_to_episode[i] for i in minibatch] for minibatch in minibatchlist]
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
-                                       same_actions, dissimilar_pairs, cache_capacity=100,
-                                       multi_view=self.multi_view,
+                                       same_actions=same_actions, dissimilar_pairs=dissimilar_pairs,
+                                       cache_capacity=100, multi_view=self.multi_view,
                                        triplets=(self.model_type == "triplet_cnn"))
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
         if self.model_type == "triplet_cnn":
             criterion = RoboticPriorsTripletLoss(self.model, self.l1_reg, loss_history)
-        # elif self.model_type == "forward_model":
-        #    pass
         else:
             criterion = RoboticPriorsLoss(self.model, self.l1_reg, loss_history)
 
@@ -203,7 +201,7 @@ class SRL4robotics(BaseLearner):
 
             for minibatch_num, _input in enumerate(data_loader):
                 # Unpack input
-                minibatch_idx, obs, next_obs, same_actions, diss_pairs = _input
+                minibatch_idx, obs, next_obs, diss_pairs, same_actions = _input
                 if self.cuda:
                     obs, next_obs = obs.cuda(), next_obs.cuda()
                     same_actions, diss_pairs = same_actions.cuda(), diss_pairs.cuda()
@@ -223,7 +221,7 @@ class SRL4robotics(BaseLearner):
                                                                                          next_obs[:, 6:, :, :])
 
                     loss = criterion(states, positive_states, negative_states, next_states, next_positive_states,
-                                     diss_pairs, same_actions, no_priors=self.no_priors)
+                                     dissimilar_pairs=diss_pairs, same_actions_pairs=same_actions, no_priors=self.no_priors)
                 else:
                     criterion.resetLosses()
                     if self.use_autoencoder:
@@ -236,7 +234,8 @@ class SRL4robotics(BaseLearner):
                     actions_st = Variable(th.from_numpy(actions_st), requires_grad=False).view(-1, 1)
 
                     if not self.no_priors:
-                        criterion.forward(states, next_states, diss_pairs, same_actions)
+                        criterion.forward(states, next_states,
+                                          dissimilar_pairs=diss_pairs, same_actions_pairs=same_actions)
 
                     if self.cuda:
                         actions_st = actions_st.cuda()

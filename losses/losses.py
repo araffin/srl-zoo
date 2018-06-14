@@ -106,7 +106,7 @@ class RoboticPriorsTripletLoss(nn.Module):
         self.loss_history = loss_history
 
     @staticmethod
-    def priorsOnStates(s, next_s, same_actions_pairs, dissimilar_pairs):
+    def priorsOnStates(s, next_s, dissimilar_pairs, same_actions_pairs):
         """
         :param s: (th Variable) states
         :param next_s: (th Variable) next states
@@ -151,11 +151,11 @@ class RoboticPriorsTripletLoss(nn.Module):
         total_loss = self.l1_coeff * l1_loss
 
         # Applying the priors on the 1st view
-        first_view_losses = self.priorsOnStates(states, next_states, same_actions_pairs, dissimilar_pairs)
+        first_view_losses = self.priorsOnStates(states, next_states, dissimilar_pairs, same_actions_pairs)
         temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss = first_view_losses
 
         # Applying the priors on the 2nd view
-        second_view_losses = self.priorsOnStates(p_states, next_p_st, same_actions_pairs, dissimilar_pairs)
+        second_view_losses = self.priorsOnStates(p_states, next_p_st, dissimilar_pairs, same_actions_pairs)
         temp_coherence_loss_2, causality_loss_2, proportionality_loss_2, repeatability_loss_2 = second_view_losses
 
         temp_coherence_loss += temp_coherence_loss_2
@@ -253,7 +253,7 @@ def findSameActions(index, minibatch, actions):
 
 def findPriorsPairs(batch_size, minibatchlist, actions, rewards, n_actions, n_pairs_per_action):
     """
-    
+
     :param batch_size:
     :param minibatchlist:
     :param actions:
@@ -301,7 +301,7 @@ def forwardModelLoss(next_states_pred, next_states, weight, loss_object):
     :param next_states: (th Variable)
     :param weight: coefficient to weight the loss
     :param loss_object: loss criterion needed to log the loss value
-    :return: 
+    :return:
     """
     forward_loss = F.mse_loss(next_states_pred, next_states, size_average=True)
     loss_object.addToLosses('forward_loss', weight, forward_loss)
@@ -410,7 +410,7 @@ def mutualInformationLoss(states, rewards_st, weight, loss_object):
     loss_object.addToLosses('reward_prior', weight, reward_prior_loss)
     return weight * reward_prior_loss
 
-        
+
 def rewardPriorLoss(states, rewards_st, weight, loss_object):
     """
     Loss expressing Correlation between predicted states and reward
@@ -420,7 +420,7 @@ def rewardPriorLoss(states, rewards_st, weight, loss_object):
     :param loss_object: loss criterion needed to log the loss value
     :return:
     """
-        
+
     reward_loss = th.mean(
     th.mm((states - th.mean(states, dim=0)).t(), (rewards_st - th.mean(rewards_st, dim=0))))
     reward_prior_loss = th.exp(-th.abs(reward_loss))
