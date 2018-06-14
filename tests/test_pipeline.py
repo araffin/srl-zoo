@@ -65,7 +65,7 @@ def testKnnMSE():
     args = ['--seed', SEED, '--n-samples', KNN_SAMPLES,
             '--log-folder', LOG_FOLDER,
             '--n-neighbors', 5, '--n-to-plot', 1,
-            '--ground_truth']
+            '--ground-truth']
     args = list(map(str, args))
     ok = subprocess.call(['python', '-m', 'plotting.knn_images'] + args)
     assertEq(ok, 0)
