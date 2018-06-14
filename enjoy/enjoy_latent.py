@@ -72,6 +72,13 @@ def main():
             args.log_dir + "exp_config.json"), "Error: could not find 'exp_config.json' in '{}'".format(
             args.log_dir)
 
+        data = json.load(open(args.log_dir + 'exp_config.json'))
+        try:
+            state_dim = data["state-dim"]
+        except KeyError:
+            # old format
+            state_dim = data["state_dim"]
+
         # loading the model
         if srl_model_type == "autoencoder":
             srl_model = CNNAutoEncoder(state_dim)
