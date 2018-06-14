@@ -177,7 +177,7 @@ class SRL4robotics(BaseLearner):
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
                                        same_actions=same_actions, dissimilar_pairs=dissimilar_pairs,
-                                       cache_capacity=100, multi_view=self.multi_view,
+                                       cache_capacity=100, multi_view=self.multi_view, n_workers=4,
                                        triplets=(self.model_type == "triplet_cnn"))
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
@@ -197,6 +197,9 @@ class SRL4robotics(BaseLearner):
             epoch_loss, epoch_batches = 0, 0
             val_loss = 0
             pbar = tqdm(total=len(minibatchlist))
+            # Temp bug fix for dataloader
+            data_loader.testMode()
+            data_loader.trainMode()
             data_loader.resetAndShuffle()
 
             for minibatch_num, _input in enumerate(data_loader):
