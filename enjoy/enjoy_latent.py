@@ -57,14 +57,15 @@ def main():
             srl_model_type = name
             model_path = args.log_dir + filename
 
-    assert srl_model_type is not None, "Error: the folder did not containe any \"srl_model.pth\", could not determine model type."
+    assert srl_model_type is not None, "Error: the folder did not contain any \"srl_model.pth\", could not determine model type."
     print("Found srl model type: " + srl_model_type)
 
     # is this a valid model
     assert srl_model_type in VALID_MODEL, "Error: '{}' model is not supported."
 
-    data = json.load(open(args.log_dir + 'image_to_state.json'))
-    state_dim = len(list(data.values())[0])
+    if srl_model_type == 'priors':
+        data = json.load(open(args.log_dir + 'image_to_state.json'))
+        state_dim = len(list(data.values())[0])
 
     # model param and info
     if srl_model_type != 'priors':
