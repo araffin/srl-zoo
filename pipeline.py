@@ -129,7 +129,10 @@ def baselineCall(exp_config, baseline="supervised"):
 
     args = ['--no-plots']
     config_args = ['epochs', 'seed', 'model-type',
-                   'data-folder', 'training-set-size', 'log-folder']
+                   'data-folder', 'training-set-size']
+
+    if 'log-folder' in exp_config.keys():
+        config_args += ['log-folder']
 
     if baseline in ["autoencoder", "vae"]:
         config_args += ['state-dim']
