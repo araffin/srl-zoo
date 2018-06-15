@@ -270,11 +270,12 @@ if __name__ == '__main__':
             if args.data_folder != "" and args.correlation:
                 training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
                 ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
-                true_states = ground_truth['ground_truth_states']
+                print(ground_truth.keys())
+                true_states = ground_truth['arm_states'] #'ground_truth_states']
                 name = "Ground Truth States - {}".format(args.data_folder)
                 episode_starts, rewards_ground = training_data['episode_starts'], training_data['rewards']
                 
-                button_positions = ground_truth['target_positions']
+                button_positions = ground_truth['button_positions'] #['target_positions']
                 with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
                     relative_pos = json.load(f).get('relative_pos', False)
 
@@ -292,22 +293,22 @@ if __name__ == '__main__':
                     rewards = colorPerEpisode(episode_starts)
 
                 # Correlation matrix: Target pos/GT vs. States predicted
-                for fg in ["Real states (GT)", "Target Position"]:
-                    if fg == "Real states (GT)":
-                        X = ground_truth['ground_truth_states'][:len(rewards)]
+                for fg in [" Agent's position ", "Target Position"]:
+                    if fg == " Agent's position ":
+                        X = ground_truth['arm_states'][:len(rewards)] #['ground_truth_states'][:len(rewards)]
                     else:
                         X = button_pos_[:len(rewards)]
                     corr = np.corrcoef(x=X + 1e-20, y=states_rewards['states'] + 1e-20, rowvar=False)
                     fig = plt.figure(figsize=(8, 6))
                     ax = fig.add_subplot(111)
                     labels = ['x_' + str(i_) for i_ in range(X.shape[1])]
-                    labels += ['st_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
+                    labels += ['g_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
                     cax = ax.matshow(corr, cmap=cmap)
                     ax.set_xticklabels(['']+labels)
                     ax.set_yticklabels(['']+labels)
                     ax.grid(False)
-                    plt.title('Correlation Matrix: Predicted states vs. X=' + fg)
-                    fig.colorbar(cax,label='correlation coefficient' )#, ticks=[-1, 0, 1])
+                    plt.title('Correlation Matrix : S = Predicted states | G = ' + fg)
+                    fig.colorbar(cax,label='correlation coefficient')
                 plt.show()
                 
         input('\nPress any key to exit.')

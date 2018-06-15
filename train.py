@@ -18,24 +18,25 @@ from collections import defaultdict
 import numpy as np
 import torch as th
 from torch.autograd import Variable
-import torch.nn as nn
-import torch.nn.functional as F
 from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
-from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, TripletNet, Discriminator, SRLModules
+from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, Discriminator, SRLModules
 
 from plotting.representation_plot import plotRepresentation, plt, plotImage
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import CustomDataLoader
-from preprocessing.preprocess import INPUT_DIM
 from preprocessing.utils import deNormalize
-from utils import parseDataFolder, printRed, printYellow
+
+from utils import printRed, printGreen, printBlue, parseDataFolder, \
+    printYellow, priorsToString, createFolder
 from pipeline import NO_PAIRS_ERROR, NAN_ERROR
 from losses.losses import autoEncoderLoss, RoboticPriorsLoss, RoboticPriorsTripletLoss, findPriorsPairs, \
     rewardModelLoss, rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss
 
+from pipeline import getBaseExpConfig, getLogFolderName, saveConfig, knnCall
+import os
 # Python 2/3 compatibility
 try:
     input = raw_input
@@ -67,7 +68,7 @@ class SRL4robotics(BaseLearner):
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False,
-                 multi_view=False, losses=None):
+                 multi_view=False, losses=None, n_actions=6):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -80,18 +81,18 @@ class SRL4robotics(BaseLearner):
         self.reward_loss = False
         self.episode_prior = False
         self.no_priors = False
+        self.losses = losses
+        self.dim_action = n_actions
 
-        self.dim_action = 4
-
-        if model_type in ["ae", "mlp", "resnet", "custom_cnn", "triplet_cnn", "linear"]:
-            self.use_forward_loss, self.use_inverse_loss = 'forward' in losses, "inverse" in losses
-            self.use_reward_loss, self.no_priors = 'reward' in losses, "priors" not in losses
-            self.use_autoencoder, self.episode_prior = model_type == "ae", "episode-prior" in losses
+        if model_type in ["ae", "mlp", "resnet", "custom_cnn", "linear"]:
+            self.use_forward_loss = "forward" in losses
+            self.use_inverse_loss = "inverse" in losses
+            self.use_reward_loss = "reward" in losses
+            self.no_priors = "priors" not in losses and 'triplet' not in self.losses
+            self.use_autoencoder = "ae" in model_type
+            self.episode_prior =  "episode-prior" in losses
             self.reward_prior = "reward-prior" in losses
-
-            self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type, cuda=cuda)
-        elif model_type == "triplet_cnn":
-             self.model = TripletNet(self.state_dim)
+            self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type, cuda=cuda, losses=losses)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -178,11 +179,11 @@ class SRL4robotics(BaseLearner):
         data_loader = CustomDataLoader(minibatchlist, images_path,
                                        same_actions=same_actions, dissimilar_pairs=dissimilar_pairs,
                                        cache_capacity=100, multi_view=self.multi_view, n_workers=4,
-                                       triplets=(self.model_type == "triplet_cnn"))
+                                       triplets=("triplet" in self.losses))
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
-        if self.model_type == "triplet_cnn":
+        if "triplet" in self.losses:
             criterion = RoboticPriorsTripletLoss(self.model, self.l1_reg, loss_history)
         else:
             criterion = RoboticPriorsLoss(self.model, self.l1_reg, loss_history)
@@ -212,14 +213,14 @@ class SRL4robotics(BaseLearner):
                 self.optimizer.zero_grad()
 
                 # Predict states given observations as in Time Contrastive Network (Triplet Loss) [Sermanet et al.]
-                if self.model_type == "triplet_cnn":
-                    states, positive_states, negative_states = self.model(obs[:, :3:, :, :], obs[:, 3:6, :, :],
+                if "triplet" in self.losses:
+
+                    states, positive_states, negative_states = self.model.forward_triplets(obs[:, :3:, :, :], obs[:, 3:6, :, :],
                                                                           obs[:, 6:, :, :])
 
-                    next_states, next_positive_states, next_negative_states = self.model(next_obs[:, :3:, :, :],
+                    next_states, next_positive_states, next_negative_states = self.model.forward_triplets(next_obs[:, :3:, :, :],
                                                                                          next_obs[:, 3:6, :, :],
                                                                                          next_obs[:, 6:, :, :])
-
                     loss = criterion(states, positive_states, negative_states, next_states, next_positive_states,
                                      dissimilar_pairs=diss_pairs, same_actions_pairs=same_actions, no_priors=self.no_priors)
                 else:
@@ -338,6 +339,30 @@ class SRL4robotics(BaseLearner):
         return loss_history, self.predStatesWithDataLoader(data_loader, restore_train=False)
 
 
+def build_config(args):
+    """
+    :param args: (parsed args object)
+    :param log_folder: (str)
+    """
+    exp_config = {
+        "batch-size": args.batch_size,
+        "data-folder": args.data_folder,
+        "epochs": args.epochs,
+        "learning-rate": args.learning_rate,
+        "training-set-size": args.training_set_size,
+        "log-folder": args.log_folder,
+        "model-type": args.model_type,
+        "seed": args.seed,
+        "state-dim": args.state_dim,
+        "knn-samples": 200,
+        "knn-seed": 1,
+        "l1-reg": 0,
+        "model-approach": args.losses,
+        "n-neighbors": 5,
+        "n-to-plot": 5
+    }
+    return exp_config
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch SRL with robotic priors')
     parser.add_argument('--epochs', type=int, default=50, metavar='N',
@@ -354,7 +379,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model-type', type=str, default="custom_cnn",
-                        choices=['custom_cnn', 'resnet', 'mlp', 'triplet_cnn', 'linear', 'ae'],
+                        choices=['custom_cnn', 'resnet', 'mlp', 'linear', 'ae'],
                         help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log-folder', type=str, default='logs/default_folder',
@@ -364,7 +389,9 @@ if __name__ == '__main__':
     parser.add_argument('--balanced-sampling', action='store_true', default=False,
                         help='Force balanced sampling for episode independent prior instead of uniform')
     parser.add_argument('--losses', type=str, nargs='+', default=["priors"], help='losses(s)',
-                        choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior"])
+                        choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet"])
+    parser.add_argument('--save-exp', action='store_true', default=False,
+                        help='Save experiment configs and (with KNN-MSE computation)')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -384,6 +411,7 @@ if __name__ == '__main__':
     print('Loading data ... ')
     training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
     actions = training_data['actions']
+    n_actions = int(np.max(actions) + 1)
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
 
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
@@ -397,7 +425,7 @@ if __name__ == '__main__':
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       losses=losses)
+                       losses=losses, n_actions=n_actions)
 
     if args.training_set_size > 0:
         limit = args.training_set_size
@@ -407,15 +435,35 @@ if __name__ == '__main__':
         episode_starts = episode_starts[:limit]
 
     loss_history, learned_states = srl.learn(images_path, actions, rewards, episode_starts)
-    # Save losses losses history
-    np.savez('{}/loss_history.npz'.format(args.log_folder), **loss_history)
-    # Save plot
-    plotLosses(loss_history, args.log_folder)
 
-    srl.saveStates(learned_states, images_path, rewards, args.log_folder)
+    ####
+    # SAVING LOGS
+    if args.save_exp:
+        print('Saving experiments using base-config file')
+        exp_config = build_config(args)
+        createFolder("logs/{}".format(exp_config['data-folder']), "Dataset log folder already exist")
+        # Check that the dataset is already preprocessed
+        log_folder, experiment_name = getLogFolderName(exp_config)
+        exp_config['log-folder'] = log_folder
+        exp_config['experiment-name'] = experiment_name
+        # Save config in log folder & results as well
+        args.log_folder = log_folder
+        saveConfig(exp_config, print_config=True)
+        # Save plot
+        srl.saveStates(learned_states, images_path, rewards, args.log_folder)
+        # Save losses losses history
+        np.savez('{}/loss_history.npz'.format(args.log_folder), **loss_history)
+        knnCall(exp_config)
+        plotLosses(loss_history, args.log_folder)
+    else:
+        # Save plot
+        plotLosses(loss_history, args.log_folder)
+        srl.saveStates(learned_states, images_path, rewards, args.log_folder)
 
     name = "Learned State Representation\n {}".format(args.log_folder.split('/')[-1])
     path = "{}/learned_states.png".format(args.log_folder)
+
+    # PLOT REPRESENTATION
     plotRepresentation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     # Do not close plot at the end of training

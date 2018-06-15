@@ -3,6 +3,7 @@ from __future__ import print_function, division, absolute_import
 import torch
 
 from .models import *
+from .triplet import EmbeddingNet
 from .priors import SRLDenseNetwork, SRLConvolutionalNetwork
 from .autoencoders import CNNAutoEncoder
 from .priors import SRLLinear
@@ -39,6 +40,7 @@ class BaseForwardModel(BaseModelSRL):
         """
         # Predict the delta between the next state and current state
         concat = torch.cat((state[:, :int(self.state_dim*self.ratio)], encodeOneHot(action, self.action_dim)), 1)
+        concat = torch.cat((state, encodeOneHot(action, self.action_dim)), 1)
         return state + self.forward_net(concat)
 
 
@@ -67,6 +69,7 @@ class BaseInverseModel(BaseModelSRL):
         :return: probability of each action
         """
         return self.inverse_net(th.cat((state[:, :int(self.state_dim*self.ratio)], next_state[:, :int(self.state_dim*self.ratio)]), 1))
+        #return self.inverse_net(th.cat((state, next_state), 1))
 
 
 class BaseRewardModel(BaseModelSRL):
@@ -97,18 +100,18 @@ class BaseRewardModel(BaseModelSRL):
         :param action: (th Tensor)
         :return: (th Variable)
         """
-        #return self.reward_net(torch.cat((state[:, int(self.state_dim* ( 1 - self.ratio) ):], encodeOneHot(action, self.action_dim), next_state[:, int(self.state_dim * ( 1 - self.ratio) ):]), 1))
         return self.reward_net(state)
 
 
 class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
-    def __init__(self, state_dim=2, action_dim=6, ratio=1, cuda=False, model_type="custom_cnn"):
+    def __init__(self, state_dim=2, action_dim=6, ratio=1, cuda=False, model_type="custom_cnn", losses=None):
         """
         :param state_dim:
         :param action_dim:
         :param cuda:
         """
         self.model_type = model_type
+        self.losses = losses
         BaseForwardModel.__init__(self)
         BaseInverseModel.__init__(self)
         BaseRewardModel.__init__(self)
@@ -125,11 +128,15 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         elif model_type == "mlp":
             self.model = SRLDenseNetwork(INPUT_DIM, state_dim, cuda=cuda)
         elif model_type == "resnet":
-             self.model = SRLConvolutionalNetwork(state_dim, cuda)
+            self.model = SRLConvolutionalNetwork(state_dim, cuda)
         elif model_type == "ae":
             self.model = CNNAutoEncoder(state_dim)
             self.model.encoder_fc.cuda()
             self.model.decoder_fc.cuda()
+
+        if losses is not None and "triplet" in losses:
+            # pretrained resnet18 with fixed weights
+            self.model = EmbeddingNet(state_dim)
 
         if cuda:
             self.model.cuda()
@@ -141,12 +148,28 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         if self.model_type == "ae":
             return self.model.encode(observations)
+        elif "triplet" in self.losses:
+            # For inference, the forward pass is done one the positive observation (first view)
+            return self.encode(observations[:, :3:, :, :])
         else:
             return self.forward(observations)
 
     def forward(self, x):
-        if self.model_type == "ae":
-            return self.model.forward(x)
         if self.model_type == 'linear' or self.model_type == 'mlp':
             x = x.contiguous()
         return self.model(x)
+
+    def encode(self, x):
+        if "triplet" in self.losses:
+            return self.model(x)
+        else:
+            raise NotImplementedError()
+
+    def forward_triplets(self, anchor, positive, negative):
+        """
+        Overriding the forward function in the case of Triplet loss
+        anchor : observation
+        positive : observation
+        negative : observation
+        """
+        return self.model(anchor), self.model(positive), self.model(negative)
