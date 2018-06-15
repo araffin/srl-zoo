@@ -2,7 +2,7 @@ from __future__ import print_function, division, absolute_import
 
 import subprocess
 
-from ..utils import createFolder
+from utils import createFolder
 
 TEST_DATA_FOLDER = "data/kuka_gym_test/"
 LOG_FOLDER = "logs/kuka_gym_test/test_priors/"

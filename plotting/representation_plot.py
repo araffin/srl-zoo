@@ -271,11 +271,13 @@ if __name__ == '__main__':
                 training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
                 ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
                 print(ground_truth.keys())
-                true_states = ground_truth['arm_states'] #'ground_truth_states']
+                true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() \
+                    else 'arm_states']
                 name = "Ground Truth States - {}".format(args.data_folder)
                 episode_starts, rewards_ground = training_data['episode_starts'], training_data['rewards']
                 
-                button_positions = ground_truth['button_positions'] #['target_positions']
+                button_positions = ground_truth['target_positions' if 'target_positions' in ground_truth.keys() \
+                    else 'button_positions']
                 with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
                     relative_pos = json.load(f).get('relative_pos', False)
 
@@ -295,7 +297,7 @@ if __name__ == '__main__':
                 # Correlation matrix: Target pos/GT vs. States predicted
                 for fg in [" Agent's position ", "Target Position"]:
                     if fg == " Agent's position ":
-                        X = ground_truth['arm_states'][:len(rewards)] #['ground_truth_states'][:len(rewards)]
+                        X = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'][:len(rewards)]
                     else:
                         X = button_pos_[:len(rewards)]
                     corr = np.corrcoef(x=X + 1e-20, y=states_rewards['states'] + 1e-20, rowvar=False)

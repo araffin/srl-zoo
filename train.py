@@ -84,12 +84,12 @@ class SRL4robotics(BaseLearner):
         self.losses = losses
         self.dim_action = n_actions
 
-        if model_type in ["ae", "mlp", "resnet", "custom_cnn", "linear"]:
+        if model_type in ["autoencoder", "mlp", "resnet", "custom_cnn", "linear"]:
             self.use_forward_loss = "forward" in losses
             self.use_inverse_loss = "inverse" in losses
             self.use_reward_loss = "reward" in losses
             self.no_priors = "priors" not in losses and 'triplet' not in self.losses
-            self.use_autoencoder = "ae" in model_type
+            self.use_autoencoder = "autoencoder" in model_type
             self.episode_prior =  "episode-prior" in losses
             self.reward_prior = "reward-prior" in losses
             self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type, cuda=cuda, losses=losses)
@@ -350,7 +350,7 @@ def build_config(args):
         "epochs": args.epochs,
         "learning-rate": args.learning_rate,
         "training-set-size": args.training_set_size,
-        "log-folder": args.log_folder,
+        "log-folder": "",
         "model-type": args.model_type,
         "seed": args.seed,
         "state-dim": args.state_dim,
@@ -358,6 +358,7 @@ def build_config(args):
         "knn-seed": 1,
         "l1-reg": 0,
         "model-approach": args.losses,
+        "losses": args.losses,
         "n-neighbors": 5,
         "n-to-plot": 5
     }
@@ -379,7 +380,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model-type', type=str, default="custom_cnn",
-                        choices=['custom_cnn', 'resnet', 'mlp', 'linear', 'ae'],
+                        choices=['custom_cnn', 'resnet', 'mlp', 'linear', 'autoencoder'],
                         help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log-folder', type=str, default='logs/default_folder',
@@ -406,8 +407,6 @@ if __name__ == '__main__':
     # dealing with losses to use
     losses = list(set(args.losses))
 
-    print('Log folder: {}'.format(args.log_folder))
-
     print('Loading data ... ')
     training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
     actions = training_data['actions']
@@ -420,6 +419,20 @@ if __name__ == '__main__':
         images_path = np.array([path.decode("utf-8") for path in ground_truth['images_path']])
     except AttributeError:
         images_path = ground_truth['images_path']
+
+    # Creat log folder
+    if args.save_exp:
+        exp_config = build_config(args)
+        createFolder("logs/{}".format(exp_config['data-folder']), "Dataset log folder already exist")
+        # Check that the dataset is already preprocessed
+        log_folder, experiment_name = getLogFolderName(exp_config)
+        print('Log folder: {}'.format(log_folder))
+        exp_config['log-folder'] = log_folder
+        exp_config['experiment-name'] = experiment_name
+        exp_config['n_actions'] = n_actions
+        # Save config in log folder & results as well
+        args.log_folder = log_folder
+        saveConfig(exp_config, print_config=True)
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
@@ -440,21 +453,12 @@ if __name__ == '__main__':
     # SAVING LOGS
     if args.save_exp:
         print('Saving experiments using base-config file')
-        exp_config = build_config(args)
-        createFolder("logs/{}".format(exp_config['data-folder']), "Dataset log folder already exist")
-        # Check that the dataset is already preprocessed
-        log_folder, experiment_name = getLogFolderName(exp_config)
-        exp_config['log-folder'] = log_folder
-        exp_config['experiment-name'] = experiment_name
-        # Save config in log folder & results as well
-        args.log_folder = log_folder
-        saveConfig(exp_config, print_config=True)
         # Save plot
+        plotLosses(loss_history, args.log_folder)
         srl.saveStates(learned_states, images_path, rewards, args.log_folder)
         # Save losses losses history
         np.savez('{}/loss_history.npz'.format(args.log_folder), **loss_history)
         knnCall(exp_config)
-        plotLosses(loss_history, args.log_folder)
     else:
         # Save plot
         plotLosses(loss_history, args.log_folder)

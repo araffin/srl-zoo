@@ -129,7 +129,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
             self.model = SRLDenseNetwork(INPUT_DIM, state_dim, cuda=cuda)
         elif model_type == "resnet":
             self.model = SRLConvolutionalNetwork(state_dim, cuda)
-        elif model_type == "ae":
+        elif model_type == "autoencoder":
             self.model = CNNAutoEncoder(state_dim)
             self.model.encoder_fc.cuda()
             self.model.decoder_fc.cuda()
@@ -146,7 +146,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param observations: (PyTorch Variable)
         :return: (PyTorch Variable)
         """
-        if self.model_type == "ae":
+        if self.model_type == "autoencoder":
             return self.model.encode(observations)
         elif "triplet" in self.losses:
             # For inference, the forward pass is done one the positive observation (first view)
