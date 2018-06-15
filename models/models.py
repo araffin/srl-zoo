@@ -239,3 +239,5 @@ def encodeOneHot(tensor, n_dim):
     if tensor.is_cuda:
         encoded_tensor = encoded_tensor.cuda()
     return Variable(encoded_tensor.scatter_(1, tensor.data, 1.))
+
+

@@ -48,8 +48,10 @@ def getLogFolderName(exp_config):
     # priors
     elif len(exp_config["priors"]) > 0:
         srl_str = priorsToString(exp_config['priors']) + "_" + srl_str
-
-    experiment_name = "{}{}{}_{}".format(date, model_str, srl_str, exp_config['model-approach'])
+    approach = exp_config["model-approach"]
+    if approach is not str():
+        approach = "_".join(approach)
+    experiment_name = "{}{}{}_{}".format(date, model_str, srl_str, approach)
 
     printBlue("\nExperiment: {}\n".format(experiment_name))
     log_folder = "logs/{}/{}".format(exp_config['data-folder'], experiment_name)

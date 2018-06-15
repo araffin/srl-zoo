@@ -30,28 +30,3 @@ class EmbeddingNet(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.fc(x)
         return x
-
-
-class TripletNet(BaseModelSRL):
-    def __init__(self, state_dim=2):
-        super(TripletNet, self).__init__()
-        self.embedding = EmbeddingNet(state_dim)
-
-    def getStates(self, observations):
-        """
-        :param observations: (PyTorch Variable)
-        :return: (PyTorch Variable)
-        """
-        # For inference, the forward pass is done one the positive observation (first view)
-        return self.encode(observations[:, :3:, :, :])
-
-    def forward(self, anchor, positive, negative):
-        """
-        anchor : observation
-        positive : observation
-        negative : observation
-        """
-        return self.embedding(anchor), self.embedding(positive), self.embedding(negative)
-
-    def encode(self, x):
-        return self.embedding(x)
