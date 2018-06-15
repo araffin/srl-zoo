@@ -437,10 +437,10 @@ class CustomDataLoader(object):
 
             # Retrieve observations
             # Define a dict to modify it in the for loop
-            obs_dict = {'obs': None, 'next_obs': None}
+            obs_dict = OrderedDict([('obs', None), ('next_obs', None)])
             indices_list = [obs_indices, obs_indices + 1]
         else:
-            obs_dict = {'obs': None}
+            obs_dict = OrderedDict([('obs', None)])
             indices_list = [obs_indices]
 
         self._sendToWorkers(batch_size, indices_list, obs_dict)
@@ -588,7 +588,7 @@ class SupervisedDataLoader(CustomDataLoader):
         targets = Variable(th.from_numpy(self.targets[i]), volatile=not self.is_training)
 
         batch_size = len(obs_indices)
-        obs_dict = {'obs': None}
+        obs_dict = OrderedDict([('obs', None)])
         indices_list = [obs_indices]
 
         self._sendToWorkers(batch_size, indices_list, obs_dict)
@@ -679,7 +679,7 @@ class AutoEncoderDataLoader(CustomDataLoader):
             noise = Variable(th.from_numpy(noise), volatile=not self.is_training)
 
         batch_size = len(obs_indices)
-        obs_dict = {'obs': None}
+        obs_dict = OrderedDict([('obs', None)])
         indices_list = [obs_indices]
 
         self._sendToWorkers(batch_size, indices_list, obs_dict)
