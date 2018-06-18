@@ -11,6 +11,7 @@ from sklearn.neighbors import KNeighborsClassifier
 
 from preprocessing.utils import deNormalize
 from models import CNNAutoEncoder, CNNVAE
+from utils import detachToNumpy
 
 VALID_MODEL = ['vae', 'autoencoder', 'priors']
 
@@ -28,7 +29,7 @@ def getImage(srl_model, mu, device):
 
         net_out = srl_model.decode(mu)
 
-        img = net_out.to(torch.device("cpu")).detach().numpy()[0].T
+        img = detachToNumpy(net_out)[0].T
 
     img = deNormalize(img)
     return img[:, :, ::-1]

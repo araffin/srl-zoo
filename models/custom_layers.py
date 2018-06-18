@@ -18,9 +18,8 @@ class GaussianNoise(nn.Module):
         super(GaussianNoise, self).__init__()
         self.std = std
         self.mean = mean
-        self.noise = th.zeros(batch_size, input_dim)
         self.device = device
-        self.noise = self.noise.to(self.device)
+        self.noise = th.zeros(batch_size, input_dim, device=self.device)
 
     def forward(self, x):
         if self.training:
@@ -46,8 +45,7 @@ class GaussianNoiseVariant(nn.Module):
 
     def forward(self, x):
         if self.training:
-            noise = th.zeros(x.size())
-            noise = noise.to(self.device)
+            noise = th.zeros(x.size(), self.device)
             noise.data.normal_(self.mean, std=self.std)
             return x + noise
         return x

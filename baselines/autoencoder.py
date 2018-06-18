@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
-from utils import parseDataFolder, createFolder
+from utils import parseDataFolder, createFolder, detachToNumpy
 from preprocessing.data_loader import AutoEncoderDataLoader
 from preprocessing.preprocess import INPUT_DIM
 from preprocessing.utils import deNormalize
@@ -58,7 +58,7 @@ class AutoEncoderLearning(BaseLearner):
 
         self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
 
-        self.model.to(self.device)
+        self.model = self.model.to(self.device)
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
 
@@ -131,8 +131,8 @@ class AutoEncoderLearning(BaseLearner):
                 val_loss /= len(val_loader)
                 if DISPLAY_PLOTS:
                     # Plot Reconstructed Image
-                    plotImage(deNormalize(noisy_obs[0].to(th.device('cpu')).detach().numpy()), "Input Validation Image")
-                    plotImage(deNormalize(decoded[0].to(th.device('cpu')).detach().numpy()), "Reconstructed Image")
+                    plotImage(deNormalize(detachToNumpy(noisy_obs[0])), "Input Validation Image")
+                    plotImage(deNormalize(detachToNumpy(decoded[0])), "Reconstructed Image")
 
             self.model.train()  # Restore train mode
 
