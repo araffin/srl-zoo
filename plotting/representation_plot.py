@@ -300,16 +300,17 @@ if __name__ == '__main__':
                         X = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'][:len(rewards)]
                     else:
                         X = button_pos_[:len(rewards)]
-                    corr = np.corrcoef(x=X + 1e-20, y=states_rewards['states'] + 1e-20, rowvar=False)
+                    eps = 1e-12
+                    corr = np.corrcoef(x=X + eps, y=states_rewards['states'] + eps, rowvar=False)
                     fig = plt.figure(figsize=(8, 6))
                     ax = fig.add_subplot(111)
-                    labels = ['x_' + str(i_) for i_ in range(X.shape[1])]
-                    labels += ['g_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
-                    cax = ax.matshow(corr, cmap=cmap)
+                    labels = ['s_' + str(i_) for i_ in range(X.shape[1])]
+                    labels += ['gt_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
+                    cax = ax.matshow(corr, cmap=cmap, vmin=-1, vmax=1)
                     ax.set_xticklabels(['']+labels)
                     ax.set_yticklabels(['']+labels)
                     ax.grid(False)
-                    plt.title('Correlation Matrix : S = Predicted states | G = ' + fg)
+                    plt.title('Correlation Matrix: S = Predicted states | GT = ' + fg)
                     fig.colorbar(cax,label='correlation coefficient')
                 plt.show()
                 
@@ -329,7 +330,6 @@ if __name__ == '__main__':
         episode_starts, rewards = training_data['episode_starts'], training_data['rewards']
 
         button_positions = ground_truth['target_positions']
-        print('button pos shape: ',button_positions.shape, button_positions)
         with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
             relative_pos = json.load(f).get('relative_pos', False)
 
