@@ -32,7 +32,7 @@ class SRLConvolutionalNetwork(BaseModelSRL):
             nn.ReLU(inplace=True),
             nn.Linear(64, state_dim),
         )
-        self.resnet.to(self.device)
+        self.resnet = self.resnet.to(self.device)
         # This variant does not require the batch_size
         self.noise = GaussianNoiseVariant(self.device, noise_std)
         # self.noise = GaussianNoise(batch_size, state_dim, self.device, noise_std)
@@ -57,7 +57,7 @@ class SRLCustomCNN(BaseModelSRL):
         super(SRLCustomCNN, self).__init__()
         self.cnn = CustomCNN(state_dim)
         self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
-        self.cnn.to(self.device)
+        self.cnn = self.cnn.to(self.device)
         self.noise = GaussianNoiseVariant(self.device, noise_std)
 
     def forward(self, x):

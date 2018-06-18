@@ -17,7 +17,7 @@ from plotting.representation_plot import plotRepresentation, plt
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import INPUT_DIM
-from utils import parseDataFolder, createFolder
+from utils import parseDataFolder, createFolder, detachToNumpy
 
 # Python 2/3 compatibility
 try:
@@ -57,7 +57,7 @@ class SupervisedLearning(BaseLearner):
 
         self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
 
-        self.model.to(self.device)
+        self.model = self.model.to(self.device)
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.log_folder = log_folder

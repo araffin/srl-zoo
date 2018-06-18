@@ -5,6 +5,8 @@ import json
 import numpy as np
 import torch as th
 
+from utils import detachToNumpy
+
 MAX_BATCH_SIZE_GPU = 512  # For plotting, max batch_size before having memory issues
 
 
@@ -62,7 +64,7 @@ class BaseLearner(object):
             # Restore training mode
             self.model.train()
         # Move the tensor back to the cpu
-        return states.to(th.device('cpu')).detach().numpy()
+        return detachToNumpy(states)
 
     def predStates(self, observations):
         """
@@ -73,9 +75,10 @@ class BaseLearner(object):
         :return: (numpy tensor)
         """
         observations = observations.astype(np.float32)
-        obs_var = th.from_numpy(observations).set_grad_enabled(False)
-        obs_var = obs_var.to(self.device)
-        states = self._predFn(obs_var, restore_train=False)
+        with th.no_grad():
+            obs_var = th.from_numpy(observations)
+            obs_var = obs_var.to(self.device)
+            states = self._predFn(obs_var, restore_train=False)
         return states
 
     def _batchPredStates(self, observations):

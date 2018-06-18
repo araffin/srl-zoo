@@ -159,7 +159,7 @@ class BaseModelVAE(BaseModelAutoEncoder):
             # Sample \epsilon from normal distribution
             # use std to create a new variable, so we don't have to care
             # about running on GPU or not
-            eps = std.data.new(std.size()).normal_()
+            eps = std.new(std.size()).normal_()
             # Then multiply with the standard deviation and add the mean
             return eps.mul(std).add_(mu)
         else:

@@ -47,7 +47,7 @@ class ConvolutionalNetwork(BaseModelSRL):
         print("{} units in the last layer".format(n_units))
         self.resnet.fc = nn.Linear(n_units, state_dim)
         self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
-        self.resnet.to(self.device)
+        self.resnet = self.resnet.to(self.device)
 
     def forward(self, x):
         x = self.resnet(x)
