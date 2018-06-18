@@ -542,10 +542,11 @@ class SRL4robotics(BaseLearner):
                                                                                 val_loss))
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
-                    # Optionally plot the current state space
-                    plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
-                                       add_colorbar=epoch == 0,
-                                       name="Learned State Representation (Training Data)")
+                    with th.no_grad():
+                        # Optionally plot the current state space
+                        plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
+                                           add_colorbar=epoch == 0,
+                                           name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
@@ -554,7 +555,9 @@ class SRL4robotics(BaseLearner):
 
         print("Predicting states for all the observations...")
         # return predicted states for training observations
-        return loss_history, self.predStatesWithDataLoader(data_loader, restore_train=False)
+        with th.no_grad():
+            pred_states = self.predStatesWithDataLoader(data_loader, restore_train=False)
+        return loss_history, pred_states
 
 
 if __name__ == '__main__':

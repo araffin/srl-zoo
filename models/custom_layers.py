@@ -45,7 +45,7 @@ class GaussianNoiseVariant(nn.Module):
 
     def forward(self, x):
         if self.training:
-            noise = th.zeros(x.size(), self.device)
+            noise = th.zeros(x.size(), device=self.device)
             noise.data.normal_(self.mean, std=self.std)
             return x + noise
         return x
