@@ -15,7 +15,5 @@
     "Temporal",
     "Causality",
     "Repeatability"
-  ],
-  "use-continuous": false,
-  "-comment": "You can add or remove 'Reference' to the list of priors"
+  ]
 }

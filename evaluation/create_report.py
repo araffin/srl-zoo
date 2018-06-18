@@ -1,3 +1,6 @@
+"""
+Create csv result from a folder of experiments
+"""
 from __future__ import print_function, division, absolute_import
 
 import argparse

@@ -17,7 +17,7 @@ from preprocessing.utils import deNormalize
 from models.base_learner import BaseLearner
 from models import DenseVAE, CNNVAE
 from pipeline import saveConfig
-from plotting.representation_plot import plot_representation, plt, plot_image
+from plotting.representation_plot import plotRepresentation, plt, plotImage
 from plotting.losses_plot import plotLosses
 
 # Python 2/3 compatibility
@@ -30,7 +30,7 @@ DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 32
 NOISE_FACTOR = 0
-TEST_BATCH_SIZE = 32
+TEST_BATCH_SIZE = 512
 
 
 class VAELearning(BaseLearner):
@@ -139,19 +139,20 @@ class VAELearning(BaseLearner):
             self.model.eval()
             val_loader.resetIterator()
             # Pass on the validation set
-            for noisy_obs, obs in val_loader:
-                noisy_obs, obs = noisy_obs.to(self.device), obs.to(self.device)
+            with th.no_grad():
+                for noisy_obs, obs in val_loader:
+                    noisy_obs, obs = noisy_obs.to(self.device), obs.to(self.device)
 
-                decoded, mu, logvar = self.model(noisy_obs)
-                loss = VAELearning._lossFunction(decoded, obs, mu, logvar, self.beta)
-                val_loss += loss.item()
-                epoch_val_loss[epoch].append(loss.item())
+                    decoded, mu, logvar = self.model(noisy_obs)
+                    loss = VAELearning._lossFunction(decoded, obs, mu, logvar, self.beta)
+                    val_loss += loss.item()
+                    epoch_val_loss[epoch].append(loss.item())
 
-            val_loss /= len(val_loader)
-            if DISPLAY_PLOTS:
-                # Plot Reconstructed Image
-                plot_image(deNormalize(noisy_obs[0].to(th.device('cpu')).detach().numpy()), "Input Validation Image")
-                plot_image(deNormalize(decoded[0].to(th.device('cpu')).detach().numpy()), "Reconstructed Image")
+                val_loss /= len(val_loader)
+                if DISPLAY_PLOTS:
+                    # Plot Reconstructed Image
+                    plotImage(deNormalize(noisy_obs[0].to(th.device('cpu')).detach().numpy()), "Input Validation Image")
+                    plotImage(deNormalize(decoded[0].to(th.device('cpu')).detach().numpy()), "Reconstructed Image")
 
             self.model.train()  # Restore train mode
 
@@ -167,8 +168,8 @@ class VAELearning(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
-                    plot_representation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
-                                        name="Learned State Representation (Training Data)")
+                    plotRepresentation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
+                                       name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
@@ -177,9 +178,11 @@ class VAELearning(BaseLearner):
         # save loss
         np.savez(self.log_folder + "/loss.npz", train=epoch_train_loss, val=epoch_val_loss)
         # Save plot
-        plotLosses({"train":epoch_train_loss, "val":epoch_val_loss}, self.log_folder)
+        plotLosses({"train": np.array(epoch_train_loss), "val": np.array(epoch_val_loss)}, self.log_folder)
         # return predicted states for training observations
-        return self.predStatesWithDataLoader(data_loader)
+        with th.no_grad():
+            pred_states = self.predStatesWithDataLoader(data_loader)
+        return pred_states
 
 
 def getModelName(args):
@@ -245,7 +248,7 @@ if __name__ == '__main__':
     BATCH_SIZE = args.batch_size
     NOISE_FACTOR = args.noise_factor
     args.data_folder = parseDataFolder(args.data_folder)
-    
+
     log_folder = args.log_folder
     if log_folder == '':
         name = getModelName(args)
@@ -267,6 +270,8 @@ if __name__ == '__main__':
         images_path = images_path[:limit]
         rewards = rewards[:limit]
 
+    print("{} samples".format(len(images_path)))
+
     print('Learning a state representation ... ')
     srl = VAELearning(args.state_dim, model_type=args.model_type, seed=args.seed,
                       log_folder=log_folder, learning_rate=args.learning_rate,
@@ -276,7 +281,7 @@ if __name__ == '__main__':
 
     name = "Learned State Representation - {} \n VAE state_dim={}".format(args.data_folder, args.state_dim)
     path = "{}/learned_states.png".format(log_folder)
-    plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
+    plotRepresentation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     if DISPLAY_PLOTS:
         input('\nPress any key to exit.')

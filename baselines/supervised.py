@@ -13,7 +13,7 @@ import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
 from models import ConvolutionalNetwork, DenseNetwork, CustomCNN
 from pipeline import saveConfig
-from plotting.representation_plot import plot_representation, plt
+from plotting.representation_plot import plotRepresentation, plt
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import INPUT_DIM
@@ -55,7 +55,7 @@ class SupervisedLearning(BaseLearner):
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
+        self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
 
         self.model.to(self.device)
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
@@ -115,16 +115,17 @@ class SupervisedLearning(BaseLearner):
 
             self.model.eval()
             val_loader.resetIterator()
-            # Pass on the validation set
-            for obs, target_states in val_loader:
-                obs, target_states = obs.to(self.device), target_states.to(self.device)
+            with th.no_grad():
+                # Pass on the validation set
+                for obs, target_states in val_loader:
+                    obs, target_states = obs.to(self.device), target_states.to(self.device)
 
-                pred_states = self.model(obs)
-                loss = criterion(pred_states, target_states)
-                val_loss += loss.item()
-                epoch_val_loss[epoch].append(loss.item())
+                    pred_states = self.model(obs)
+                    loss = criterion(pred_states, target_states)
+                    val_loss += loss.item()
+                    epoch_val_loss[epoch].append(loss.item())
 
-            val_loss /= len(val_loader)
+                val_loss /= len(val_loader)
             self.model.train()  # Restore train mode
 
             # Save best model
@@ -139,8 +140,8 @@ class SupervisedLearning(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     # Optionally plot the current state space
-                    plot_representation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
-                                        name="Learned State Representation (Training Data)")
+                    plotRepresentation(self.predStatesWithDataLoader(data_loader), rewards, add_colorbar=epoch == 0,
+                                       name="Learned State Representation (Training Data)")
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
@@ -149,9 +150,11 @@ class SupervisedLearning(BaseLearner):
         # save loss
         np.savez(self.log_folder + "/loss.npz", train=epoch_train_loss, val=epoch_val_loss)
         # Save plot
-        plotLosses({"train":epoch_train_loss, "val":epoch_val_loss}, self.log_folder)
+        plotLosses({"train": np.array(epoch_train_loss), "val": np.array(epoch_val_loss)}, self.log_folder)
         # return predicted states for training observations
-        return self.predStatesWithDataLoader(data_loader)
+        with th.no_grad():
+            pred_states = self.predStatesWithDataLoader(data_loader)
+        return pred_states
 
 
 def getModelName(args):
@@ -196,7 +199,8 @@ if __name__ == '__main__':
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model-type', type=str, default="resnet", help='Model architecture (default: "resnet")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
-    parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
+    parser.add_argument('--training-set-size', type=int, default=-1,
+                        help='Limit size of the training set (default: -1)')
     parser.add_argument('--relative-pos', action='store_true', default=False,
                         help='Use relative position as ground_truth')
     parser.add_argument('--log-folder', type=str, default='', help='Override the default log-folder')
@@ -225,8 +229,10 @@ if __name__ == '__main__':
 
     # TODO: normalize true states
     ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
-    true_states = ground_truth['arm_states']
-    button_positions = ground_truth['button_positions']
+    # Backward compatibility with previous names
+    true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
+    target_positions = ground_truth[
+        'target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
 
     if args.relative_pos:
         print("Using relative position")
@@ -234,7 +240,7 @@ if __name__ == '__main__':
         for i in range(len(episode_starts)):
             if episode_starts[i] == 1:
                 button_idx += 1
-            true_states[i] -= button_positions[button_idx]
+            true_states[i] -= target_positions[button_idx]
 
     images_path = ground_truth['images_path']
     state_dim = true_states.shape[1]
@@ -258,7 +264,7 @@ if __name__ == '__main__':
 
     name = "Learned State Representation - {} \n Supervised Learning".format(args.data_folder)
     path = "{}/learned_states.png".format(log_folder)
-    plot_representation(learned_states, rewards, name, add_colorbar=True, path=path)
+    plotRepresentation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     if DISPLAY_PLOTS:
         input('\nPress any key to exit.')

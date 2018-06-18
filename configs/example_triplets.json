@@ -11,7 +11,5 @@
   "n-neighbors": 5,
   "n-to-plot": 5,
   "multi-view": true,
-  "priors": [],
-  "use-continuous": false,
-  "-comment": "You can add or remove 'Reference|SameEnv' to the list of priors"
+  "priors": []
 }

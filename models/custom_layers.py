@@ -11,7 +11,7 @@ class GaussianNoise(nn.Module):
     :param input_dim: (int)
     :param std: (float) standard deviation
     :param mean: (float)
-    :param cuda: (bool)
+    :param device: (pytorch device)
     """
 
     def __init__(self, batch_size, input_dim, device, std, mean=0):
@@ -19,6 +19,7 @@ class GaussianNoise(nn.Module):
         self.std = std
         self.mean = mean
         self.noise = th.zeros(batch_size, input_dim)
+        self.device = device
         self.noise = self.noise.to(self.device)
 
     def forward(self, x):
@@ -34,14 +35,14 @@ class GaussianNoiseVariant(nn.Module):
     It recreates a variable at each call
     :param std: (float) standard deviation
     :param mean: (float)
-    :param cuda: (bool)
+    :param device: (pytorch device)
     """
 
     def __init__(self, device, std, mean=0):
         super(GaussianNoiseVariant, self).__init__()
         self.std = std
         self.mean = mean
-        self.cuda = cuda
+        self.device = device
 
     def forward(self, x):
         if self.training:

@@ -12,8 +12,8 @@ def parseDataFolder(path):
     :param path: (str)
     :return: (str) name of the dataset folder
     """
-    if "data/" in path:
-        path = path.split('data/')[1].strip("/")
+    if path.startswith('data/'):
+        path = path[5:]
     return path
 
 

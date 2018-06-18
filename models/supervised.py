@@ -30,7 +30,7 @@ class DenseNetwork(BaseModelSRL):
 
 class ConvolutionalNetwork(BaseModelSRL):
     """
-    Convolutional Neural Network using pretrained ResNet
+    Convolutional Neural Network using ResNet
     input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
     :param state_dim: (int)
     :param cuda: (bool)
@@ -38,16 +38,16 @@ class ConvolutionalNetwork(BaseModelSRL):
 
     def __init__(self, state_dim=2, cuda=False):
         super(ConvolutionalNetwork, self).__init__()
-        self.resnet = models.resnet18(pretrained=True)
+        self.resnet = models.resnet18(pretrained=False)
         # Freeze params
-        for param in self.resnet.parameters():
-            param.set_grad_enabled(False)
+        # for param in self.resnet.parameters():
+        #     param.requires_grad = False
         # Replace the last fully-connected layer
         n_units = self.resnet.fc.in_features
         print("{} units in the last layer".format(n_units))
         self.resnet.fc = nn.Linear(n_units, state_dim)
-        if cuda:
-            self.resnet.cuda()
+        self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
+        self.resnet.to(self.device)
 
     def forward(self, x):
         x = self.resnet(x)

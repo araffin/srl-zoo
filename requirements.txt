@@ -4,6 +4,7 @@ backports.shutil-get-terminal-size==1.0.0
 backports.ssl-match-hostname==3.5.0.1
 certifi==2017.11.5
 cffi==1.11.2
+coverage==4.5.1
 cycler==0.10.0
 decorator==4.1.2
 enum34==1.1.6

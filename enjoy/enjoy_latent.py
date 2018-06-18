@@ -22,12 +22,13 @@ def getImage(srl_model, mu, device):
     :param device: (pytorch device)
     :return: ([float])
     """
-    mu = torch.from_numpy(np.array(mu).reshape(1, -1)).to(torch.float)
-    mu = mu.to(device)
+    with torch.no_grad():
+        mu = torch.from_numpy(np.array(mu).reshape(1, -1)).to(torch.float)
+        mu = mu.to(device)
 
-    net_out = srl_model.decode(mu)
+        net_out = srl_model.decode(mu)
 
-    img = net_out.to(torch.device("cpu")).detach().numpy()[0].T
+        img = net_out.to(torch.device("cpu")).detach().numpy()[0].T
 
     img = deNormalize(img)
     return img[:, :, ::-1]
@@ -58,6 +59,9 @@ def main():
     # is this a valid model
     assert srl_model_type in VALID_MODEL, "Error: '{}' model is not supported."
 
+    data = json.load(open(args.log_dir + 'image_to_state.json'))
+    state_dim = len(list(data.values())[0])
+
     # model param and info
     if srl_model_type != 'priors':
         assert os.path.exists(
@@ -81,8 +85,7 @@ def main():
         srl_model.to(device)
 
     else:
-        data = json.load(open(args.log_dir + 'image_to_state.json'))
-        state_dim = len(list(data.values())[0])
+
         srl_model_knn = KNeighborsClassifier()
 
         # Load all the points and images, find bounds and train KNN model
@@ -110,7 +113,7 @@ def main():
         if k == 27:
             break
 
-        # make the image 
+        # make the image
         mu = []
         for i in range(state_dim):
             mu.append(cv2.getTrackbarPos(str(i), 'sliders'))
@@ -120,6 +123,7 @@ def main():
         else:
             # rescale for the bounds of the priors representation, and find nearest image
             img_path = y[srl_model_knn.predict([(np.array(mu) / 100) * (max_X - min_X) + min_X])[0]]
+            # Remove trailing .jpg if present
             img_path = img_path.split('.jpg')[0]
             img = cv2.imread("data/" + img_path + ".jpg")
 

@@ -1,5 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
+from torch.autograd import Function
+
 from .models import *
 
 
@@ -14,19 +16,22 @@ class SRLConvolutionalNetwork(BaseModelSRL):
 
     def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
         super(SRLConvolutionalNetwork, self).__init__()
-        self.resnet = models.resnet18(pretrained=True)
-        # TODO: add squeezeNet support
-        # self.squeezeNet = models.squeezenet1_0(pretrained=True)
-        # TODO: freeze less layers
-        # Freeze params
-        for param in self.resnet.parameters():
-            param.set_grad_enabled(False)
+        self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
+        self.resnet = models.resnet18(pretrained=False)
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
         # Replace the last fully-connected layer
         n_units = self.resnet.fc.in_features
         print("{} units in the last layer".format(n_units))
-        self.resnet.fc = nn.Linear(n_units, state_dim)
+
+        self.resnet.fc = nn.Sequential(
+            nn.Linear(n_units, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, state_dim),
+        )
         self.resnet.to(self.device)
         # This variant does not require the batch_size
         self.noise = GaussianNoiseVariant(self.device, noise_std)
@@ -51,7 +56,7 @@ class SRLCustomCNN(BaseModelSRL):
     def __init__(self, state_dim=2, cuda=False, noise_std=1e-6):
         super(SRLCustomCNN, self).__init__()
         self.cnn = CustomCNN(state_dim)
-        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
+        self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
         self.cnn.to(self.device)
         self.noise = GaussianNoiseVariant(self.device, noise_std)
 
@@ -78,7 +83,7 @@ class SRLDenseNetwork(BaseModelSRL):
                  cuda=False, n_hidden=32, noise_std=1e-6):
         super(SRLDenseNetwork, self).__init__()
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() and cuda else "cpu")
+        self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
 
         self.fc1 = nn.Linear(input_dim, n_hidden)
         self.fc2 = nn.Linear(n_hidden, state_dim)
@@ -93,3 +98,53 @@ class SRLDenseNetwork(BaseModelSRL):
         if self.training:
             x = self.noise(x)
         return x
+
+
+# From https://github.com/fungtion/DANN
+class ReverseLayerF(Function):
+    """
+    Fonction to backpropagate the opposite of the gradient
+    scaled by a constant
+    """
+
+    @staticmethod
+    def forward(ctx, x, lambda_):
+        """
+        :param x: (PyTorch Tensor)
+        :param lambda_: (float) scaling factor
+        :return: (PyTorch Tensor)
+        """
+        ctx.lambda_ = lambda_
+        # Equivalent to return x ?
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """
+        :param grad_output: (PyTorch Tensor)
+        :return: (PyTorch Tensor, None)
+        """
+        # Compute the opposite of the gradient
+        output = grad_output.neg() * ctx.lambda_
+        return output, None
+
+
+class Discriminator(nn.Module):
+    """
+    Discriminator network to distinguish states from two different episodes
+    :input_dim: (int) input_dim = 2 * state_dim
+    """
+
+    def __init__(self, input_dim):
+        super(Discriminator, self).__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        return self.net(x)

@@ -18,7 +18,6 @@ def plotLosses(loss_history, path=None):
     """
     keys = list(loss_history.keys())
     keys.sort()
-
     plt.figure("Losses")
     for key in keys:
         # check if the loss was averaged by epoch or not yet
@@ -41,7 +40,7 @@ def plotLosses(loss_history, path=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Plot losses')
-    parser.add_argument('-i', '--input_file', type=str, default="", required=True,
+    parser.add_argument('-i', '--input-file', type=str, default="", required=True,
                         help='Path to a npz file containing losses history')
     parser.add_argument('--log-folder', type=str, default="", help='Path to a log folder')
     args = parser.parse_args()

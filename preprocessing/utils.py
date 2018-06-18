@@ -2,10 +2,8 @@ from __future__ import print_function, division
 
 import os
 import re
-from collections import OrderedDict
 
 import numpy as np
-import pandas as pd
 
 
 def detectBasePath(filename, folder_name="srl-robotic-priors-pytorch", default_path=""):
@@ -25,69 +23,6 @@ def detectBasePath(filename, folder_name="srl-robotic-priors-pytorch", default_p
     else:
         print("[ERROR] Base path not found, fallback to default_path: {}".format(default_path))
     return base_path
-
-
-def getActions(delta_pos, n_actions):
-    """
-    :param delta_pos: (float)
-    :param n_actions: (int)
-    :return: (dict)
-    """
-    possible_deltas = [i * delta_pos for i in range(-1, 2)]
-    actions = []
-    for dx in possible_deltas:
-        for dy in possible_deltas:
-            for dz in possible_deltas:
-                if dx == 0 and dy == 0 and dz == 0:
-                    continue
-                actions.append((dx, dy, dz))
-
-    assert len(actions) == n_actions, "Wrong number of actions: {}".format(len(actions))
-
-    action_to_idx = {action: idx for idx, action in enumerate(actions)}
-    # Sort the dictionnary to have a consistent order
-    action_to_idx = OrderedDict(sorted(action_to_idx.items(), key=lambda item: item[1]))
-
-    return action_to_idx
-
-
-def findClosestAction(action, action_to_idx, show_warning=True):
-    """
-    :param action: ([float])
-    :param action_to_idx: (dict)
-    :param show_warning: (bool)
-    :return: (int)
-    """
-    action_idx = action_to_idx.get(tuple(action))
-    if action_idx is None:
-        if show_warning:
-            print("[WARNING] {} not found in action dict".format(action))
-        distances = [np.linalg.norm(np.array(a) - action) for a in action_to_idx.keys()]
-        action_idx = np.argmin(distances)
-    return action_idx
-
-
-def samePoint(pos, ref_pos, threshold):
-    """
-    Return true if the position `pos` is close enough
-    to the reference
-    :param pos: (numpy array)
-    :param ref_pos: (numpy array)
-    :param threshold: (float)
-    :return: (bool)
-    """
-    return np.linalg.norm(ref_pos - pos, 2) <= threshold
-
-
-def getDataFrame(text_file):
-    """
-    :param text_file: (str) path to a text file extracted from a ROS bag
-    :return: (pandas dataFrame)
-    """
-    with open(text_file) as f:
-        # Read first line and retrieve the column names
-        headers = f.readline().strip("#").strip("\n")[1:].split(' ')
-    return pd.read_csv(text_file, sep=" ", skiprows=1, names=headers)
 
 
 def preprocessInput(x, mode="image_net"):

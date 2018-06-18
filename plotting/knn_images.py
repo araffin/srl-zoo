@@ -53,7 +53,8 @@ with open("{}/exp_config.json".format(args.log_folder), 'r') as f:
 # Load ground truth and images path
 ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
 
-true_states = ground_truth['arm_states']
+# Backward compatibility with previous name
+true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
 images_path = ground_truth['images_path']
 
 if args.ground_truth:
@@ -64,12 +65,13 @@ else:
 if args.relative_pos:
     print("Using relative position")
     episode_starts = np.load('data/{}/preprocessed_data.npz'.format(data_folder))['episode_starts']
-    button_positions = ground_truth['button_positions']
+    # Backward compatibility with previous name
+    target_positions = ground_truth['target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
     button_idx = -1
     for i in range(len(episode_starts)):
         if episode_starts[i] == 1:
             button_idx += 1
-        true_states[i] -= button_positions[button_idx]
+        true_states[i] -= target_positions[button_idx]
 
 
 knn_path = '{}/NearestNeighbors'.format(args.log_folder)

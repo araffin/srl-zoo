@@ -38,7 +38,6 @@ class BaseLearner(object):
         super(BaseLearner, self).__init__()
         self.state_dim = state_dim
         self.batch_size = batch_size
-        self.cuda = cuda
         self.model = None
         self.seed = seed
         # Seed the random generator
