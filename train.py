@@ -144,9 +144,9 @@ class RoboticPriorsLoss(nn.Module):
             for name, w, loss in zip(names, weights, losses):
                 if w > 0:
                     if len(self.loss_history[name]) > 0:
-                        self.loss_history[name][-1] += w * loss.data[0]
+                        self.loss_history[name][-1] += w * loss.item()
                     else:
-                        self.loss_history[name].append(w * loss.data[0])
+                        self.loss_history[name].append(w * loss.item())
 
         return total_loss
 
@@ -237,9 +237,9 @@ class RoboticPriorsTripletLoss(nn.Module):
                 for name, w, loss in zip(names, weights, losses):
                     if w > 0:
                         if len(self.loss_history[name]) > 0:
-                            self.loss_history[name][-1] += w * loss.data[0]
+                            self.loss_history[name][-1] += w * loss.item()
                         else:
-                            self.loss_history[name].append(w * loss.data[0])
+                            self.loss_history[name].append(w * loss.item())
 
         # Time-Contrastive Triplet Loss
         distance_positive = (states - p_states).pow(2).sum(1)
@@ -289,9 +289,9 @@ class SRL4robotics(BaseLearner):
         if self.episode_prior:
             self.discriminator = Discriminator(2 * self.state_dim)
 
-        self.model.to(self.device)
+        self.model = self.model.to(self.device)
         if self.episode_prior:
-            self.discriminator.to(self.device)
+            self.discriminator = self.discriminator.to(self.device)
 
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
 
