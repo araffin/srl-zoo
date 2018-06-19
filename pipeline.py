@@ -36,8 +36,7 @@ def getLogFolderName(exp_config):
     date = datetime.datetime.now().strftime("%y-%m-%d_%Hh%M_%S")
     model_str = "_{}".format(exp_config['model-type'])
 
-    srl_str = "ST_DIM{}_SEED{}".format(exp_config['state-dim'],
-                                       exp_config['seed'])
+    srl_str = "ST_DIM{}".format(exp_config['state-dim'])
 
     # baselines
     if "priors" not in exp_config:

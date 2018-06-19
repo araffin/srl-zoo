@@ -380,6 +380,27 @@ def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_o
     return weight * ae_loss
 
 
+def vaeLoss(decoded, obs, mu, logvar, weight, loss_object, beta=1):
+    """
+    Reconstruction + KL divergence losses summed over all elements and batch
+    :param decoded: (Pytorch Variable)
+    :param obs: (Pytorch Variable)
+    :param mu: (Pytorch Variable)
+    :param logvar: (Pytorch Variable)
+    :param beta: (float) used to weight the KL divergence for disentangling
+    :return: (Pytorch Variable)
+    """
+    generation_loss = F.mse_loss(decoded, obs, size_average=False)
+
+    # see Appendix B from VAE paper:
+    # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
+    # https://arxiv.org/abs/1312.6114
+    kl_divergence = -0.5 * th.sum(1 + logvar - mu.pow(2) - logvar.exp())
+
+    vae_loss = generation_loss + beta * kl_divergence
+    loss_object.addToLosses('kl_loss', weight, vae_loss)
+    return weight * vae_loss
+
 def mutualInformationLoss(states, rewards_st, weight, loss_object):
     """
     Loss criterion to assess mutual information between predicted states and rewards

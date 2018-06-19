@@ -26,14 +26,14 @@ from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, Discr
 
 from plotting.representation_plot import plotRepresentation, plt, plotImage
 from plotting.losses_plot import plotLosses
-from preprocessing.data_loader import CustomDataLoader
+from preprocessing.data_loader import CustomDataLoader, AutoEncoderDataLoader
 from preprocessing.utils import deNormalize
 
 from utils import printRed, printGreen, printBlue, parseDataFolder, \
     printYellow, priorsToString, createFolder
 from pipeline import NO_PAIRS_ERROR, NAN_ERROR
 from losses.losses import autoEncoderLoss, RoboticPriorsLoss, RoboticPriorsTripletLoss, findPriorsPairs, \
-    rewardModelLoss, rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss
+    rewardModelLoss, rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss, vaeLoss
 
 from pipeline import getBaseExpConfig, getLogFolderName, saveConfig, knnCall
 import os
@@ -77,6 +77,7 @@ class SRL4robotics(BaseLearner):
         self.use_inverse_loss = False
         self.use_reward_loss = False
         self.use_autoencoder = False
+        self.use_vae = False
         self.reward_prior = False
         self.reward_loss = False
         self.episode_prior = False
@@ -84,12 +85,13 @@ class SRL4robotics(BaseLearner):
         self.losses = losses
         self.dim_action = n_actions
 
-        if model_type in ["autoencoder", "mlp", "resnet", "custom_cnn", "linear"]:
+        if model_type in ["autoencoder", "mlp", "resnet", "custom_cnn", "linear", "vae"]:
             self.use_forward_loss = "forward" in losses
             self.use_inverse_loss = "inverse" in losses
             self.use_reward_loss = "reward" in losses
             self.no_priors = "priors" not in losses and 'triplet' not in self.losses
-            self.use_autoencoder = "autoencoder" in model_type
+            self.use_autoencoder = "autoencoder" in losses
+            self.use_vae = "vae" in losses
             self.episode_prior =  "episode-prior" in losses
             self.reward_prior = "reward-prior" in losses
             self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type, cuda=cuda, losses=losses)
@@ -227,6 +229,9 @@ class SRL4robotics(BaseLearner):
                     criterion.resetLosses()
                     if self.use_autoencoder:
                         (states, decoded_obs), (next_states, decoded_next_obs) = self.model(obs), self.model(next_obs)
+                    elif self.use_vae:
+                        decoded_obs, mu, logvar = self.model(obs)
+                        states, next_states = self.model.getStates(obs), self.model.getStates(next_obs)
                     else:
                         states, next_states = self.model(obs), self.model(next_obs)
                         decoded_obs, decoded_next_obs = None, None
@@ -261,7 +266,8 @@ class SRL4robotics(BaseLearner):
 
                     if self.use_autoencoder:
                         autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_object=criterion)
-
+                    if self.use_vae:
+                        vaeLoss(decoded_obs, obs, mu, logvar, weight=1, loss_object=criterion)
                     if self.reward_prior:
                         rewards_st = rewards[minibatchlist[minibatch_idx]]
                         rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
@@ -324,7 +330,7 @@ class SRL4robotics(BaseLearner):
                                        add_colorbar=epoch == 0,
                                        name="Learned State Representation (Training Data)")
 
-                    if self.use_autoencoder:
+                    if self.use_autoencoder or self.use_vae:
                         # Plot Reconstructed Image
                         plotImage(deNormalize(obs[0].data.cpu().numpy()), "Input Image (Train)")
                         plotImage(deNormalize(decoded_obs[0].data.cpu().numpy()), "Reconstructed Image")
@@ -380,7 +386,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
     parser.add_argument('--model-type', type=str, default="custom_cnn",
-                        choices=['custom_cnn', 'resnet', 'mlp', 'linear', 'autoencoder'],
+                        choices=['custom_cnn', 'resnet', 'mlp', 'linear'],
                         help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log-folder', type=str, default='logs/default_folder',
@@ -390,7 +396,8 @@ if __name__ == '__main__':
     parser.add_argument('--balanced-sampling', action='store_true', default=False,
                         help='Force balanced sampling for episode independent prior instead of uniform')
     parser.add_argument('--losses', type=str, nargs='+', default=["priors"], help='losses(s)',
-                        choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet"])
+                        choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
+                       'autoencoder', 'vae'],)
     parser.add_argument('--save-exp', action='store_true', default=False,
                         help='Save experiment configs and (with KNN-MSE computation)')
 
