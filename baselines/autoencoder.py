@@ -105,7 +105,7 @@ class AutoEncoderLearning(BaseLearner):
 
                 _, decoded = self.model(noisy_obs)
                 self.optimizer.zero_grad()
-                loss = criterion(decoded, obs)
+                loss = criterion(decoded, obs.detach())
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.item()
@@ -124,7 +124,7 @@ class AutoEncoderLearning(BaseLearner):
                     noisy_obs, obs = noisy_obs.to(self.device), obs.to(self.device)
 
                     _, decoded = self.model(noisy_obs)
-                    loss = criterion(decoded, obs)
+                    loss = criterion(decoded, obs.detach())
                     val_loss += loss.item()
                     epoch_val_loss[epoch].append(loss.item())
 

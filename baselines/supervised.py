@@ -47,7 +47,7 @@ class SupervisedLearning(BaseLearner):
 
         if model_type == "resnet":
             self.model = ConvolutionalNetwork(self.state_dim, cuda)
-        elif model_type == "custom_cnn":
+        elif model_type in ["cnn", "custom_cnn"]:
             self.model = CustomCNN(self.state_dim)
         elif model_type == "mlp":
             self.model = DenseNetwork(INPUT_DIM, self.state_dim)
@@ -103,7 +103,7 @@ class SupervisedLearning(BaseLearner):
 
                 pred_states = self.model(obs)
                 self.optimizer.zero_grad()
-                loss = criterion(pred_states, target_states)
+                loss = criterion(pred_states, target_states.detach())
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.item()
@@ -121,7 +121,7 @@ class SupervisedLearning(BaseLearner):
                     obs, target_states = obs.to(self.device), target_states.to(self.device)
 
                     pred_states = self.model(obs)
-                    loss = criterion(pred_states, target_states)
+                    loss = criterion(pred_states, target_states.detach())
                     val_loss += loss.item()
                     epoch_val_loss[epoch].append(loss.item())
 
