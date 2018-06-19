@@ -22,11 +22,11 @@ from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models.base_learner import BaseLearner
-from models import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, Discriminator, SRLModules
+from models import Discriminator, SRLModules
 
 from plotting.representation_plot import plotRepresentation, plt, plotImage
 from plotting.losses_plot import plotLosses
-from preprocessing.data_loader import CustomDataLoader, AutoEncoderDataLoader
+from preprocessing.data_loader import CustomDataLoader
 from preprocessing.utils import deNormalize
 
 from utils import printRed, printGreen, printBlue, parseDataFolder, \
@@ -68,7 +68,7 @@ class SRL4robotics(BaseLearner):
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False,
-                 multi_view=False, losses=None, n_actions=6):
+                 multi_view=False, losses=None, n_actions=6, beta=1):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -82,18 +82,21 @@ class SRL4robotics(BaseLearner):
         self.reward_loss = False
         self.episode_prior = False
         self.no_priors = False
+        self.use_supervised = False
         self.losses = losses
         self.dim_action = n_actions
-
-        if model_type in ["autoencoder", "mlp", "resnet", "custom_cnn", "linear", "vae"]:
+        self.beta = beta
+        if model_type in ["autoencoder", "mlp", "resnet", "custom_cnn", "linear", "vae"] \
+            or "autoencoder" in losses or "vae" in losses or "supervised" in losses:
             self.use_forward_loss = "forward" in losses
             self.use_inverse_loss = "inverse" in losses
             self.use_reward_loss = "reward" in losses
             self.no_priors = "priors" not in losses and 'triplet' not in self.losses
-            self.use_autoencoder = "autoencoder" in losses
-            self.use_vae = "vae" in losses
             self.episode_prior =  "episode-prior" in losses
             self.reward_prior = "reward-prior" in losses
+            self.use_autoencoder = "autoencoder" in losses
+            self.use_vae = "vae" in losses
+            self.use_supervised = "supervised" in losses
             self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type, cuda=cuda, losses=losses)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
@@ -267,7 +270,7 @@ class SRL4robotics(BaseLearner):
                     if self.use_autoencoder:
                         autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_object=criterion)
                     if self.use_vae:
-                        vaeLoss(decoded_obs, obs, mu, logvar, weight=1, loss_object=criterion)
+                        vaeLoss(decoded_obs, obs, mu, logvar, weight=1, loss_object=criterion, beta=self.beta)
                     if self.reward_prior:
                         rewards_st = rewards[minibatchlist[minibatch_idx]]
                         rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
@@ -397,7 +400,9 @@ if __name__ == '__main__':
                         help='Force balanced sampling for episode independent prior instead of uniform')
     parser.add_argument('--losses', type=str, nargs='+', default=["priors"], help='losses(s)',
                         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-                       'autoencoder', 'vae'],)
+                       "autoencoder", "vae"],)
+    parser.add_argument('--beta', type=float, default=1.0,
+                        help='(For VAE only) the Beta factor on the KL divergence, higher value means more disentangling.')
     parser.add_argument('--save-exp', action='store_true', default=False,
                         help='Save experiment configs and (with KNN-MSE computation)')
 
@@ -445,7 +450,7 @@ if __name__ == '__main__':
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       losses=losses, n_actions=n_actions)
+                       losses=losses, n_actions=n_actions, beta=args.beta)
 
     if args.training_set_size > 0:
         limit = args.training_set_size

@@ -4,10 +4,9 @@ import torch
 
 from .models import *
 from .triplet import EmbeddingNet
-from .priors import SRLDenseNetwork, SRLConvolutionalNetwork
+from .priors import SRLDenseNetwork, SRLConvolutionalNetwork, SRLLinear
 from .autoencoders import CNNAutoEncoder, DenseAutoEncoder, LinearAutoEncoder
 from .vae import CNNVAE, DenseVAE
-from .priors import SRLLinear
 
 try:
     from preprocessing.preprocess import INPUT_DIM
@@ -97,7 +96,7 @@ class BaseRewardModel(BaseModelSRL):
     def rewardModel(self, state):
         """
         Predict reward given current state and action
-:        :param state: (th Variable)
+        :param state: (th Variable)
         :param action: (th Tensor)
         :return: (th Variable)
         """
@@ -123,45 +122,51 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         # Architecture
         if model_type == "custom_cnn":
-            self.model = CustomCNN(state_dim)
-        elif model_type == "linear":
-            self.model = SRLLinear(input_dim=INPUT_DIM, state_dim=state_dim, cuda=cuda)
+            if "autoencoder" in losses:
+                self.model = CNNAutoEncoder(state_dim)
+                self.model.encoder_fc.cuda()
+                self.model.decoder_fc.cuda()
+            elif "vae" in losses:
+                self.model = CNNVAE(state_dim)
+                self.model.encoder_fc1.cuda()
+                self.model.encoder_fc2.cuda()
+                self.model.decoder_fc.cuda()
+            else:
+                # for losses not depending on specific architecture (supevised, inv, fwd..)
+                self.model = CustomCNN(state_dim)
+
         elif model_type == "mlp":
-            self.model = SRLDenseNetwork(INPUT_DIM, state_dim, cuda=cuda)
+            if "autoencoder" in losses:
+                self.model = DenseAutoEncoder(state_dim)
+                self.model.encoder.cuda()
+                self.model.decoder.cuda()
+            elif "vae" in losses:
+                self.model = DenseVAE(input_dim=INPUT_DIM,
+                                      state_dim=state_dim)
+                self.model.encoder_fc1.cuda()
+                self.model.encoder_fc21.cuda()
+                self.model.encoder_fc22.cuda()
+                self.model.decoder.cuda()
+            else:
+                # for losses not depending on specific architecture (supevised, inv, fwd..)
+                self.model = SRLDenseNetwork(INPUT_DIM, state_dim, cuda=cuda)
+
+        elif model_type == "linear":
+            if "autoencoder" in losses:
+                self.model = LinearAutoEncoder(state_dim)
+                self.model.encoder.cuda()
+                self.model.decoder.cuda()
+            else:
+                # for losses not depending on specific architecture (supevised, inv, fwd..)
+                self.model = SRLLinear(input_dim=INPUT_DIM, state_dim=state_dim, cuda=cuda)
+
         elif model_type == "resnet":
             self.model = SRLConvolutionalNetwork(state_dim, cuda)
 
-        if losses is not None:
-            if "triplet" in losses:
+        if losses is not None and "triplet" in losses:
                 # pretrained resnet18 with fixed weights
-                self.model = EmbeddingNet(state_dim)
-            elif "autoencoder" in losses:
-                if model_type == "custom_cnn":
-                    self.model = CNNAutoEncoder(state_dim)
-                    self.model.encoder_fc.cuda()
-                    self.model.decoder_fc.cuda()
-                elif model_type == "mlp":
-                    self.model = DenseAutoEncoder(state_dim)
-                    self.model.encoder.cuda()
-                    self.model.decoder.cuda()
-                elif model_type == "linear":
-                    self.model = LinearAutoEncoder(state_dim)
-                    self.model.encoder.cuda()
-                    self.model.decoder.cuda()
-            elif "vae" in losses:
-                if model_type == "custom_cnn":
-                    self.model = CNNVAE(state_dim)
-                    self.model.encoder_fc1.cuda()
-                    self.model.encoder_fc2.cuda()
-                    self.model.decoder_fc.cuda()
-                elif model_type == "mlp":
-                    self.model = DenseVAE(input_dim=INPUT_DIM,
-                                          state_dim=state_dim)
-                    self.model.encoder_fc1.cuda()
-                    self.model.encoder_fc21.cuda()
-                    self.model.encoder_fc22.cuda()
-                    self.model.decoder.cuda()
-            
+            self.model = EmbeddingNet(state_dim)
+
         if cuda:
             self.model.cuda()
 
