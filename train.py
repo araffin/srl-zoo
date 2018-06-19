@@ -392,7 +392,7 @@ if __name__ == '__main__':
                         choices=['custom_cnn', 'resnet', 'mlp', 'linear'],
                         help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
-    parser.add_argument('--log-folder', type=str, default='logs/default_folder',
+    parser.add_argument('--log-folder', type=str, default="",
                         help='Folder within logs/ where the experiment model and plots will be saved')
     parser.add_argument('--multi-view', action='store_true', default=False,
                         help='Enable use of multiple camera')
@@ -403,8 +403,6 @@ if __name__ == '__main__':
                        "autoencoder", "vae"],)
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For VAE only) the Beta factor on the KL divergence, higher value means more disentangling.')
-    parser.add_argument('--save-exp', action='store_true', default=False,
-                        help='Save experiment configs and (with KNN-MSE computation)')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -433,7 +431,7 @@ if __name__ == '__main__':
         images_path = ground_truth['images_path']
 
     # Creat log folder
-    if args.save_exp:
+    if args.log_folder == "":
         exp_config = build_config(args)
         createFolder("logs/{}".format(exp_config['data-folder']), "Dataset log folder already exist")
         # Check that the dataset is already preprocessed
@@ -463,7 +461,7 @@ if __name__ == '__main__':
 
     ####
     # SAVING LOGS
-    if args.save_exp:
+    if args.log_folder == "":
         print('Saving experiments using base-config file')
         # Save plot
         plotLosses(loss_history, args.log_folder)
