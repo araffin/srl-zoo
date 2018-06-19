@@ -16,7 +16,7 @@ class EmbeddingNet(nn.Module):
         self.conv_layers = models.resnet18(pretrained=True)
         # Freeze params
         for param in self.conv_layers.parameters():
-            param.set_grad_enabled(False)
+            param.require_grad_(False)
         # Replace the last fully-connected layer
         n_units = self.conv_layers.fc.in_features
         print("{} units in the last layer".format(n_units))
