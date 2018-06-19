@@ -26,27 +26,31 @@ def createFolders():
 def testPriorTrain():
     createFolders()
     for model_type in ['custom_cnn', 'resnet', 'mlp']:
-        args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
-                '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
-                '--seed', SEED, '--val-size', 0.1, '--log-folder', LOG_FOLDER,
-                '--state-dim', STATE_DIM, '--model-type', model_type, '-bs', 128]
-        args = list(map(str, args))
+        for loss in ["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior"]:
+            args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
+                    '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
+                    '--seed', SEED, '--val-size', 0.1, '--log-folder', LOG_FOLDER,
+                    '--state-dim', STATE_DIM, '--model-type', model_type, '-bs', 128,
+                    '--losses', loss]
+            args = list(map(str, args))
 
-        ok = subprocess.call(['python', 'train.py'] + args)
-        assertEq(ok, 0)
+            ok = subprocess.call(['python', 'train.py'] + args)
+            assertEq(ok, 0)
+
 
 def testbaselineTrain():
     createFolders()
-    for model_type in ['cnn', 'mlp']:
+    for model_type in ['custom_cnn', 'mlp']:
         for baseline in ['vae', 'autoencoder']:
             args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
                     '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
-                    '--seed', SEED, '--state-dim', STATE_DIM, '--model-type', model_type]
+                    '--seed', SEED, '--val-size', 0.1, '--log-folder', LOG_FOLDER,
+                    '--state-dim', STATE_DIM, '--model-type', model_type, '-bs', 128,
+                    '--losses', baseline]
             args = list(map(str, args))
 
-            ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
+            ok = subprocess.call(['python', 'train.py'] + args)
             assertEq(ok, 0)
-
 
 def testsupervisedTrain():
     createFolders()
