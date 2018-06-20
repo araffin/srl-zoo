@@ -41,12 +41,9 @@ def getLogFolderName(exp_config):
     # baselines
     if "priors" not in exp_config:
         for name in ['vae', 'autoencoder', 'supervised']:
-            if name in exp_config['log-folder']:
+            if name in exp_config["losses"]:
                 srl_str = "_" + name + "_" + srl_str
                 break
-    # priors
-    elif len(exp_config["priors"]) > 0:
-        srl_str = priorsToString(exp_config['priors']) + "_" + srl_str
     approach = exp_config["model-approach"]
     if approach is not str():
         approach = "_".join(approach)
@@ -93,9 +90,6 @@ def stateRepresentationLearningCall(exp_config):
 
     if exp_config.get('multi-view', False):
         args.extend(['--multi-view'])
-
-    if len(exp_config["priors"]) == 0:
-        args.extend(['--no-priors'])
 
     for arg in ['learning-rate', 'l1-reg', 'batch-size',
                 'state-dim', 'epochs', 'seed', 'model-type',
@@ -308,13 +302,6 @@ if __name__ == '__main__':
             exp_config['state-dim'] = state_dim
             dimReductionCall(exp_config, 'pca')
             evaluateBaseline(base_config)
-
-        # # t-SNE
-        # for state_dim in [2, 3]:
-        #     # Update config
-        #     exp_config['state-dim'] = state_dim
-        #     dimReductionCall(exp_config, 'tsne')
-        #     evaluateBaseline(base_config)
 
     # Reproduce a previous experiment using "exp_config.json"
     elif args.exp_config != "":

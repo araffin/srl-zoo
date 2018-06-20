@@ -137,7 +137,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         elif model_type == "mlp":
             if "autoencoder" in losses:
-                self.model = DenseAutoEncoder(state_dim)
+                self.model = DenseAutoEncoder(input_dim=INPUT_DIM, state_dim=state_dim)
                 self.model.encoder.cuda()
                 self.model.decoder.cuda()
             elif "vae" in losses:
@@ -153,7 +153,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         elif model_type == "linear":
             if "autoencoder" in losses:
-                self.model = LinearAutoEncoder(state_dim)
+                self.model = LinearAutoEncoder(input_dim=INPUT_DIM, state_dim=state_dim)
                 self.model.encoder.cuda()
                 self.model.decoder.cuda()
             else:

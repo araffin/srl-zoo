@@ -416,6 +416,9 @@ if __name__ == '__main__':
 
     # dealing with losses to use
     losses = list(set(args.losses))
+    assert not("autoencoder" in losses and "vae" in losses), "Model cannot be both an Autoencoder and a VAE (come on!)"
+    assert not (("autoencoder" in losses or "vae" in losses) and args.model_type == "resnet"), "Model cannot be an Autoencoder or VAE using ResNet Architecture !"
+    assert not ("vae" in losses and args.model_type == "linear"), "Model cannot be VAE using Linear Architecture !"
 
     print('Loading data ... ')
     training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))

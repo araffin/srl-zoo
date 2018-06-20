@@ -2,11 +2,10 @@ from __future__ import print_function, division, absolute_import
 
 import subprocess
 
-from utils import createFolder
+from ..utils import createFolder
 
 TEST_DATA_FOLDER = "data/kuka_gym_test/"
 LOG_FOLDER = "logs/kuka_gym_test/test_priors/"
-LOSS = "forward inverse reward priors episode-prior reward-prior"
 NUM_EPOCHS = 1
 STATE_DIM = 2
 TRAINING_SET_SIZE = 2000
@@ -24,6 +23,7 @@ def createFolders():
     folder_path = '{}/NearestNeighbors/'.format(LOG_FOLDER)
     createFolder(folder_path, "NearestNeighbors folder already exist")
 
+
 def testPriorTrain():
     createFolders()
     for model_type in ['custom_cnn', 'resnet', 'mlp']:
@@ -31,7 +31,8 @@ def testPriorTrain():
                 '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
                 '--seed', SEED, '--val-size', 0.1, '--log-folder', LOG_FOLDER,
                 '--state-dim', STATE_DIM, '--model-type', model_type, '-bs', 128,
-                '--losses', LOSS]
+                '--losses', "forward", "inverse", "reward", "priors", "episode-prior", "reward-prior",
+                '--l1-reg', 0.0001]
         args = list(map(str, args))
 
         ok = subprocess.call(['python', 'train.py'] + args)
@@ -51,6 +52,17 @@ def testbaselineTrain():
 
             ok = subprocess.call(['python', 'train.py'] + args)
             assertEq(ok, 0)
+
+    args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
+            '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
+            '--seed', SEED, '--val-size', 0.1, '--log-folder', LOG_FOLDER,
+            '--state-dim', STATE_DIM, '--model-type', 'linear', '-bs', 128,
+            '--losses', 'autoencoder']
+    args = list(map(str, args))
+
+    ok = subprocess.call(['python', 'train.py'] + args)
+    assertEq(ok, 0)
+
 
 def testsupervisedTrain():
     createFolders()

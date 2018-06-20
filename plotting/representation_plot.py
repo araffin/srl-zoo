@@ -270,7 +270,6 @@ if __name__ == '__main__':
             if args.data_folder != "" and args.correlation:
                 training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
                 ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
-                print(ground_truth.keys())
                 true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() \
                     else 'arm_states']
                 name = "Ground Truth States - {}".format(args.data_folder)
@@ -305,12 +304,12 @@ if __name__ == '__main__':
                     fig = plt.figure(figsize=(8, 6))
                     ax = fig.add_subplot(111)
                     labels = ['s_' + str(i_) for i_ in range(X.shape[1])]
-                    labels += ['gt_' + str(i_) for i_ in range(states_rewards['states'].shape[1])]
+                    labels += [r'$\tilde{s}_' + str(i_) + '$' for i_ in range(states_rewards['states'].shape[1])]
                     cax = ax.matshow(corr, cmap=cmap, vmin=-1, vmax=1)
                     ax.set_xticklabels(['']+labels)
                     ax.set_yticklabels(['']+labels)
                     ax.grid(False)
-                    plt.title('Correlation Matrix: S = Predicted states | GT = ' + fg)
+                    plt.title(r'Correlation Matrix: S = Predicted states | $\tilde{S}$ = ' + fg)
                     fig.colorbar(cax,label='correlation coefficient')
                 plt.show()
                 
