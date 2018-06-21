@@ -2,7 +2,6 @@ from __future__ import print_function, division, absolute_import
 
 import torch as th
 import torch.nn as nn
-from torch.autograd import Variable
 
 
 class GaussianNoise(nn.Module):
@@ -12,16 +11,15 @@ class GaussianNoise(nn.Module):
     :param input_dim: (int)
     :param std: (float) standard deviation
     :param mean: (float)
-    :param cuda: (bool)
+    :param device: (pytorch device)
     """
 
-    def __init__(self, batch_size, input_dim, std, mean=0, cuda=False):
+    def __init__(self, batch_size, input_dim, device, std, mean=0):
         super(GaussianNoise, self).__init__()
         self.std = std
         self.mean = mean
-        self.noise = Variable(th.zeros(batch_size, input_dim))
-        if cuda:
-            self.noise = self.noise.cuda()
+        self.device = device
+        self.noise = th.zeros(batch_size, input_dim, device=self.device)
 
     def forward(self, x):
         if self.training:
@@ -34,22 +32,20 @@ class GaussianNoiseVariant(nn.Module):
     """
     Variant of the Gaussian Noise layer that does not require fixed batch_size
     It recreates a variable at each call
+    :param device: (pytorch device)
     :param std: (float) standard deviation
     :param mean: (float)
-    :param cuda: (bool)
     """
 
-    def __init__(self, std, mean=0, cuda=False):
+    def __init__(self, device, std, mean=0):
         super(GaussianNoiseVariant, self).__init__()
         self.std = std
         self.mean = mean
-        self.cuda = cuda
+        self.device = device
 
     def forward(self, x):
         if self.training:
-            noise = Variable(th.zeros(x.size()))
-            if self.cuda:
-                noise = noise.cuda()
+            noise = th.zeros(x.size(), device=self.device)
             noise.data.normal_(self.mean, std=self.std)
             return x + noise
         return x

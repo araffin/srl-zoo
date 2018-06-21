@@ -30,7 +30,7 @@ from preprocessing.data_loader import CustomDataLoader
 from preprocessing.utils import deNormalize
 
 from utils import printRed, printGreen, printBlue, parseDataFolder, \
-    printYellow, priorsToString, createFolder
+    printYellow, priorsToString, createFolder, detachToNumpy
 from pipeline import NO_PAIRS_ERROR, NAN_ERROR
 from losses.losses import autoEncoderLoss, RoboticPriorsLoss, RoboticPriorsTripletLoss, findPriorsPairs, \
     rewardModelLoss, rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss, vaeLoss
@@ -102,13 +102,12 @@ class SRL4robotics(BaseLearner):
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
 
-        if self.episode_prior:
-            self.discriminator = Discriminator(2 * self.state_dim)
+        self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
 
-        if cuda:
-            self.model.cuda()
-            if self.episode_prior:
-                self.discriminator.cuda()
+        if self.episode_prior:
+            self.discriminator = Discriminator(2 * self.state_dim).to(self.device)
+
+        self.model = self.model.to(self.device)
 
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
 
@@ -208,9 +207,8 @@ class SRL4robotics(BaseLearner):
             for minibatch_num, _input in enumerate(data_loader):
                 # Unpack input
                 minibatch_idx, obs, next_obs, diss_pairs, same_actions = _input
-                if self.cuda:
-                    obs, next_obs = obs.cuda(), next_obs.cuda()
-                    same_actions, diss_pairs = same_actions.cuda(), diss_pairs.cuda()
+                obs, next_obs = obs.to(self.device), next_obs.to(self.device)
+                same_actions, diss_pairs = same_actions.to(self.device), diss_pairs.to(self.device)
 
                 if self.no_priors:
                     same_actions, diss_pairs = None, None
@@ -240,7 +238,7 @@ class SRL4robotics(BaseLearner):
                         decoded_obs, decoded_next_obs = None, None
                     # Actions associated to the observations of the current minibatch
                     actions_st = actions[minibatchlist[minibatch_idx]]
-                    actions_st = Variable(th.from_numpy(actions_st), requires_grad=False).view(-1, 1)
+                    actions_st = th.from_numpy(actions_st).view(-1, 1).requires_grad_(False)
 
                     if not self.no_priors:
                         criterion.forward(states, next_states,
@@ -289,12 +287,12 @@ class SRL4robotics(BaseLearner):
                 # to avoid memory error
                 loss.backward()
                 if minibatch_idx in val_indices:
-                    val_loss += loss.data[0]
+                    val_loss += loss.item()
                     # We do not optimize on validation data
                     # so optimizer.step() is not called
                 else:
                     self.optimizer.step()
-                    epoch_loss += loss.data[0]
+                    epoch_loss += loss.item()
                     epoch_batches += 1
                 pbar.update(1)
             pbar.close()
@@ -328,16 +326,16 @@ class SRL4robotics(BaseLearner):
                                                                                 val_loss))
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
-                    # Optionally plot the current state space
-                    plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
-                                       add_colorbar=epoch == 0,
-                                       name="Learned State Representation (Training Data)")
-
-                    if self.use_autoencoder or self.use_vae:
-                        # Plot Reconstructed Image
-                        plotImage(deNormalize(obs[0].data.cpu().numpy()), "Input Image (Train)")
-                        plotImage(deNormalize(decoded_obs[0].data.cpu().numpy()), "Reconstructed Image")
-        if DISPLAY_PLOTS:
+                    with th.no_grad():
+                        # Optionally plot the current state space
+                        plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
+                                           add_colorbar=epoch == 0,
+                                           name="Learned State Representation (Training Data)")
+                        if self.use_autoencoder or self.use_vae:
+                            # Plot Reconstructed Image
+                            plotImage(deNormalize(detachToNumpy(obs[0])), "Input Image (Train)")
+                            plotImage(deNormalize(detachToNumpy(decoded_obs[0])), "Reconstructed Image")
+if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
         # Load best model before predicting states
@@ -345,7 +343,9 @@ class SRL4robotics(BaseLearner):
 
         print("Predicting states for all the observations...")
         # return predicted states for training observations
-        return loss_history, self.predStatesWithDataLoader(data_loader, restore_train=False)
+        with th.no_grad():
+            pred_states = self.predStatesWithDataLoader(data_loader, restore_train=False)
+        return loss_history, pred_states
 
 
 def build_config(args):

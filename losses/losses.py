@@ -46,9 +46,9 @@ class RoboticPriorsLoss(nn.Module):
             for name, w, loss in zip(self.names, self.weights, self.losses):
                 if w > 0:
                     if len(self.loss_history[name]) > 0:
-                        self.loss_history[name][-1] += w * loss.data[0]
+                        self.loss_history[name][-1] += w * loss.item()
                     else:
-                        self.loss_history[name].append(w * loss.data[0])
+                        self.loss_history[name].append(w * loss.item())
 
     def computeTotalLoss(self):
         return sum([self.weights[i] * self.losses[i] for i in range(len(self.losses))])
@@ -175,9 +175,9 @@ class RoboticPriorsTripletLoss(nn.Module):
                 for name, w, loss in zip(names, weights, losses):
                     if w > 0:
                         if len(self.loss_history[name]) > 0:
-                            self.loss_history[name][-1] += w * loss.data[0]
+                            self.loss_history[name][-1] += w * loss.item()
                         else:
-                            self.loss_history[name].append(w * loss.data[0])
+                            self.loss_history[name].append(w * loss.item())
 
         # Time-Contrastive Triplet Loss
         distance_positive = (states - p_states).pow(2).sum(1)

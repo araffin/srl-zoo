@@ -2,7 +2,17 @@ from __future__ import print_function, division
 
 import os
 
+import torch
 from termcolor import colored
+
+
+def detachToNumpy(tensor):
+    """
+    gets a pytorch tensor and returns a numpy array
+    :param tensor: (pytorch tensor)
+    :return: (numpy float)
+    """
+    return tensor.to(torch.device('cpu')).detach().numpy()
 
 
 def parseDataFolder(path):
