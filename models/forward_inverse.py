@@ -116,6 +116,9 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         BaseInverseModel.__init__(self)
         BaseRewardModel.__init__(self)
 
+        self.cuda = cuda
+        self.device = th.device("cuda" if th.cuda.is_available() and self.cuda else "cpu")
+
         self.initForwardNet(state_dim, action_dim, ratio)
         self.initInverseNet(state_dim, action_dim, ratio)
         self.initRewardNet(state_dim, action_dim, ratio)
@@ -124,13 +127,13 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         if model_type == "custom_cnn":
             if "autoencoder" in losses:
                 self.model = CNNAutoEncoder(state_dim)
-                self.model.encoder_fc.cuda()
-                self.model.decoder_fc.cuda()
+                self.model.encoder_fc = self.model.encoder_fc.to(self.device)
+                self.model.decoder_fc = self.model.decoder_fc.to(self.device)
             elif "vae" in losses:
                 self.model = CNNVAE(state_dim)
-                self.model.encoder_fc1.cuda()
-                self.model.encoder_fc2.cuda()
-                self.model.decoder_fc.cuda()
+                self.model.encoder_fc1 = self.model.encoder_fc1.to(self.device)
+                self.model.encoder_fc2 = self.model.encoder_fc2.to(self.device)
+                self.model.decoder_fc = self.model.decoder_fc.to(self.device)
             else:
                 # for losses not depending on specific architecture (supevised, inv, fwd..)
                 self.model = CustomCNN(state_dim)
@@ -138,15 +141,15 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         elif model_type == "mlp":
             if "autoencoder" in losses:
                 self.model = DenseAutoEncoder(input_dim=INPUT_DIM, state_dim=state_dim)
-                self.model.encoder.cuda()
-                self.model.decoder.cuda()
+                self.model.encoder = self.model.encoder.to(self.device)
+                self.model.decoder = self.model.decoder.to(self.device)
             elif "vae" in losses:
                 self.model = DenseVAE(input_dim=INPUT_DIM,
                                       state_dim=state_dim)
-                self.model.encoder_fc1.cuda()
-                self.model.encoder_fc21.cuda()
-                self.model.encoder_fc22.cuda()
-                self.model.decoder.cuda()
+                self.model.encoder_fc1 = self.model.encoder_fc1.to(self.device)
+                self.model.encoder_fc21 = self.model.encoder_fc21.to(self.device)
+                self.model.encoder_fc22 = self.model.encoder_fc22.to(self.device)
+                self.model.decoder = self.model.decoder.to(self.device)
             else:
                 # for losses not depending on specific architecture (supevised, inv, fwd..)
                 self.model = SRLDenseNetwork(INPUT_DIM, state_dim, cuda=cuda)
@@ -154,8 +157,8 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         elif model_type == "linear":
             if "autoencoder" in losses:
                 self.model = LinearAutoEncoder(input_dim=INPUT_DIM, state_dim=state_dim)
-                self.model.encoder.cuda()
-                self.model.decoder.cuda()
+                self.model.encoder = self.model.encoder.to(self.device)
+                self.model.decoder = self.model.decoder.to(self.device)
             else:
                 # for losses not depending on specific architecture (supevised, inv, fwd..)
                 self.model = SRLLinear(input_dim=INPUT_DIM, state_dim=state_dim, cuda=cuda)
@@ -164,11 +167,10 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
             self.model = SRLConvolutionalNetwork(state_dim, cuda)
 
         if losses is not None and "triplet" in losses:
-                # pretrained resnet18 with fixed weights
+            # pretrained resnet18 with fixed weights
             self.model = EmbeddingNet(state_dim)
 
-        if cuda:
-            self.model.cuda()
+        self.model = self.model.to(self.device)
 
     def getStates(self, observations):
         """
