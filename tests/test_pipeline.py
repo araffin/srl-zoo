@@ -38,10 +38,12 @@ def testPriorTrain():
 def testbaselineTrain():
     createFolders()
     for model_type in ['cnn', 'mlp']:
-        for baseline in ['vae', 'autoencoder']:
+        for baseline in ['vae', 'autoencoder', 'supervised']:
             args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
                     '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
-                    '--seed', SEED, '--state-dim', STATE_DIM, '--model-type', model_type]
+                    '--seed', SEED, '--model-type', model_type]
+            if baseline != 'supervised':
+                args += ['--state-dim', STATE_DIM]
             args = list(map(str, args))
 
             ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)

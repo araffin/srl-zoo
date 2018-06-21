@@ -17,7 +17,7 @@ from plotting.representation_plot import plotRepresentation, plt
 from plotting.losses_plot import plotLosses
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import INPUT_DIM
-from utils import parseDataFolder, createFolder
+from utils import parseDataFolder, createFolder, detachToNumpy
 
 # Python 2/3 compatibility
 try:
@@ -47,7 +47,7 @@ class SupervisedLearning(BaseLearner):
 
         if model_type == "resnet":
             self.model = ConvolutionalNetwork(self.state_dim, cuda)
-        elif model_type == "custom_cnn":
+        elif model_type in ["cnn", "custom_cnn"]:
             self.model = CustomCNN(self.state_dim)
         elif model_type == "mlp":
             self.model = DenseNetwork(INPUT_DIM, self.state_dim)
@@ -55,8 +55,9 @@ class SupervisedLearning(BaseLearner):
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
 
-        if cuda:
-            self.model.cuda()
+        self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
+
+        self.model = self.model.to(self.device)
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.log_folder = log_folder
@@ -98,16 +99,15 @@ class SupervisedLearning(BaseLearner):
             train_loader.resetAndShuffle()
             pbar = tqdm(total=len(train_loader))
             for batch_idx, (obs, target_states) in enumerate(train_loader):
-                if self.cuda:
-                    obs, target_states = obs.cuda(), target_states.cuda()
+                obs, target_states = obs.to(self.device), target_states.to(self.device)
 
                 pred_states = self.model(obs)
                 self.optimizer.zero_grad()
-                loss = criterion(pred_states, target_states)
+                loss = criterion(pred_states, target_states.detach())
                 loss.backward()
                 self.optimizer.step()
-                train_loss += loss.data[0]
-                epoch_train_loss[epoch].append(loss.data[0])
+                train_loss += loss.item()
+                epoch_train_loss[epoch].append(loss.item())
                 pbar.update(1)
             pbar.close()
 
@@ -115,17 +115,17 @@ class SupervisedLearning(BaseLearner):
 
             self.model.eval()
             val_loader.resetIterator()
-            # Pass on the validation set
-            for obs, target_states in val_loader:
-                if self.cuda:
-                    obs, target_states = obs.cuda(), target_states.cuda()
+            with th.no_grad():
+                # Pass on the validation set
+                for obs, target_states in val_loader:
+                    obs, target_states = obs.to(self.device), target_states.to(self.device)
 
-                pred_states = self.model(obs)
-                loss = criterion(pred_states, target_states)
-                val_loss += loss.data[0]
-                epoch_val_loss[epoch].append(loss.data[0])
+                    pred_states = self.model(obs)
+                    loss = criterion(pred_states, target_states.detach())
+                    val_loss += loss.item()
+                    epoch_val_loss[epoch].append(loss.item())
 
-            val_loss /= len(val_loader)
+                val_loss /= len(val_loader)
             self.model.train()  # Restore train mode
 
             # Save best model
@@ -150,9 +150,11 @@ class SupervisedLearning(BaseLearner):
         # save loss
         np.savez(self.log_folder + "/loss.npz", train=epoch_train_loss, val=epoch_val_loss)
         # Save plot
-        plotLosses({"train":np.array(epoch_train_loss), "val":np.array(epoch_val_loss)}, self.log_folder)
+        plotLosses({"train": np.array(epoch_train_loss), "val": np.array(epoch_val_loss)}, self.log_folder)
         # return predicted states for training observations
-        return self.predStatesWithDataLoader(data_loader)
+        with th.no_grad():
+            pred_states = self.predStatesWithDataLoader(data_loader)
+        return pred_states
 
 
 def getModelName(args):

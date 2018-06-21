@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
-from utils import parseDataFolder, createFolder
+from utils import parseDataFolder, createFolder, detachToNumpy
 from preprocessing.data_loader import AutoEncoderDataLoader
 from preprocessing.preprocess import INPUT_DIM
 from preprocessing.utils import deNormalize
@@ -57,8 +57,9 @@ class VAELearning(BaseLearner):
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
 
-        if cuda:
-            self.model.cuda()
+        self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
+
+        self.model = self.model.to(self.device)
         learnable_params = [param for param in self.model.parameters() if param.requires_grad]
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
 
@@ -121,16 +122,15 @@ class VAELearning(BaseLearner):
             train_loader.resetAndShuffle()
             pbar = tqdm(total=len(train_loader))
             for batch_idx, (noisy_obs, obs) in enumerate(train_loader):
-                if self.cuda:
-                    noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
+                noisy_obs, obs = noisy_obs.to(self.device), obs.to(self.device)
 
                 self.optimizer.zero_grad()
                 decoded, mu, logvar = self.model(noisy_obs)
                 loss = VAELearning._lossFunction(decoded, obs, mu, logvar, self.beta)
                 loss.backward()
                 self.optimizer.step()
-                train_loss += loss.data[0]
-                epoch_train_loss[epoch].append(loss.data[0])
+                train_loss += loss.item()
+                epoch_train_loss[epoch].append(loss.item())
                 pbar.update(1)
             pbar.close()
 
@@ -139,20 +139,20 @@ class VAELearning(BaseLearner):
             self.model.eval()
             val_loader.resetIterator()
             # Pass on the validation set
-            for noisy_obs, obs in val_loader:
-                if self.cuda:
-                    noisy_obs, obs = noisy_obs.cuda(), obs.cuda()
+            with th.no_grad():
+                for noisy_obs, obs in val_loader:
+                    noisy_obs, obs = noisy_obs.to(self.device), obs.to(self.device)
 
-                decoded, mu, logvar = self.model(noisy_obs)
-                loss = VAELearning._lossFunction(decoded, obs, mu, logvar, self.beta)
-                val_loss += loss.data[0]
-                epoch_val_loss[epoch].append(loss.data[0])
+                    decoded, mu, logvar = self.model(noisy_obs)
+                    loss = VAELearning._lossFunction(decoded, obs, mu, logvar, self.beta)
+                    val_loss += loss.item()
+                    epoch_val_loss[epoch].append(loss.item())
 
-            val_loss /= len(val_loader)
-            if DISPLAY_PLOTS:
-                # Plot Reconstructed Image
-                plotImage(deNormalize(noisy_obs[0].data.cpu().numpy()), "Input Validation Image")
-                plotImage(deNormalize(decoded[0].data.cpu().numpy()), "Reconstructed Image")
+                val_loss /= len(val_loader)
+                if DISPLAY_PLOTS:
+                    # Plot Reconstructed Image
+                    plotImage(deNormalize(detachToNumpy(noisy_obs[0])), "Input Validation Image")
+                    plotImage(deNormalize(detachToNumpy(decoded[0])), "Reconstructed Image")
 
             self.model.train()  # Restore train mode
 
@@ -178,9 +178,11 @@ class VAELearning(BaseLearner):
         # save loss
         np.savez(self.log_folder + "/loss.npz", train=epoch_train_loss, val=epoch_val_loss)
         # Save plot
-        plotLosses({"train":np.array(epoch_train_loss), "val":np.array(epoch_val_loss)}, self.log_folder)
+        plotLosses({"train": np.array(epoch_train_loss), "val": np.array(epoch_val_loss)}, self.log_folder)
         # return predicted states for training observations
-        return self.predStatesWithDataLoader(data_loader)
+        with th.no_grad():
+            pred_states = self.predStatesWithDataLoader(data_loader)
+        return pred_states
 
 
 def getModelName(args):
