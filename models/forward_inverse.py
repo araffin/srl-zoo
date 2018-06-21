@@ -34,9 +34,9 @@ class BaseForwardModel(BaseModelSRL):
     def forwardModel(self, state, action):
         """
         Predict next state given current state and action
-        :param state: (th Variable)
+        :param state: (th.Tensor)
         :param action: (th Tensor)
-        :return: (th Variable)
+        :return: (th.Tensor)
         """
         # Predict the delta between the next state and current state
         concat = torch.cat((state[:, :int(self.state_dim*self.ratio)], encodeOneHot(action, self.action_dim)), 1)
@@ -64,8 +64,8 @@ class BaseInverseModel(BaseModelSRL):
     def inverseModel(self, state, next_state):
         """
         Predict action given current state and next state
-        :param state: (th Variable)
-        :param next_state: (th Variable)
+        :param state: (th.Tensor)
+        :param next_state: (th.Tensor)
         :return: probability of each action
         """
         return self.inverse_net(th.cat((state[:, :int(self.state_dim*self.ratio)], next_state[:, :int(self.state_dim*self.ratio)]), 1))
@@ -96,9 +96,9 @@ class BaseRewardModel(BaseModelSRL):
     def rewardModel(self, state):
         """
         Predict reward given current state and action
-        :param state: (th Variable)
+        :param state: (th.Tensor)
         :param action: (th Tensor)
-        :return: (th Variable)
+        :return: (th.Tensor)
         """
         return self.reward_net(state)
 
@@ -172,8 +172,8 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
     def getStates(self, observations):
         """
-        :param observations: (PyTorch Variable)
-        :return: (PyTorch Variable)
+        :param observations: (PyTorch Tensor)
+        :return: (PyTorch Tensor)
         """
         if "autoencoder" in self.losses or "vae" in self.losses:
             return self.model.getStates(observations)

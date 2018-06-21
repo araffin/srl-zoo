@@ -17,7 +17,6 @@ from collections import defaultdict
 
 import numpy as np
 import torch as th
-from torch.autograd import Variable
 from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
@@ -238,14 +237,11 @@ class SRL4robotics(BaseLearner):
                         decoded_obs, decoded_next_obs = None, None
                     # Actions associated to the observations of the current minibatch
                     actions_st = actions[minibatchlist[minibatch_idx]]
-                    actions_st = th.from_numpy(actions_st).view(-1, 1).requires_grad_(False)
+                    actions_st = th.from_numpy(actions_st).view(-1, 1).requires_grad_(False).to(self.device)
 
                     if not self.no_priors:
                         criterion.forward(states, next_states,
                                           dissimilar_pairs=diss_pairs, same_actions_pairs=same_actions)
-
-                    if self.cuda:
-                        actions_st = actions_st.cuda()
 
                     if self.use_forward_loss:
                         next_states_pred = self.model.forwardModel(states, actions_st)
@@ -259,9 +255,7 @@ class SRL4robotics(BaseLearner):
                         rewards_st = rewards[minibatchlist[minibatch_idx]]
                         # Removing negative reward
                         rewards_st[rewards_st == -1] = 0
-                        rewards_st = Variable(th.from_numpy(rewards_st)).view(-1, 1)
-                        if self.cuda:
-                            rewards_st = rewards_st.cuda()
+                        rewards_st = th.from_numpy(rewards_st).view(-1, 1).to(self.device)
                         rewards_pred = self.model.rewardModel(states)
                         rewardModelLoss(rewards_pred, rewards_st.long(), weight=2.5, loss_object=criterion)
 
@@ -271,14 +265,12 @@ class SRL4robotics(BaseLearner):
                         vaeLoss(decoded_obs, obs, mu, logvar, weight=1, loss_object=criterion, beta=self.beta)
                     if self.reward_prior:
                         rewards_st = rewards[minibatchlist[minibatch_idx]]
-                        rewards_st = Variable(th.from_numpy(rewards_st).float()).view(-1, 1)
-                        if self.cuda:
-                            rewards_st = rewards_st.cuda()
+                        rewards_st = th.from_numpy(rewards_st).float().view(-1, 1).to(self.device)
                         rewardPriorLoss(states, rewards_st, weight=10., loss_object=criterion)
 
                     if self.episode_prior:
                         episodePriorLoss(minibatch_idx, minibatch_episodes, states, self.discriminator,
-                                         BALANCED_SAMPLING, weight=1, loss_object=criterion, cuda=self.cuda)
+                                         BALANCED_SAMPLING, weight=1, loss_object=criterion)
                     # Compute weighted average of losses
                     criterion.updateLossHistory()
                     loss = criterion.computeTotalLoss()
@@ -335,7 +327,7 @@ class SRL4robotics(BaseLearner):
                             # Plot Reconstructed Image
                             plotImage(deNormalize(detachToNumpy(obs[0])), "Input Image (Train)")
                             plotImage(deNormalize(detachToNumpy(decoded_obs[0])), "Reconstructed Image")
-if DISPLAY_PLOTS:
+        if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
         # Load best model before predicting states
@@ -433,7 +425,7 @@ if __name__ == '__main__':
     except AttributeError:
         images_path = ground_truth['images_path']
 
-    # Creat log folder
+    # Create log folder
     if args.log_folder == "":
         exp_config = build_config(args)
         createFolder("logs/{}".format(exp_config['data-folder']), "Dataset log folder already exist")

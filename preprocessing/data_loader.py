@@ -533,7 +533,7 @@ class SupervisedDataLoader(CustomDataLoader):
     :param y_values: (numpy tensor)
     :param images_path: (numpy 1D array of str)
     :param batch_size: (int)
-    :param is_training: (bool) Whether to create volatile variables or not
+    :param is_training: (bool) Whether to create tensor that keep track of the gradient or not
     :param no_targets: (bool) Set to true, only inputs are generated
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
@@ -610,7 +610,7 @@ class SupervisedDataLoader(CustomDataLoader):
     def testMode(self):
         """
         Switch to test mode
-        Variables will be created with the volatile keyword
+        Tensors will not keep track of the gradient
         """
         self.is_training = False
 
@@ -623,7 +623,7 @@ class AutoEncoderDataLoader(CustomDataLoader):
     :param images_path: (numpy 1D array of str)
     :param batch_size: (int)
     :param noise_factor: (float)
-    :param is_training: (bool) Whether to create volatile variables or not
+    :param is_training: (bool) Whether to create tensor that keep track of the gradient or not
     :param no_targets: (bool) Set to true, only inputs are generated
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
@@ -704,6 +704,6 @@ class AutoEncoderDataLoader(CustomDataLoader):
     def testMode(self):
         """
         Switch to test mode
-        Variables will be created with the volatile keyword
+        Tensors will not keep track of the gradient
         """
         self.is_training = False

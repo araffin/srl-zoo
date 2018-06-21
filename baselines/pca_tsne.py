@@ -53,7 +53,7 @@ def saveExpConfig(args, log_folder):
 
 def toNumpyMatrix(obs_var):
     """
-    :param obs_var: (PyTorch Variable)
+    :param obs_var: (th.Tensor)
     :return: (numpy matrix)
     """
     obs_tensor = obs_var.data.numpy()

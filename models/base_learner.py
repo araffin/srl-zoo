@@ -53,7 +53,7 @@ class BaseLearner(object):
     def _predFn(self, observations, restore_train=True):
         """
         Predict states in test mode given observations
-        :param observations: (PyTorch Variable)
+        :param observations: (PyTorch Tensor)
         :param restore_train: (bool) whether to restore training mode after prediction
         :return: (numpy tensor)
         """

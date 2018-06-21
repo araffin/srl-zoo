@@ -4,7 +4,6 @@ import sys
 
 import numpy as np
 import torch as th
-from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -59,11 +58,11 @@ class RoboticPriorsLoss(nn.Module):
     def forward(self, states, next_states,
                 dissimilar_pairs=None, same_actions_pairs=None):
         """
-        :param states: (th Variable)
-        :param next_states: (th Variable)
+        :param states: (th.Tensor)
+        :param next_states: (th.Tensor)
         :param dissimilar_pairs: (th tensor)
         :param same_actions_pairs: (th tensor)
-        :return: (th Variable)
+        :return: (th.Tensor)
         """
 
         state_diff = next_states - states
@@ -108,8 +107,8 @@ class RoboticPriorsTripletLoss(nn.Module):
     @staticmethod
     def priorsOnStates(s, next_s, dissimilar_pairs, same_actions_pairs):
         """
-        :param s: (th Variable) states
-        :param next_s: (th Variable) next states
+        :param s: (th.Tensor) states
+        :param next_s: (th.Tensor) next states
         :param dissimilar_pairs: (th tensor)
         :param same_actions_pairs: (th tensor)
         """
@@ -136,16 +135,16 @@ class RoboticPriorsTripletLoss(nn.Module):
                 alpha=0.2, no_priors=False):
         """
         :param alpha: (float) margin that is enforced between positive & neg observation (TCN Triplet Loss)
-        :param states: (th Variable) states for the anchor obs
-        :param p_states: (th Variable) states for the positive obs
-        :param n_states: (th Variable) states for the negative obs
-        :param next_states: (th Variable)
-        :param next_p_st: (th Variable) next states for the positive obs
+        :param states: (th.Tensor) states for the anchor obs
+        :param p_states: (th.Tensor) states for the positive obs
+        :param n_states: (th.Tensor) states for the negative obs
+        :param next_states: (th.Tensor)
+        :param next_p_st: (th.Tensor) next states for the positive obs
         :param dissimilar_pairs: (th Tensor)
         :param same_actions_pairs: (th Tensor)
         :param alpha: (float) gap value in the triplet loss
         :param no_priors: (bool) no use of priors in the loss/ Only triplets
-        :return: (th Variable)
+        :return: (th.Tensor)
         """
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
         total_loss = self.l1_coeff * l1_loss
@@ -297,8 +296,8 @@ def findPriorsPairs(batch_size, minibatchlist, actions, rewards, n_actions, n_pa
 
 def forwardModelLoss(next_states_pred, next_states, weight, loss_object):
     """
-    :param next_states_pred: (th Variable)
-    :param next_states: (th Variable)
+    :param next_states_pred: (th.Tensor)
+    :param next_states: (th.Tensor)
     :param weight: coefficient to weight the loss
     :param loss_object: loss criterion needed to log the loss value
     :return:
@@ -311,8 +310,8 @@ def forwardModelLoss(next_states_pred, next_states, weight, loss_object):
 def inverseModelLoss(actions_pred, actions_st, weight, loss_object):
     """
     Inverse model's loss: Cross-entropy between predicted categoriacal actions and true actions
-    :param actions_pred: (th Variable)
-    :param actions_st: (th Variable)
+    :param actions_pred: (th.Tensor)
+    :param actions_st: (th.Tensor)
     :param weight: coefficient to weight the loss
     :param loss_object: loss criterion needed to log the loss value
     :return:
@@ -339,8 +338,8 @@ def l1Loss(params, weight, loss_object):
 def rewardModelLoss(rewards_pred, rewards_st, weight, loss_object):
     """
     Categorical Reward prediction Loss (Cross-entropy)
-    :param rewards_pred: predicted reward - categorical (th Variable)
-    :param rewards_st: ( int - th Variable)
+    :param rewards_pred: predicted reward - categorical (th.Tensor)
+    :param rewards_st: ( int - th.Tensor)
     :param weight: coefficient to weight the loss
     :param loss_object: loss criterion needed to log the loss value
     :return:
@@ -383,12 +382,12 @@ def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_o
 def vaeLoss(decoded, obs, mu, logvar, weight, loss_object, beta=1):
     """
     Reconstruction + KL divergence losses summed over all elements and batch
-    :param decoded: (Pytorch Variable)
-    :param obs: (Pytorch Variable)
-    :param mu: (Pytorch Variable)
-    :param logvar: (Pytorch Variable)
+    :param decoded: (th.Tensor)
+    :param obs: (th.Tensor)
+    :param mu: (th.Tensor)
+    :param logvar: (th.Tensor)
     :param beta: (float) used to weight the KL divergence for disentangling
-    :return: (Pytorch Variable)
+    :return: (th.Tensor)
     """
     generation_loss = F.mse_loss(decoded, obs, size_average=False)
 
@@ -404,8 +403,8 @@ def vaeLoss(decoded, obs, mu, logvar, weight, loss_object, beta=1):
 def mutualInformationLoss(states, rewards_st, weight, loss_object):
     """
     Loss criterion to assess mutual information between predicted states and rewards
-    :param states: (th Variable)
-    :param rewards_st:(th Variable)
+    :param states: (th.Tensor)
+    :param rewards_st:(th.Tensor)
     :param weight: coefficient to weight the loss (float)
     :param loss_object: loss criterion needed to log the loss value
     :return:
@@ -435,8 +434,8 @@ def mutualInformationLoss(states, rewards_st, weight, loss_object):
 def rewardPriorLoss(states, rewards_st, weight, loss_object):
     """
     Loss expressing Correlation between predicted states and reward
-    :param states: (th Variable)
-    :param rewards_st: rewards at timestep t (th Variable)
+    :param states: (th.Tensor)
+    :param rewards_st: rewards at timestep t (th.Tensor)
     :param weight: coefficient to weight the los s
     :param loss_object: loss criterion needed to log the loss value
     :return:
@@ -449,17 +448,16 @@ def rewardPriorLoss(states, rewards_st, weight, loss_object):
     return weight * reward_prior_loss
 
 
-def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, balanced_sampling, weight, loss_object, cuda=False):
+def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, balanced_sampling, weight, loss_object):
     """
     TODO: fill out
     :param minibatch_idx:
     :param minibatch_episodes:
-    :param states: (th Variable)
+    :param states: (th.Tensor)
     :param discriminator:
     :param balanced_sampling:
     :param weight: coefficient to weight the loss
     :param loss_object: loss criterion needed to log the loss value
-    :param cuda:
     :return:
     """
     # The "episode prior" idea is really close
@@ -497,10 +495,9 @@ def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, b
     episode_output = discriminator(episode_input)
 
     others_episodes = episodes[others_idx]
-    same_episodes = Variable(th.from_numpy((episodes == others_episodes).astype(np.float32)))
+    same_episodes = th.from_numpy((episodes == others_episodes).astype(np.float32))
+    same_episodes = same_episodes.to(states.device)
 
-    if cuda:
-        same_episodes = same_episodes.cuda()
     # TODO: classification accuracy/loss
     episode_loss = criterion_episode(episode_output.squeeze(1), same_episodes)
     loss_object.addToLosses('episode_prior', weight, episode_loss)

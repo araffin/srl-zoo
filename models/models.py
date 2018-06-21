@@ -24,8 +24,8 @@ class BaseModelSRL(nn.Module):
 
     def getStates(self, observations):
         """
-        :param observations: (PyTorch Variable)
-        :return: (PyTorch Variable)
+        :param observations: (PyTorch Tensor)
+        :return: (PyTorch Tensor)
         """
         return self.forward(observations)
 
@@ -85,29 +85,29 @@ class BaseModelAutoEncoder(BaseModelSRL):
 
     def getStates(self, observations):
         """
-        :param observations: (PyTorch Variable)
-        :return: (PyTorch Variable)
+        :param observations: (PyTorch Tensor)
+        :return: (PyTorch Tensor)
         """
         return self.encode(observations)
 
     def encode(self, x):
         """
-        :param x: (PyTorch Variable)
-        :return: (PyTorch Variable)
+        :param x: (PyTorch Tensor)
+        :return: (PyTorch Tensor)
         """
         raise NotImplementedError
 
     def decode(self, x):
         """
-        :param x: (PyTorch Variable)
-        :return: (PyTorch Variable)
+        :param x: (PyTorch Tensor)
+        :return: (PyTorch Tensor)
         """
         raise NotImplementedError
 
     def forward(self, x):
         """
-        :param x: (PyTorch Variable)
-        :return: (PyTorch Variable)
+        :param x: (PyTorch Tensor)
+        :return: (PyTorch Tensor)
         """
         input_shape = x.size()
         encoded = self.encode(x)
@@ -126,22 +126,22 @@ class BaseModelVAE(BaseModelAutoEncoder):
 
     def getStates(self, observations):
         """
-        :param observations: (PyTorch Variable)
-        :return: (PyTorch Variable)
+        :param observations: (PyTorch Tensor)
+        :return: (PyTorch Tensor)
         """
         return self.encode(observations)[0]
 
     def encode(self, x):
         """
-        :param x: (PyTorch Variable)
-        :return: (PyTorch Variable)
+        :param x: (PyTorch Tensor)
+        :return: (PyTorch Tensor)
         """
         raise NotImplementedError
 
     def decode(self, x):
         """
-        :param x: (PyTorch Variable)
-        :return: (PyTorch Variable)
+        :param x: (PyTorch Tensor)
+        :return: (PyTorch Tensor)
         """
         raise NotImplementedError
 
@@ -149,15 +149,15 @@ class BaseModelVAE(BaseModelAutoEncoder):
         """
         Reparameterize for the backpropagation of z instead of q.
         (See "The reparameterization trick" section of https://arxiv.org/abs/1312.6114)
-        :param mu: (Pytorch Variable)
-        :param logvar: (Pytorch Variable)
+        :param mu: (PyTorch Tensor)
+        :param logvar: (PyTorch Tensor)
         """
         if self.training:
             # logvar = \log(\sigma^2) = 2 * \log(\sigma)
             # \sigma = \exp(0.5 * logvar)
             std = logvar.mul(0.5).exp_()
             # Sample \epsilon from normal distribution
-            # use std to create a new variable, so we don't have to care
+            # use std to create a new tensor, so we don't have to care
             # about running on GPU or not
             eps = std.new(std.size()).normal_()
             # Then multiply with the standard deviation and add the mean
@@ -167,8 +167,8 @@ class BaseModelVAE(BaseModelAutoEncoder):
 
     def forward(self, x):
         """
-        :param x: (PyTorch Variable)
-        :return: (PyTorch Variable)
+        :param x: (PyTorch Tensor)
+        :return: (PyTorch Tensor)
         """
         input_shape = x.size()
         mu, logvar = self.encode(x)
@@ -232,11 +232,7 @@ def encodeOneHot(tensor, n_dim):
     One hot encoding for a given tensor
     :param tensor: (th Tensor)
     :param n_dim: (int) Number of dimensions
-    :return: (th Variable)
+    :return: (th.Tensor)
     """
-    encoded_tensor = th.Tensor(tensor.shape[0], n_dim).zero_()
-    if tensor.is_cuda:
-        encoded_tensor = encoded_tensor.cuda()
-    return Variable(encoded_tensor.scatter_(1, tensor.data, 1.))
-
-
+    encoded_tensor = th.Tensor(tensor.shape[0], n_dim).zero_().to(tensor.device)
+    return encoded_tensor.scatter_(1, tensor.data, 1.)
