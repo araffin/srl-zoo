@@ -39,7 +39,7 @@ class BaseForwardModel(BaseModelSRL):
         :return: (th.Tensor)
         """
         # Predict the delta between the next state and current state
-        concat = torch.cat((state[:, :int(self.state_dim*self.ratio)], encodeOneHot(action, self.action_dim)), 1)
+        # concat = torch.cat((state[:, :int(self.state_dim*self.ratio)], encodeOneHot(action, self.action_dim)), 1)
         concat = torch.cat((state, encodeOneHot(action, self.action_dim)), 1)
         return state + self.forward_net(concat)
 
@@ -68,8 +68,9 @@ class BaseInverseModel(BaseModelSRL):
         :param next_state: (th.Tensor)
         :return: probability of each action
         """
-        return self.inverse_net(th.cat((state[:, :int(self.state_dim*self.ratio)], next_state[:, :int(self.state_dim*self.ratio)]), 1))
-        #return self.inverse_net(th.cat((state, next_state), 1))
+        return self.inverse_net(
+            th.cat((state[:, :int(self.state_dim * self.ratio)], next_state[:, :int(self.state_dim * self.ratio)]), 1))
+        # return self.inverse_net(th.cat((state, next_state), 1))
 
 
 class BaseRewardModel(BaseModelSRL):
@@ -83,7 +84,7 @@ class BaseRewardModel(BaseModelSRL):
     def initRewardNet(self, state_dim, action_dim, ratio=1):
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.reward_net = nn.Sequential(nn.Linear(int(state_dim *ratio), 2),
+        self.reward_net = nn.Sequential(nn.Linear(int(state_dim * ratio), 2),
                                         nn.ReLU(),
                                         nn.Linear(2, 2),
                                         nn.ReLU(),

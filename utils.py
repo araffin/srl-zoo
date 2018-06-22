@@ -5,6 +5,12 @@ import os
 import torch
 from termcolor import colored
 
+# Python 2/3 compatibility
+try:
+    input = raw_input
+except NameError:
+    pass
+
 
 def detachToNumpy(tensor):
     """
@@ -67,17 +73,3 @@ def printBlue(string):
     :param string: (str)
     """
     print(colored(string, 'blue'))
-
-
-def priorsToString(priors_list):
-    """
-    Convert a list of priors to a string
-    (for the experiment name)
-    :param priors_list: [str]
-    :return: (str)
-    """
-    string = '_'
-    for index, priors in enumerate(priors_list):
-        # Keep only first three letters
-        string = string + priors[0:3]
-    return string

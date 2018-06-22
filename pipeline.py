@@ -7,15 +7,15 @@ from __future__ import print_function, division
 
 import argparse
 import datetime
-import subprocess
 import json
 import os
+import subprocess
 import sys
 from collections import OrderedDict
 from pprint import pprint
 
 from utils import printRed, printGreen, printBlue, parseDataFolder, \
-    printYellow, priorsToString, createFolder
+    printYellow, createFolder
 
 # Fix for matplotlib non-zero return
 # Apparently due to segmentation fault

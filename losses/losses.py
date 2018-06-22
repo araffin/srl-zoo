@@ -7,10 +7,9 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils import printRed, printYellow
-from pipeline import NO_PAIRS_ERROR, NAN_ERROR
-from models.models import encodeOneHot
 from models.priors import ReverseLayerF
+from pipeline import NO_PAIRS_ERROR
+from utils import printRed
 
 try:
     from functools import reduce
@@ -75,9 +74,9 @@ class RoboticPriorsLoss(nn.Module):
                                  state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
 
         repeatability_loss = (
-            similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
-            (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2,
-                                                                                               dim=1) ** 2).mean()
+                similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
+                (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2,
+                                                                                                   dim=1) ** 2).mean()
         self.weights = [1, 1, 1, 1]
         self.names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss', 'repeatability_loss']
         self.losses = [temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss]
@@ -123,9 +122,9 @@ class RoboticPriorsTripletLoss(nn.Module):
                                  state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
 
         repeatability_loss = (
-            similarity(s[same_actions_pairs[:, 0]], s[same_actions_pairs[:, 1]]) *
-            (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2,
-                                                                                               dim=1) ** 2).mean()
+                similarity(s[same_actions_pairs[:, 0]], s[same_actions_pairs[:, 1]]) *
+                (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2,
+                                                                                                   dim=1) ** 2).mean()
 
         return temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss
 
@@ -198,6 +197,8 @@ def overSampling(batch_size, m_list, pairs, function_on_pairs, actions, rewards)
     :param m_list: (list) mini-batch list
     :param pairs: similar / dissimilar pairs
     :param function_on_pairs: (function) findDissimilar applied to pairs
+    :param actions: (numpy array)
+    :param rewards: (numpy array)
     :return: (list, list) pairs, mini-batch list modified
     """
     # For a each minibatch_id
@@ -233,6 +234,8 @@ def findDissimilar(index, minibatch1, minibatch2, actions, rewards):
     :param index: (int)
     :param minibatch1: (numpy array)
     :param minibatch2: (numpy array)
+    :param actions: (numpy array)
+    :param rewards: (numpy array)
     :return: (dict, numpy array)
     """
     return np.where((actions[minibatch2] == actions[minibatch1[index]]) *
@@ -245,6 +248,7 @@ def findSameActions(index, minibatch, actions):
     as in a reference observation
     :param index: (int)
     :param minibatch: (numpy array)
+    :param actions: (numpy array)
     :return: (numpy array)
     """
     return np.where(actions[minibatch] == actions[minibatch[index]])[0]
@@ -339,13 +343,13 @@ def rewardModelLoss(rewards_pred, rewards_st, weight, loss_object):
     """
     Categorical Reward prediction Loss (Cross-entropy)
     :param rewards_pred: predicted reward - categorical (th.Tensor)
-    :param rewards_st: ( int - th.Tensor)
+    :param rewards_st: (th.Tensor)
     :param weight: coefficient to weight the loss
     :param loss_object: loss criterion needed to log the loss value
     :return:
     """
-    lossFn = nn.CrossEntropyLoss()
-    reward_loss = lossFn(rewards_pred, target=rewards_st.squeeze(1))
+    loss_fn = nn.CrossEntropyLoss()
+    reward_loss = loss_fn(rewards_pred, target=rewards_st.squeeze(1))
     loss_object.addToLosses('reward_loss', weight, reward_loss)
     return weight * reward_loss
 
@@ -353,7 +357,6 @@ def rewardModelLoss(rewards_pred, rewards_st, weight, loss_object):
 # reconstructionLoss = nn.MSELoss(size_average=True)
 # Redefine MSE otherwise PyTorch won't less us compute gradient w.r.t. input
 def reconstructionLoss(_input, target):
-
     """
     TODO: fill out
     :param _input:
@@ -386,6 +389,8 @@ def vaeLoss(decoded, obs, mu, logvar, weight, loss_object, beta=1):
     :param obs: (th.Tensor)
     :param mu: (th.Tensor)
     :param logvar: (th.Tensor)
+    :param weight: coefficient to weight the loss (float)
+    :param loss_object: loss criterion needed to log the loss value
     :param beta: (float) used to weight the KL divergence for disentangling
     :return: (th.Tensor)
     """
@@ -400,6 +405,7 @@ def vaeLoss(decoded, obs, mu, logvar, weight, loss_object, beta=1):
     loss_object.addToLosses('kl_loss', weight, vae_loss)
     return weight * vae_loss
 
+
 def mutualInformationLoss(states, rewards_st, weight, loss_object):
     """
     Loss criterion to assess mutual information between predicted states and rewards
@@ -409,23 +415,23 @@ def mutualInformationLoss(states, rewards_st, weight, loss_object):
     :param loss_object: loss criterion needed to log the loss value
     :return:
     """
-    #concat_var = th.cat((states, encodeOneHot(actions_st, n_dim=n_actions).float()), 1)
+    # concat_var = th.cat((states, encodeOneHot(actions_st, n_dim=n_actions).float()), 1)
     X = states
     Y = rewards_st
     I = 0
     eps = 1e-10
-    p_x = float(1/np.sqrt(2*np.pi)) * \
-           th.exp(-th.pow(th.norm((X - th.mean(X, dim=0))/(th.std(X, dim=0)+eps), 2, dim=1), 2)/2) + eps
-    p_y = float(1/np.sqrt(2*np.pi)) * \
-           th.exp(-th.pow(th.norm((Y - th.mean(Y, dim=0))/(th.std(Y, dim=0)+eps), 2, dim=1), 2)/2) + eps
+    p_x = float(1 / np.sqrt(2 * np.pi)) * \
+          th.exp(-th.pow(th.norm((X - th.mean(X, dim=0)) / (th.std(X, dim=0) + eps), 2, dim=1), 2) / 2) + eps
+    p_y = float(1 / np.sqrt(2 * np.pi)) * \
+          th.exp(-th.pow(th.norm((Y - th.mean(Y, dim=0)) / (th.std(Y, dim=0) + eps), 2, dim=1), 2) / 2) + eps
     for x in range(X.shape[0]):
         for y in range(Y.shape[0]):
-            p_xy = float(1/np.sqrt(2*np.pi)) * \
-                   th.exp(-th.pow(th.norm((th.cat([X[x],Y[y]]) - th.mean(th.cat([X,Y], dim=1), dim=0))/
-                                          (th.std(th.cat([X,Y], dim=1), dim=0)+ eps), 2), 2) /2) + eps
+            p_xy = float(1 / np.sqrt(2 * np.pi)) * \
+                   th.exp(-th.pow(th.norm((th.cat([X[x], Y[y]]) - th.mean(th.cat([X, Y], dim=1), dim=0)) /
+                                          (th.std(th.cat([X, Y], dim=1), dim=0) + eps), 2), 2) / 2) + eps
             I += p_xy * th.log(p_xy / (p_x[x] * p_y[y]))
 
-    #VI = - th.sum(p_x * th.log(p_x)) - th.sum(p_y * th.log(p_y)) - 2*I
+    # VI = - th.sum(p_x * th.log(p_x)) - th.sum(p_y * th.log(p_y)) - 2*I
     reward_prior_loss = th.exp(-I)
     loss_object.addToLosses('reward_prior', weight, reward_prior_loss)
     return weight * reward_prior_loss
@@ -442,7 +448,7 @@ def rewardPriorLoss(states, rewards_st, weight, loss_object):
     """
 
     reward_loss = th.mean(
-    th.mm((states - th.mean(states, dim=0)).t(), (rewards_st - th.mean(rewards_st, dim=0))))
+        th.mm((states - th.mean(states, dim=0)).t(), (rewards_st - th.mean(rewards_st, dim=0))))
     reward_prior_loss = th.exp(-th.abs(reward_loss))
     loss_object.addToLosses('reward_prior', weight, reward_prior_loss)
     return weight * reward_prior_loss

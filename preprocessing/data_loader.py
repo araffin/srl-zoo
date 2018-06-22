@@ -76,7 +76,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
 
                 # negative timestep by random sampling
                 length_set_steps = len(all_frame_steps)
-                negative = all_frame_steps[random.randint(0, length_set_steps-1)]
+                negative = all_frame_steps[random.randint(0, length_set_steps - 1)]
                 negative_path = '{}{:06d}'.format(image_path[:-6], negative)
 
                 im3 = cv2.imread(negative_path + "_1.jpg")
@@ -397,7 +397,7 @@ class CustomDataLoader(object):
                 self.n_received += 1
             # Channel first
             obs = np.transpose(obs, (0, 3, 2, 1))
-            obs_dict[key] = th.from_numpy(obs).requires_grad_(self.is_training)
+            obs_dict[key] = th.from_numpy(obs).requires_grad_(False)
             # Free memory
             del obs
 
@@ -445,7 +445,7 @@ class CustomDataLoader(object):
         self._sendToWorkers(batch_size, indices_list, obs_dict)
 
         if self.is_training:
-            self.preprocess_result = self.minibatches_indices[i], obs_dict['obs'], obs_dict['next_obs'],\
+            self.preprocess_result = self.minibatches_indices[i], obs_dict['obs'], obs_dict['next_obs'], \
                                      diss_pairs.clone(), same_actions.clone()
         else:
             self.preprocess_result = obs_dict['obs']
@@ -566,7 +566,6 @@ class SupervisedDataLoader(CustomDataLoader):
         """
         self.minibatchlist = self.original_minibatchlist.copy()
         self.targets = self.original_targets.copy()
-
 
     def shuffleMinitbatchesOrder(self):
         """

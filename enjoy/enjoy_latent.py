@@ -15,6 +15,7 @@ from utils import detachToNumpy
 
 VALID_MODEL = ['vae', 'autoencoder', 'priors']
 
+
 def getImage(srl_model, mu, device):
     """
     Gets an image for a chosen mu value using the srl_model

@@ -12,11 +12,14 @@ TRAINING_SET_SIZE = 2000
 KNN_SAMPLES = 1000
 SEED = 0
 
+
 def assertEq(left, right):
     assert left == right, "{} != {}".format(left, right)
 
+
 def assertNeq(left, right):
     assert left != right, "{} == {}".format(left, right)
+
 
 def createFolders():
     createFolder(LOG_FOLDER, "Test log folder already exist")

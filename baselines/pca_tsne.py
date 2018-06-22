@@ -18,13 +18,7 @@ from pipeline import saveConfig
 import plotting.representation_plot as plot_script
 from plotting.representation_plot import plotRepresentation
 from preprocessing.data_loader import AutoEncoderDataLoader
-from utils import parseDataFolder, createFolder
-
-# Python 2/3 compatibility
-try:
-    input = raw_input
-except NameError:
-    pass
+from utils import parseDataFolder, createFolder, input
 
 
 def getModelName(args):

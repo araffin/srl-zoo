@@ -67,6 +67,7 @@ class SRLCustomCNN(BaseModelSRL):
             x = self.noise(x)
         return x
 
+
 class SRLDenseNetwork(BaseModelSRL):
     """
     Dense Neural Net for State Representation Learning (SRL)
@@ -74,7 +75,6 @@ class SRLDenseNetwork(BaseModelSRL):
     :param input_dim: (int) 3 x H x H
     :param state_dim: (int)
     :param noise_std: (float)  To avoid NaN (states must be different)
-    :param batch_size: (int)
     :param cuda: (bool)
     :param n_hidden: (int)
     """
@@ -87,11 +87,10 @@ class SRLDenseNetwork(BaseModelSRL):
             nn.Linear(input_dim, n_hidden),
             nn.ReLU(),
             nn.Linear(n_hidden, state_dim)
-            )
+        )
 
         self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
         self.noise = GaussianNoiseVariant(self.device, noise_std)
-
 
     def forward(self, x):
         # Flatten input

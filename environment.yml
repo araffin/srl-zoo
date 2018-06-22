@@ -95,5 +95,4 @@ dependencies:
   - pyzmq==16.0.2
   - seaborn==0.8.1
   - termcolor==1.1.0
-  - torch==0.3.0.post4
   - tqdm==4.19.4

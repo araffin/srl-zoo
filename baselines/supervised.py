@@ -10,20 +10,14 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
-from models.base_learner import BaseLearner
 from models import ConvolutionalNetwork, DenseNetwork, CustomCNN
+from models.base_learner import BaseLearner
 from pipeline import saveConfig
-from plotting.representation_plot import plotRepresentation, plt
 from plotting.losses_plot import plotLosses
+from plotting.representation_plot import plotRepresentation, plt
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import INPUT_DIM
-from utils import parseDataFolder, createFolder, detachToNumpy
-
-# Python 2/3 compatibility
-try:
-    input = raw_input
-except NameError:
-    pass
+from utils import parseDataFolder, createFolder, input
 
 DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch

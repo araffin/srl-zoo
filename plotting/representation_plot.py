@@ -270,13 +270,13 @@ if __name__ == '__main__':
             if args.data_folder != "" and args.correlation:
                 training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
                 ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
-                true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() \
-                    else 'arm_states']
+                true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys()
+                                           else 'arm_states']
                 name = "Ground Truth States - {}".format(args.data_folder)
                 episode_starts, rewards_ground = training_data['episode_starts'], training_data['rewards']
-                
-                button_positions = ground_truth['target_positions' if 'target_positions' in ground_truth.keys() \
-                    else 'button_positions']
+
+                button_positions = ground_truth['target_positions' if 'target_positions' in ground_truth.keys()
+                                                else 'button_positions']
                 with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
                     relative_pos = json.load(f).get('relative_pos', False)
 
@@ -296,7 +296,9 @@ if __name__ == '__main__':
                 # Correlation matrix: Target pos/GT vs. States predicted
                 for fg in [" Agent's position ", "Target Position"]:
                     if fg == " Agent's position ":
-                        X = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'][:len(rewards)]
+                        X = ground_truth[
+                                'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'][
+                            :len(rewards)]
                     else:
                         X = button_pos_[:len(rewards)]
                     eps = 1e-12
@@ -306,13 +308,13 @@ if __name__ == '__main__':
                     labels = ['s_' + str(i_) for i_ in range(X.shape[1])]
                     labels += [r'$\tilde{s}_' + str(i_) + '$' for i_ in range(states_rewards['states'].shape[1])]
                     cax = ax.matshow(corr, cmap=cmap, vmin=-1, vmax=1)
-                    ax.set_xticklabels(['']+labels)
-                    ax.set_yticklabels(['']+labels)
+                    ax.set_xticklabels([''] + labels)
+                    ax.set_yticklabels([''] + labels)
                     ax.grid(False)
                     plt.title(r'Correlation Matrix: S = Predicted states | $\tilde{S}$ = ' + fg)
-                    fig.colorbar(cax,label='correlation coefficient')
+                    fig.colorbar(cax, label='correlation coefficient')
                 plt.show()
-                
+
         input('\nPress any key to exit.')
 
     elif args.data_folder != "":
