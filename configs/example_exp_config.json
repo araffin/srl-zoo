@@ -8,7 +8,7 @@
   "l1-reg": 0,
   "learning-rate": 0.001,
   "log-folder": "logs/staticButtonSimplest/modelY2017-M11-D09-H11M28S32-resnet-ProTemCauRep-ST-DIM4-SEED1-priors",
-  "model-approach": "priors",
+  "losses": ["priors"],
   "model-type": "resnet",
   "n-neighbors": 5,
   "priors": [

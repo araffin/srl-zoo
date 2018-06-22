@@ -349,7 +349,6 @@ def buildConfig(args):
         "knn-seed": 1,
         "l1-reg": 0,
         "losses": args.losses,
-        "model-approach": args.losses, #  For pipeline script
         "n-neighbors": 5,
         "n-to-plot": 5
     }

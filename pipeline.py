@@ -44,10 +44,10 @@ def getLogFolderName(exp_config):
             if name in exp_config["losses"]:
                 srl_str = "_" + name + "_" + srl_str
                 break
-    approach = exp_config["model-approach"]
-    if approach is not str():
-        approach = "_".join(approach)
-    experiment_name = "{}{}{}_{}".format(date, model_str, srl_str, approach)
+    losses = exp_config["losses"]
+    if losses is not str():
+        losses = "_".join(losses)
+    experiment_name = "{}{}{}_{}".format(date, model_str, srl_str, losses)
 
     printBlue("\nExperiment: {}\n".format(experiment_name))
     log_folder = "logs/{}/{}".format(exp_config['data-folder'], experiment_name)
@@ -124,21 +124,23 @@ def baselineCall(exp_config, baseline="supervised"):
 
     args = ['--no-plots']
     config_args = ['epochs', 'seed', 'model-type',
-                   'data-folder', 'training-set-size']
+                   'data-folder', 'training-set-size', 'batch-size']
 
     if 'log-folder' in exp_config.keys():
         config_args += ['log-folder']
 
     if baseline in ["autoencoder", "vae"]:
         config_args += ['state-dim']
-        exp_config['losses'] = baseline
+        exp_config['losses'] = [baseline]
         for arg in config_args:
             args.extend(['--{}'.format(arg), str(exp_config[arg])])
+        args += ['--losses', baseline]
         ok = subprocess.call(['python', 'train.py'.format(baseline)] + args)
 
-    elif baseline == "supervised" and exp_config['relative-pos']:
+    if exp_config['relative-pos']:
         args += ['--relative-pos']
 
+    if baseline == "supervised":
         for arg in config_args:
             args.extend(['--{}'.format(arg), str(exp_config[arg])])
         ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
