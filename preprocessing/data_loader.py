@@ -105,8 +105,6 @@ class CustomDataLoader(object):
 
     :param minibatchlist: [[int]] list of list of int (observations ids)
     :param images_path: (numpy 1D array of str)
-    :param same_actions: [numpy matrix]
-    :param dissimilar_pairs: [numpy matrix]
     :param test_batch_size: (int)
     :param cache_capacity: (int) number of images that can be cached
     :param multi_view: (bool) enables dual camera mode
@@ -117,8 +115,7 @@ class CustomDataLoader(object):
     It may also produce deadlocks
     """
 
-    def __init__(self, minibatchlist, images_path, same_actions=None,
-                 dissimilar_pairs=None, test_batch_size=512, cache_capacity=5000,
+    def __init__(self, minibatchlist, images_path, test_batch_size=512, cache_capacity=5000,
                  n_workers=5, auto_cleanup=True, multi_view=False, triplets=False):
         super(CustomDataLoader, self).__init__()
 
@@ -130,13 +127,9 @@ class CustomDataLoader(object):
         self.minibatchlist = np.array(minibatchlist[:])
         # Copy useful array to avoid side effects
         self.images_path = images_path[:]
-        self.dissimilar_pairs = np.array(dissimilar_pairs[:]) if dissimilar_pairs is not None else np.array([])
-        self.same_actions = np.array(same_actions[:]) if same_actions is not None else np.array([])
         # Save minibatches original order
         self.minibatches_indices = np.arange(len(minibatchlist), dtype=np.int64)
         self.original_minibatchlist = self.minibatchlist.copy()
-        self.original_same_actions = self.same_actions.copy()
-        self.original_dissimilar_pairs = self.dissimilar_pairs.copy()
 
         # Index of the minibatch in the iterator
         self.current_idx = 0
@@ -204,8 +197,6 @@ class CustomDataLoader(object):
         """
         self.minibatches_indices = np.arange(len(self.minibatchlist), dtype=np.int64)
         self.minibatchlist = self.original_minibatchlist.copy()
-        self.same_actions = self.original_same_actions.copy()
-        self.dissimilar_pairs = self.original_dissimilar_pairs.copy()
 
     def trainMode(self):
         """
@@ -220,7 +211,7 @@ class CustomDataLoader(object):
     def testMode(self):
         """
         Switch to test mode (faster mode) and reset the iterator
-        Next observations, same and dissimilar pairs are not computed
+        Next observations are not computed
         """
         self.is_training = False
         self.minibatchlist = []
@@ -306,10 +297,6 @@ class CustomDataLoader(object):
         indices = np.random.permutation(self.n_minibatches).astype(np.int64)
         self.minibatches_indices = indices
         self.minibatchlist = self.minibatchlist[indices]
-        if len(self.same_actions) > 0:
-            self.same_actions = self.same_actions[indices]
-        if len(self.dissimilar_pairs) > 0:
-            self.dissimilar_pairs = self.dissimilar_pairs[indices]
 
     def resetQueues(self):
         """
@@ -397,7 +384,7 @@ class CustomDataLoader(object):
                 self.n_received += 1
             # Channel first
             obs = np.transpose(obs, (0, 3, 2, 1))
-            obs_dict[key] = th.from_numpy(obs).requires_grad_(False)
+            obs_dict[key] = th.from_numpy(obs)
             # Free memory
             del obs
 
@@ -423,17 +410,8 @@ class CustomDataLoader(object):
 
         batch_size = len(obs_indices)
         # If we are training we need addional tensors
-        # (next obs, dissimilar and similar pairs)
+        # (next obs)
         if self.is_training:
-            # Dummy values for PyTorch < 0.4
-            diss_pairs, same_actions = np.array([0]), np.array([0])
-            if len(self.dissimilar_pairs) > 0:
-                diss_pairs = self.dissimilar_pairs[i][np.random.permutation(self.dissimilar_pairs[i].shape[0])]
-            if len(self.same_actions) > 0:
-                same_actions = self.same_actions[i][np.random.permutation(self.same_actions[i].shape[0])]
-            # Convert to torch tensor
-            diss_pairs, same_actions = th.from_numpy(diss_pairs), th.from_numpy(same_actions)
-
             # Retrieve observations
             # Define a dict to modify it in the for loop
             obs_dict = OrderedDict([('obs', None), ('next_obs', None)])
@@ -445,8 +423,7 @@ class CustomDataLoader(object):
         self._sendToWorkers(batch_size, indices_list, obs_dict)
 
         if self.is_training:
-            self.preprocess_result = self.minibatches_indices[i], obs_dict['obs'], obs_dict['next_obs'], \
-                                     diss_pairs.clone(), same_actions.clone()
+            self.preprocess_result = self.minibatches_indices[i], obs_dict['obs'], obs_dict['next_obs']
         else:
             self.preprocess_result = obs_dict['obs']
 
@@ -553,8 +530,7 @@ class SupervisedDataLoader(CustomDataLoader):
 
         # Here the cache is not useful: we do not have observations
         # that are present in different minibatches
-        super(SupervisedDataLoader, self).__init__(minibatchlist, images_path, None, None,
-                                                   cache_capacity=0,
+        super(SupervisedDataLoader, self).__init__(minibatchlist, images_path, cache_capacity=0,
                                                    n_workers=n_workers, auto_cleanup=auto_cleanup)
         # Training mode is the default one
         if not is_training:
@@ -641,8 +617,7 @@ class AutoEncoderDataLoader(CustomDataLoader):
 
         # Here the cache is not useful: we do not have observations
         # that are present in different minibatches
-        super(AutoEncoderDataLoader, self).__init__(minibatchlist, images_path, None, None,
-                                                    cache_capacity=0,
+        super(AutoEncoderDataLoader, self).__init__(minibatchlist, images_path, cache_capacity=0,
                                                     n_workers=n_workers, auto_cleanup=auto_cleanup)
         # Training mode is the default one
         if not is_training:

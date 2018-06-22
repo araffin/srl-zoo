@@ -54,15 +54,18 @@ class RoboticPriorsLoss(nn.Module):
     def resetLosses(self):
         self.names, self.weights, self.losses = [], [], []
 
-    def forward(self, states, next_states,
-                dissimilar_pairs=None, same_actions_pairs=None):
+    def forward(self, states, next_states, minibatch_idx,
+                dissimilar_pairs, same_actions_pairs):
         """
         :param states: (th.Tensor)
         :param next_states: (th.Tensor)
-        :param dissimilar_pairs: (th tensor)
-        :param same_actions_pairs: (th tensor)
+        :param minibatch_idx: (int)
+        :param dissimilar_pairs: ([numpy array])
+        :param same_actions_pairs: ([numpy array])
         :return: (th.Tensor)
         """
+        dissimilar_pairs = th.from_numpy(dissimilar_pairs[minibatch_idx]).to(states.device)
+        same_actions_pairs = th.from_numpy(same_actions_pairs[minibatch_idx]).to(states.device)
 
         state_diff = next_states - states
         state_diff_norm = state_diff.norm(2, dim=1)
@@ -130,7 +133,7 @@ class RoboticPriorsTripletLoss(nn.Module):
 
     # Override in the case of use of Time-Contrastive Triplet Loss
     def forward(self, states, p_states, n_states, next_states, next_p_st,
-                dissimilar_pairs, same_actions_pairs,
+                minibatch_idx, dissimilar_pairs, same_actions_pairs,
                 alpha=0.2, no_priors=False):
         """
         :param alpha: (float) margin that is enforced between positive & neg observation (TCN Triplet Loss)
@@ -139,12 +142,16 @@ class RoboticPriorsTripletLoss(nn.Module):
         :param n_states: (th.Tensor) states for the negative obs
         :param next_states: (th.Tensor)
         :param next_p_st: (th.Tensor) next states for the positive obs
-        :param dissimilar_pairs: (th Tensor)
-        :param same_actions_pairs: (th Tensor)
+        :param minibatch_idx: (int)
+        :param dissimilar_pairs: ([numpy array])
+        :param same_actions_pairs: ([numpy array])
         :param alpha: (float) gap value in the triplet loss
         :param no_priors: (bool) no use of priors in the loss/ Only triplets
         :return: (th.Tensor)
         """
+        dissimilar_pairs = dissimilar_pairs[minibatch_idx]
+        same_actions_pairs = same_actions_pairs[minibatch_idx]
+
         l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
         total_loss = self.l1_coeff * l1_loss
 
@@ -257,13 +264,13 @@ def findSameActions(index, minibatch, actions):
 def findPriorsPairs(batch_size, minibatchlist, actions, rewards, n_actions, n_pairs_per_action):
     """
 
-    :param batch_size:
-    :param minibatchlist:
-    :param actions:
-    :param rewards:
-    :param n_actions:
-    :param n_pairs_per_action:
-    :return:
+    :param batch_size: (int)
+    :param minibatchlist: ([[int]])
+    :param actions: (numpy array)
+    :param rewards: (numpy array)
+    :param n_actions: (int)
+    :param n_pairs_per_action: ([int])
+    :return: ([numpy array], [numpy array])
     """
     dissimilar_pairs = [
         np.array(
@@ -320,8 +327,8 @@ def inverseModelLoss(actions_pred, actions_st, weight, loss_object):
     :param loss_object: loss criterion needed to log the loss value
     :return:
     """
-    lossFn = nn.CrossEntropyLoss()
-    inverse_loss = lossFn(actions_pred, actions_st.squeeze(1))
+    loss_fn = nn.CrossEntropyLoss()
+    inverse_loss = loss_fn(actions_pred, actions_st.squeeze(1))
     loss_object.addToLosses('inverse_loss', weight, inverse_loss)
     return weight * inverse_loss
 

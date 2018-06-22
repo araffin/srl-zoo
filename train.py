@@ -32,7 +32,6 @@ from preprocessing.utils import deNormalize
 from utils import parseDataFolder, \
     printYellow, createFolder, detachToNumpy, input
 
-
 DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 256  #
@@ -164,17 +163,17 @@ class SRL4robotics(BaseLearner):
         print("Number of observations per action")
         print(n_obs_per_action)
 
-        same_actions, dissimilar_pairs = None, None
+        dissimilar_pairs, same_actions_pairs = None, None
         if not self.no_priors:
-            same_actions, dissimilar_pairs = findPriorsPairs(self.batch_size, minibatchlist, actions, rewards,
-                                                             n_actions, n_pairs_per_action)
+            dissimilar_pairs, same_actions_pairs = findPriorsPairs(self.batch_size, minibatchlist, actions, rewards,
+                                                                   n_actions, n_pairs_per_action)
+
 
         if self.episode_prior:
             idx_to_episode = {idx: episode_idx for idx, episode_idx in enumerate(np.cumsum(episode_starts))}
             minibatch_episodes = [[idx_to_episode[i] for i in minibatch] for minibatch in minibatchlist]
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
-                                       same_actions=same_actions, dissimilar_pairs=dissimilar_pairs,
                                        cache_capacity=100, multi_view=self.multi_view, n_workers=4,
                                        triplets=("triplet" in self.losses))
         # TRAINING -----------------------------------------------------------------------------------------------------
@@ -197,15 +196,8 @@ class SRL4robotics(BaseLearner):
             pbar = tqdm(total=len(minibatchlist))
             data_loader.resetAndShuffle()
 
-            for minibatch_num, _input in enumerate(data_loader):
-                # Unpack input
-                minibatch_idx, obs, next_obs, diss_pairs, same_actions = _input
+            for minibatch_num, (minibatch_idx, obs, next_obs) in enumerate(data_loader):
                 obs, next_obs = obs.to(self.device), next_obs.to(self.device)
-                same_actions, diss_pairs = same_actions.to(self.device), diss_pairs.to(self.device)
-
-                if self.no_priors:
-                    same_actions, diss_pairs = None, None
-
                 self.optimizer.zero_grad()
 
                 # Predict states given observations as in Time Contrastive Network (Triplet Loss) [Sermanet et al.]
@@ -220,10 +212,12 @@ class SRL4robotics(BaseLearner):
                         next_obs[:, 3:6, :, :],
                         next_obs[:, 6:, :, :])
                     loss = loss_object(states, positive_states, negative_states, next_states, next_positive_states,
-                                       dissimilar_pairs=diss_pairs, same_actions_pairs=same_actions,
-                                       no_priors=self.no_priors)
+                                       minibatch_idx=minibatch_idx, dissimilar_pairs=dissimilar_pairs,
+                                       same_actions_pairs=same_actions_pairs, no_priors=self.no_priors)
                 else:
                     loss_object.resetLosses()
+
+                    decoded_obs, decoded_next_obs = None, None
                     if self.use_autoencoder:
                         (states, decoded_obs), (next_states, decoded_next_obs) = self.model(obs), self.model(next_obs)
                     elif self.use_vae:
@@ -231,14 +225,14 @@ class SRL4robotics(BaseLearner):
                         states, next_states = self.model.getStates(obs), self.model.getStates(next_obs)
                     else:
                         states, next_states = self.model(obs), self.model(next_obs)
-                        decoded_obs, decoded_next_obs = None, None
+
                     # Actions associated to the observations of the current minibatch
                     actions_st = actions[minibatchlist[minibatch_idx]]
                     actions_st = th.from_numpy(actions_st).view(-1, 1).requires_grad_(False).to(self.device)
 
                     if not self.no_priors:
-                        loss_object.forward(states, next_states,
-                                            dissimilar_pairs=diss_pairs, same_actions_pairs=same_actions)
+                        loss_object.forward(states, next_states, minibatch_idx=minibatch_idx,
+                                            dissimilar_pairs=dissimilar_pairs, same_actions_pairs=same_actions_pairs)
 
                     if self.use_forward_loss:
                         next_states_pred = self.model.forwardModel(states, actions_st)
@@ -337,7 +331,7 @@ class SRL4robotics(BaseLearner):
         return loss_history, pred_states
 
 
-def build_config(args):
+def buildConfig(args):
     """
     :param args: (parsed args object)
     """
@@ -354,8 +348,8 @@ def build_config(args):
         "knn-samples": 200,
         "knn-seed": 1,
         "l1-reg": 0,
-        "model-approach": args.losses,
         "losses": args.losses,
+        "model-approach": args.losses, #  For pipeline script
         "n-neighbors": 5,
         "n-to-plot": 5
     }
@@ -425,7 +419,7 @@ if __name__ == '__main__':
 
     # Create log folder
     if args.log_folder == "":
-        exp_config = build_config(args)
+        exp_config = buildConfig(args)
         createFolder("logs/{}".format(exp_config['data-folder']), "Dataset log folder already exist")
         # Check that the dataset is already preprocessed
         log_folder, experiment_name = getLogFolderName(exp_config)
@@ -453,18 +447,11 @@ if __name__ == '__main__':
     loss_history, learned_states = srl.learn(images_path, actions, rewards, episode_starts)
 
     # SAVING LOGS
-    if args.log_folder == "":
-        print('Saving experiments using base-config file')
-        # Save plot
-        plotLosses(loss_history, args.log_folder)
-        srl.saveStates(learned_states, images_path, rewards, args.log_folder)
-        # Save losses losses history
-        np.savez('{}/loss_history.npz'.format(args.log_folder), **loss_history)
-        knnCall(exp_config)
-    else:
-        # Save plot
-        plotLosses(loss_history, args.log_folder)
-        srl.saveStates(learned_states, images_path, rewards, args.log_folder)
+    # Save plot
+    plotLosses(loss_history, args.log_folder)
+    srl.saveStates(learned_states, images_path, rewards, args.log_folder)
+    # Save losses losses history
+    np.savez('{}/loss_history.npz'.format(args.log_folder), **loss_history)
 
     name = "Learned State Representation\n {}".format(args.log_folder.split('/')[-1])
     path = "{}/learned_states.png".format(args.log_folder)
