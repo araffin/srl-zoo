@@ -141,21 +141,20 @@ def baselineCall(exp_config, baseline="supervised"):
     printConfigOnError(ok, exp_config, "baselineCall")
 
 
-def dimReductionCall(exp_config, baseline="pca"):
+def pcaCall(exp_config):
     """
     :param exp_config: (dict)
-    :param baseline: (str) one of "pca" or "tsne"
     """
-    printGreen("\n Baseline {}...".format(baseline))
+    printGreen("\n Baseline PCA...")
 
-    args = ['--no-plots', '--method', baseline]
+    args = ['--no-plots']
     config_args = ['data-folder', 'training-set-size', 'state-dim']
 
     for arg in config_args:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
-    ok = subprocess.call(['python', '-m', 'baselines.pca_tsne'] + args)
-    printConfigOnError(ok, exp_config, "dimReductionCall")
+    ok = subprocess.call(['python', '-m', 'baselines.pca'] + args)
+    printConfigOnError(ok, exp_config, "pcaCall")
 
 
 def knnCall(exp_config):
@@ -300,7 +299,7 @@ if __name__ == '__main__':
         for state_dim in [2, 6, 12, 32]:
             # Update config
             exp_config['state-dim'] = state_dim
-            dimReductionCall(exp_config, 'pca')
+            pcaCall(exp_config)
             evaluateBaseline(base_config)
 
     # Reproduce a previous experiment using "exp_config.json"

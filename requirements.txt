@@ -12,7 +12,6 @@ functools32==3.2.3.post2
 ipython==5.4.1
 ipython-genutils==0.2.0
 matplotlib==2.1.0
-MulticoreTSNE==0.1
 numpy==1.13.3
 olefile==0.44
 pandas==0.21.0

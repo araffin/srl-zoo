@@ -10,9 +10,6 @@ import seaborn as sns
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
-# from sklearn.manifold import TSNE
-# Faster implementation of t-SNE:
-from MulticoreTSNE import MulticoreTSNE as TSNE
 
 # Python 2/3 compatibility
 try:
@@ -46,27 +43,6 @@ def pauseOrClose(fig):
         plt.pause(0.0001)  # Small pause to update the plot
     else:
         plt.close(fig)
-
-
-def plotTSNE(states, rewards, name="T-SNE of Learned States", add_colorbar=True, path=None,
-             n_components=3, perplexity=100.0, learning_rate=200.0, n_iter=1000, cmap="coolwarm"):
-    """
-    :param states: (numpy array)
-    :param rewards: (numpy 1D array)
-    :param name: (str)
-    :param add_colorbar: (bool)
-    :param path: (str)
-    :param n_components: (int)
-    :param perplexity: (float)
-    :param learning_rate: (float)
-    :param n_iter: (int)
-    :param cmap: (str)
-    """
-    assert n_components in [2, 3], "You cannot apply t-SNE with n_components={}".format(n_components)
-    t_sne = TSNE(n_components=n_components, perplexity=perplexity,
-                 learning_rate=learning_rate, n_iter=n_iter, verbose=1, n_jobs=4)
-    s_transformed = t_sne.fit_transform(states)
-    plotRepresentation(s_transformed, rewards, name, add_colorbar, path, cmap=cmap, fit_pca=False)
 
 
 def plotRepresentation(states, rewards, name="Learned State Representation",
@@ -227,7 +203,6 @@ if __name__ == '__main__':
                         help='Path to a npz file containing states and rewards')
     parser.add_argument('--data-folder', type=str, default="",
                         help='Path to a dataset folder, it will plot ground truth states')
-    parser.add_argument('--t-sne', action='store_true', default=False, help='Use t-SNE instead of PCA')
     parser.add_argument('--color-episode', action='store_true', default=False,
                         help='Color states per episodes instead of reward')
     parser.add_argument('--plot-against', action='store_true', default=False,
@@ -250,21 +225,22 @@ if __name__ == '__main__':
         print("Loading {}...".format(args.input_file))
         states_rewards = np.load(args.input_file)
         rewards = states_rewards['rewards']
+
         if args.color_episode:
             episode_starts = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['episode_starts']
             rewards = colorPerEpisode(episode_starts)[:len(rewards)]
-        if args.t_sne:
-            print("Using t-SNE...")
-            plotTSNE(states_rewards['states'], rewards, cmap=cmap)
-        elif args.plot_against:
+
+        if args.plot_against:
             print("Plotting against")
             plotAgainst(states_rewards['states'], rewards, cmap=cmap)
+
         elif args.projection:
             training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
             ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
             true_states = ground_truth['ground_truth_states']
             gt = true_states
             plotRepresentation(states_rewards['states'], rewards, cmap=cmap, gt=gt)
+
         else:
             button_pos_ = []
             if args.data_folder != "" and args.correlation:
@@ -296,9 +272,8 @@ if __name__ == '__main__':
                 # Correlation matrix: Target pos/GT vs. States predicted
                 for fg in [" Agent's position ", "Target Position"]:
                     if fg == " Agent's position ":
-                        X = ground_truth[
-                                'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'][
-                            :len(rewards)]
+                        key = 'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'
+                        X = ground_truth[][:len(rewards)]
                     else:
                         X = button_pos_[:len(rewards)]
                     eps = 1e-12

@@ -87,7 +87,6 @@ dependencies:
   - backports.shutil-get-terminal-size==1.0.0
   - backports.ssl-match-hostname==3.5.0.1
   - ipython-genutils==0.2.0
-  - multicoretsne==0.1
   - pandas==0.21.0
   - prompt-toolkit==1.0.15
   - pytest-cov==2.5.1

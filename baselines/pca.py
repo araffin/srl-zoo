@@ -10,7 +10,6 @@ except ImportError:
 
 import numpy as np
 from tqdm import tqdm
-from MulticoreTSNE import MulticoreTSNE as TSNE
 from sklearn.decomposition import IncrementalPCA
 
 from models.base_learner import BaseLearner
@@ -55,10 +54,9 @@ def toNumpyMatrix(obs_var):
     return obs_tensor.reshape(-1, n_features)
 
 
-parser = argparse.ArgumentParser(description='Dimension Reduction using PCA or TSNE')
+parser = argparse.ArgumentParser(description='Dimension Reduction using PCA')
 parser.add_argument('-bs', '--batch-size', type=int, default=16, help='batch_size for IncrementalPCA (default: 16)')
 parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
-parser.add_argument('--method', type=str, default="pca", help='one of "pca" or "tsne"')
 parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
 parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
 parser.add_argument('--state-dim', type=int, default=3, help='State dimension')
@@ -67,6 +65,7 @@ args = parser.parse_args()
 DISPLAY_PLOTS = not args.no_plots
 plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
 args.data_folder = parseDataFolder(args.data_folder)
+args.method = "pca"
 log_folder = "logs/{}/baselines/{}".format(args.data_folder, getModelName(args))
 
 createFolder(log_folder, "{} folder already exist".format(args.method))
@@ -116,12 +115,6 @@ predictions = []
 for obs_var in data_loader:
     predictions.append(ipca.transform(toNumpyMatrix(obs_var)))
 predictions = np.concatenate(predictions, axis=0)
-
-if args.method == "tsne":
-    t_sne = TSNE(n_components=args.state_dim, perplexity=100.0,
-                 learning_rate=200.0, n_iter=1000, verbose=1, n_jobs=4)
-    predictions = t_sne.fit_transform(predictions)
-    # We cannot save t-sne params
 
 BaseLearner.saveStates(predictions, images_path, rewards, log_folder)
 
