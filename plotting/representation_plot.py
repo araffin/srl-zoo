@@ -273,7 +273,7 @@ if __name__ == '__main__':
                 for fg in [" Agent's position ", "Target Position"]:
                     if fg == " Agent's position ":
                         key = 'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'
-                        X = ground_truth[][:len(rewards)]
+                        X = ground_truth[key][:len(rewards)]
                     else:
                         X = button_pos_[:len(rewards)]
                     eps = 1e-12
