@@ -9,7 +9,8 @@ from termcolor import colored
 try:
     input = raw_input
 except NameError:
-    pass
+    # Assign the built-in function to a variable
+    input = input
 
 
 def detachToNumpy(tensor):
