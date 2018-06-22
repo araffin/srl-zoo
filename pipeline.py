@@ -131,13 +131,18 @@ def baselineCall(exp_config, baseline="supervised"):
 
     if baseline in ["autoencoder", "vae"]:
         config_args += ['state-dim']
+        exp_config['losses'] = baseline
+        for arg in config_args:
+            args.extend(['--{}'.format(arg), str(exp_config[arg])])
+        ok = subprocess.call(['python', 'train.py'.format(baseline)] + args)
+
     elif baseline == "supervised" and exp_config['relative-pos']:
         args += ['--relative-pos']
 
-    for arg in config_args:
-        args.extend(['--{}'.format(arg), str(exp_config[arg])])
+        for arg in config_args:
+            args.extend(['--{}'.format(arg), str(exp_config[arg])])
+        ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
 
-    ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
     printConfigOnError(ok, exp_config, "baselineCall")
 
 
@@ -221,7 +226,6 @@ def getBaseExpConfig(args):
     args.data_folder = parseDataFolder(args.data_folder)
     dataset_path = "data/{}".format(args.data_folder)
     assert os.path.isdir(dataset_path), "Path to dataset folder is not valid: {}".format(dataset_path)
-
     with open(args.base_config, 'r') as f:
         exp_config = json.load(f)
     exp_config['data-folder'] = args.data_folder
@@ -287,7 +291,7 @@ if __name__ == '__main__':
                 evaluateBaseline(base_config)
 
             # Autoencoder and VAE
-            exp_config['model-type'] = "cnn"
+            exp_config['model-type'] = "custom_cnn"
             for baseline in ['autoencoder', 'vae']:
                 for state_dim in [2, 3, 6, 12, 32]:
                     # Update config

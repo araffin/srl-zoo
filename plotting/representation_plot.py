@@ -280,7 +280,7 @@ if __name__ == '__main__':
                     corr = np.corrcoef(x=X + eps, y=states_rewards['states'] + eps, rowvar=False)
                     fig = plt.figure(figsize=(8, 6))
                     ax = fig.add_subplot(111)
-                    labels = ['s_' + str(i_) for i_ in range(X.shape[1])]
+                    labels = [r'$s_' + str(i_) + '$' for i_ in range(X.shape[1])]
                     labels += [r'$\tilde{s}_' + str(i_) + '$' for i_ in range(states_rewards['states'].shape[1])]
                     cax = ax.matshow(corr, cmap=cmap, vmin=-1, vmax=1)
                     ax.set_xticklabels([''] + labels)
