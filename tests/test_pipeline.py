@@ -62,7 +62,6 @@ def testExtraSRLTrain():
                 '--losses', "forward", "inverse", "reward", "priors", "episode-prior", "reward-prior",
                 '--l1-reg', 0.0001]
         args = list(map(str, args))
-
         ok = subprocess.call(['python', 'train.py'] + args)
         assertEq(ok, 0)
 
@@ -76,6 +75,8 @@ def testExtraSRLTrain():
                     '--l1-reg', 0.0001,
                     '--multi-view']
             args = list(map(str, args))
+            ok = subprocess.call(['python', 'train.py'] + args)
+            assertEq(ok, 0)
 
 
 def testExtraBaselineTrain():
@@ -87,7 +88,6 @@ def testExtraBaselineTrain():
                 '--state-dim', STATE_DIM, '--model-type', 'mlp', '-bs', 128,
                 '--losses', baseline]
         args = list(map(str, args))
-
         ok = subprocess.call(['python', 'train.py'] + args)
         assertEq(ok, 0)
 
@@ -99,7 +99,6 @@ def testExtraBaselineTrain():
                 '--losses', baseline,
                 '--multi-view']
         args = list(map(str, args))
-
         ok = subprocess.call(['python', 'train.py'] + args)
         assertEq(ok, 0)
 
@@ -111,6 +110,9 @@ def testExtraBaselineTrain():
             '--state-dim', STATE_DIM, '--model-type', 'linear', '-bs', 128,
             '--losses', 'autoencoder']
     args = list(map(str, args))
+    ok = subprocess.call(['python', 'train.py'] + args)
+    assertEq(ok, 0)
+
     # dual camera
     args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
             '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
@@ -119,7 +121,6 @@ def testExtraBaselineTrain():
             '--losses', 'autoencoder',
             '--multi-view']
     args = list(map(str, args))
-
     ok = subprocess.call(['python', 'train.py'] + args)
     assertEq(ok, 0)
 
@@ -129,6 +130,5 @@ def testExtraSupervisedTrain():
             '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
             '--seed', SEED, '--model-type', 'mlp']
     args = list(map(str, args))
-
     ok = subprocess.call(['python', '-m', 'baselines.supervised'] + args)
     assertEq(ok, 0)
