@@ -90,110 +90,6 @@ class RoboticPriorsLoss(nn.Module):
         return self.computeTotalLoss()
 
 
-class RoboticPriorsTripletLoss(nn.Module):
-    """
-    :param model: (PyTorch model)
-    :param l1_reg: (float) l1 regularization coeff
-    :param loss_history: (dict) will be modified
-    """
-
-    def __init__(self, model, l1_reg=0.0, loss_history=None):
-        super(RoboticPriorsTripletLoss, self).__init__()
-        # Retrieve only trainable and regularizable parameters (we should exclude biases)
-        self.reg_params = [param for name, param in model.named_parameters() if
-                           ".bias" not in name and param.requires_grad]
-        n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
-        self.l1_coeff = (l1_reg / n_params)
-        self.loss_history = loss_history
-
-    @staticmethod
-    def priorsOnStates(s, next_s, dissimilar_pairs, same_actions_pairs):
-        """
-        :param s: (th.Tensor) states
-        :param next_s: (th.Tensor) next states
-        :param dissimilar_pairs: (th tensor)
-        :param same_actions_pairs: (th tensor)
-        """
-
-        state_diff = next_s - s
-        state_diff_norm = state_diff.norm(2, dim=1)
-        similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
-        temp_coherence_loss = (state_diff_norm ** 2).mean()
-        causality_loss = similarity(s[dissimilar_pairs[:, 0]],
-                                    s[dissimilar_pairs[:, 1]]).mean()
-        proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
-                                 state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
-
-        repeatability_loss = (
-                similarity(s[same_actions_pairs[:, 0]], s[same_actions_pairs[:, 1]]) *
-                (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2,
-                                                                                                   dim=1) ** 2).mean()
-
-        return temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss
-
-    # Override in the case of use of Time-Contrastive Triplet Loss
-    def forward(self, states, p_states, n_states, next_states, next_p_st,
-                minibatch_idx, dissimilar_pairs, same_actions_pairs,
-                alpha=0.2, no_priors=False):
-        """
-        :param alpha: (float) margin that is enforced between positive & neg observation (TCN Triplet Loss)
-        :param states: (th.Tensor) states for the anchor obs
-        :param p_states: (th.Tensor) states for the positive obs
-        :param n_states: (th.Tensor) states for the negative obs
-        :param next_states: (th.Tensor)
-        :param next_p_st: (th.Tensor) next states for the positive obs
-        :param minibatch_idx: (int)
-        :param dissimilar_pairs: ([numpy array])
-        :param same_actions_pairs: ([numpy array])
-        :param alpha: (float) gap value in the triplet loss
-        :param no_priors: (bool) no use of priors in the loss/ Only triplets
-        :return: (th.Tensor)
-        """
-        dissimilar_pairs = dissimilar_pairs[minibatch_idx]
-        same_actions_pairs = same_actions_pairs[minibatch_idx]
-
-        l1_loss = sum([th.sum(th.abs(param)) for param in self.reg_params])
-        total_loss = self.l1_coeff * l1_loss
-
-        # Applying the priors on the 1st view
-        first_view_losses = self.priorsOnStates(states, next_states, dissimilar_pairs, same_actions_pairs)
-        temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss = first_view_losses
-
-        # Applying the priors on the 2nd view
-        second_view_losses = self.priorsOnStates(p_states, next_p_st, dissimilar_pairs, same_actions_pairs)
-        temp_coherence_loss_2, causality_loss_2, proportionality_loss_2, repeatability_loss_2 = second_view_losses
-
-        temp_coherence_loss += temp_coherence_loss_2
-        causality_loss += causality_loss_2
-        proportionality_loss += proportionality_loss_2
-        repeatability_loss += repeatability_loss_2
-
-        if not no_priors:
-            total_loss += 1 * temp_coherence_loss + 1 * causality_loss + 1 * proportionality_loss \
-                          + 1 * repeatability_loss
-            if self.loss_history is not None:
-                weights = [1, 1, 1, 1, self.l1_coeff]
-                names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss',
-                         'repeatability_loss', 'l1_loss']
-                losses = [temp_coherence_loss, causality_loss, proportionality_loss,
-                          repeatability_loss, l1_loss]
-                for name, w, loss in zip(names, weights, losses):
-                    if w > 0:
-                        if len(self.loss_history[name]) > 0:
-                            self.loss_history[name][-1] += w * loss.item()
-                        else:
-                            self.loss_history[name].append(w * loss.item())
-
-        # Time-Contrastive Triplet Loss
-        distance_positive = (states - p_states).pow(2).sum(1)
-        distance_negative = (states - n_states).pow(2).sum(1)
-        tcn_trplet_loss = F.relu(distance_positive - distance_negative + alpha)
-        tcn_trplet_loss = tcn_trplet_loss.mean()
-        total_loss += 1 * tcn_trplet_loss
-
-        return total_loss
-
-
 def overSampling(batch_size, m_list, pairs, function_on_pairs, actions, rewards):
     """
     Look for minibatches missing pairs of observations with the similar/dissimilar rewards (see params)
@@ -515,3 +411,20 @@ def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, b
     episode_loss = criterion_episode(episode_output.squeeze(1), same_episodes)
     loss_object.addToLosses('episode_prior', weight, episode_loss)
     return weight * episode_loss
+
+
+def tripletLoss(states, p_states, n_states, weight, loss_object, alpha=0.2):
+    """
+    :param alpha: (float) margin that is enforced between positive & neg observation (TCN Triplet Loss)
+    :param states: (th.Tensor) states for the anchor obs
+    :param p_states: (th.Tensor) states for the positive obs
+    :param n_states: (th.Tensor) states for the negative obs
+    :return: (th.Tensor)
+    """
+    # Time-Contrastive Triplet Loss
+    distance_positive = (states - p_states).pow(2).sum(1)
+    distance_negative = (states - n_states).pow(2).sum(1)
+    tcn_triplet_loss = F.relu(distance_positive - distance_negative + alpha)
+    tcn_triplet_loss = tcn_triplet_loss.mean()
+    loss_object.addToLosses('triplet_loss', weight, tcn_triplet_loss)
+    return weight * tcn_triplet_loss

@@ -8,3 +8,10 @@ IMAGE_WIDTH = 224  # in px
 IMAGE_HEIGHT = 224  # in px
 N_CHANNELS = 3
 INPUT_DIM = IMAGE_WIDTH * IMAGE_HEIGHT * N_CHANNELS
+
+
+def getNChannels():
+    return N_CHANNELS
+
+def getInputDim():
+    return INPUT_DIM

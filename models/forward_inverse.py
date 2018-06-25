@@ -9,9 +9,9 @@ from .autoencoders import CNNAutoEncoder, DenseAutoEncoder, LinearAutoEncoder
 from .vae import CNNVAE, DenseVAE
 
 try:
-    from preprocessing.preprocess import INPUT_DIM
+    from preprocessing.preprocess import getInputDim
 except ImportError:
-    from ..preprocessing.preprocess import INPUT_DIM
+    from ..preprocessing.preprocess import getInputDim
 
 
 class BaseForwardModel(BaseModelSRL):
@@ -135,11 +135,11 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         elif model_type == "mlp":
             if "autoencoder" in losses:
-                self.model = DenseAutoEncoder(input_dim=INPUT_DIM, state_dim=state_dim)
+                self.model = DenseAutoEncoder(input_dim=getInputDim(), state_dim=state_dim)
                 self.model.encoder = self.model.encoder.to(self.device)
                 self.model.decoder = self.model.decoder.to(self.device)
             elif "vae" in losses:
-                self.model = DenseVAE(input_dim=INPUT_DIM,
+                self.model = DenseVAE(input_dim=getInputDim(),
                                       state_dim=state_dim)
                 self.model.encoder_fc1 = self.model.encoder_fc1.to(self.device)
                 self.model.encoder_fc21 = self.model.encoder_fc21.to(self.device)
@@ -147,16 +147,16 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
                 self.model.decoder = self.model.decoder.to(self.device)
             else:
                 # for losses not depending on specific architecture (supevised, inv, fwd..)
-                self.model = SRLDenseNetwork(INPUT_DIM, state_dim, cuda=cuda)
+                self.model = SRLDenseNetwork(getInputDim(), state_dim, cuda=cuda)
 
         elif model_type == "linear":
             if "autoencoder" in losses:
-                self.model = LinearAutoEncoder(input_dim=INPUT_DIM, state_dim=state_dim)
+                self.model = LinearAutoEncoder(input_dim=getInputDim(), state_dim=state_dim)
                 self.model.encoder = self.model.encoder.to(self.device)
                 self.model.decoder = self.model.decoder.to(self.device)
             else:
                 # for losses not depending on specific architecture (supevised, inv, fwd..)
-                self.model = SRLLinear(input_dim=INPUT_DIM, state_dim=state_dim, cuda=cuda)
+                self.model = SRLLinear(input_dim=getInputDim(), state_dim=state_dim, cuda=cuda)
 
         elif model_type == "resnet":
             self.model = SRLConvolutionalNetwork(state_dim, cuda)

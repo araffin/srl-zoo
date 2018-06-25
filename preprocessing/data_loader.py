@@ -12,7 +12,7 @@ import numpy as np
 import torch as th
 
 from .utils import preprocessInput
-from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
+from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels
 
 
 def preprocessImage(image):
@@ -47,7 +47,6 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             break
         # Remove trailing .jpg if present
         image_path = image_path.split('.jpg')[0]
-
         if multi_view:
 
             images = []
@@ -356,7 +355,7 @@ class CustomDataLoader(object):
         # Preprocessing loop, it fills workers queues
         for indices, key in zip(indices_list, obs_dict.keys()):
 
-            obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS), dtype=np.float32)
+            obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels()), dtype=np.float32)
             # Reset queues and received count
             self.resetQueues()
 
@@ -606,7 +605,7 @@ class AutoEncoderDataLoader(CustomDataLoader):
     """
 
     def __init__(self, x_indices, images_path, batch_size, noise_factor=0.0, is_training=True,
-                 no_targets=False, n_workers=5, auto_cleanup=True):
+                 no_targets=False, n_workers=5, auto_cleanup=True, multi_view=False):
         # Create minibatch list
         minibatchlist, _ = self.createMinibatchList(x_indices, x_indices, batch_size)
 
@@ -614,11 +613,13 @@ class AutoEncoderDataLoader(CustomDataLoader):
         # (not needed when plotting or predicting states)
         self.no_targets = no_targets
         self.noise_factor = noise_factor
+        self.multi_view = multi_view
 
         # Here the cache is not useful: we do not have observations
         # that are present in different minibatches
-        super(AutoEncoderDataLoader, self).__init__(minibatchlist, images_path, cache_capacity=0,
-                                                    n_workers=n_workers, auto_cleanup=auto_cleanup)
+        super(AutoEncoderDataLoader, self).__init__(minibatchlist, images_path, [], [],
+                                                    cache_capacity=0,
+                                                    n_workers=n_workers, auto_cleanup=auto_cleanup, multi_view=multi_view)
         # Training mode is the default one
         if not is_training:
             self.testMode()
@@ -647,7 +648,7 @@ class AutoEncoderDataLoader(CustomDataLoader):
         # Warning: the noise is not consistent
         # for validation set (different at each iteration)
         if self.noise_factor > 0:
-            noise_shape = (len(obs_indices), N_CHANNELS, IMAGE_HEIGHT, IMAGE_WIDTH)
+            noise_shape = (len(obs_indices), getNChannels(), IMAGE_HEIGHT, IMAGE_WIDTH)
             noise = self.noise_factor * np.random.normal(loc=0.0, scale=1.0, size=noise_shape).astype(np.float32)
             noise = th.from_numpy(noise).requires_grad_(self.is_training)
 

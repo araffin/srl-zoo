@@ -16,7 +16,7 @@ from pipeline import saveConfig
 from plotting.losses_plot import plotLosses
 from plotting.representation_plot import plotRepresentation, plt
 from preprocessing.data_loader import SupervisedDataLoader
-from preprocessing.preprocess import INPUT_DIM
+from preprocessing.preprocess import getInputDim
 from utils import parseDataFolder, createFolder, input
 
 DISPLAY_PLOTS = True
@@ -44,7 +44,7 @@ class SupervisedLearning(BaseLearner):
         elif model_type in ["cnn", "custom_cnn"]:
             self.model = CustomCNN(self.state_dim)
         elif model_type == "mlp":
-            self.model = DenseNetwork(INPUT_DIM, self.state_dim)
+            self.model = DenseNetwork(getInputDim(), self.state_dim)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
