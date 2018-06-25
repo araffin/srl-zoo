@@ -190,12 +190,19 @@ python pipeline.py -c path/to/exp_config.json
 
 Usage:
 ```
-python train.py [-h] [--epochs N] [--seed S] [--state-dim STATE_DIM]
-                [-bs BATCH_SIZE] [--training-set-size TRAINING_SET_SIZE]
-                [-lr LEARNING_RATE] [--l1-reg L1_REG] [--no-cuda] [--no-plots]
-                [--model-type MODEL_TYPE] --data-folder DATA_FOLDER
-                [--log-folder LOG_FOLDER]
+usage: train.py [-h] [--epochs N] [--seed S] [--state-dim STATE_DIM]
+                [-bs BATCH_SIZE] [--val-size VAL_SIZE]
+                [--training-set-size TRAINING_SET_SIZE] [-lr LEARNING_RATE]
+                [--l1-reg L1_REG] [--no-cuda] [--no-plots]
+                [--model-type {custom_cnn,resnet,mlp,linear}] --data-folder
+                DATA_FOLDER [--log-folder LOG_FOLDER] [--multi-view]
+                [--balanced-sampling]
+                [--losses {forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae} 
+                [--beta BETA]
 
+PyTorch SRL with robotic priors
+
+optional arguments:
   -h, --help            show this help message and exit
   --epochs N            number of epochs to train (default: 50)
   --seed S              random seed (default: 1)
@@ -203,22 +210,28 @@ python train.py [-h] [--epochs N] [--seed S] [--state-dim STATE_DIM]
                         state dimension (default: 2)
   -bs BATCH_SIZE, --batch-size BATCH_SIZE
                         batch_size (default: 256)
+  --val-size VAL_SIZE   Validation set size in percentage (default: 0.2)
   --training-set-size TRAINING_SET_SIZE
-                        Limit size of the training set (default: -1)
+                        Limit size (number of samples) of the training set
+                        (default: -1)
   -lr LEARNING_RATE, --learning-rate LEARNING_RATE
                         learning rate (default: 0.005)
   --l1-reg L1_REG       L1 regularization coeff (default: 0.0)
   --no-cuda             disables CUDA training
   --no-plots            disables plots
-  --model-type MODEL_TYPE
-                        Model architecture (default: "resnet")
+  --model-type {custom_cnn,resnet,mlp,linear}
+                        Model architecture (default: "custom_cnn")
   --data-folder DATA_FOLDER
                         Dataset folder
   --log-folder LOG_FOLDER
-                        Folder within logs/ where the experiment model and
-                        plots will be saved
-  --multi-view          Enable use of multiple camera (two)
-  --no-priors           Disable use of priors - in case of triplet loss
+                        Folder within logs/ where the experiment model and plots will be saved.
+                        If disabled, automatic logs will be generated with experiment config file & KNN-MSE computation.
+  --multi-view          Enable use of multiple camera (for all losses, except on ResNet Architecture).
+  --balanced-sampling   Force balanced sampling for episode independent prior instead of uniform
+  --losses              Combininable losses(s) to be applied for SRL
+  --beta BETA           The Beta factor on the KL divergence,
+                        higher value means more disentangling (for VAE only).
+
 
 ```
 
@@ -228,33 +241,27 @@ Example:
 python train.py --data-folder data/path/to/dataset
 ```
 
-In case of `--multi-view` enabled make sure you set the global variable N_CHANNELS in file `preprocess.py` to 6
-if `--model-type` is custom_cnn ( 9 if `triplet_cnn`).
-
-
 ## Multiple Cameras
 
 ### Stacked Observations
 
-Using the `custom_cnn` architecture, it is possible to pass pairs of images from different views stacked along the channels' dimension i.e of dim (224,224,6).
+Using the `custom_cnn` and `mlp` architecture, it is possible to pass pairs of images from different views stacked along the channels' dimension i.e of dim (224,224,6).
 
-To use this functionality to perform state representation learning with priors, enable `--multi-view` (see usage of script train.py),
-and set the global variable N_CHANNELS in file `preprocess.py` to 6.
+To use this functionality to perform state representation learning, enable `--multi-view` (see usage of script train.py),
+and use a dataset generated for the purpose.
 
 
 ### Triplets of Observations
 
-Using the `triplet_cnn` architecture, it is possible to learn representation of states using a dataset of triplets, i.e tuples made of an anchor, a positive and a negative observation.
+Similarly, it is possible to learn representation of states using a dataset of triplets, i.e tuples made of an anchor, a positive and a negative observation.
 
 The anchor and the positive observation are views of the scene at the same time step, but from different cameras.
 
 The negative example is an image from the same camera as the anchor but at a different time step selected randomly among images in the same record.
 
-In our case the TCN-like architecture is made of a pre-trained ResNet with an extra fully connected layer (embedding).
+In our case, to use the TCN-like architecture is made of a pre-trained ResNet with an extra fully connected layer (embedding).
 
-To use this functionality also enable `--multi-view`, preferably `--no-priors` (see usage of script train.py),
-and set the global variable N_CHANNELS in file `preprocess.py` to 9 for training (3 otherwise).
-
+To use this functionality also enable `--multi-view`, and use a dataset generated for the purpose.
 Related papers:
 - "Time-Contrastive Networks: Self-Supervised Learning from Video" (P. Sermanet et al., 2017), paper: [https://arxiv.org/abs/1704.06888](https://arxiv.org/abs/1704.06888)
 
@@ -274,6 +281,27 @@ python evaluation/create_report.py -d logs/nameOfTheDataset/
 ```
 
 ### Plot a Learned Representation
+
+```
+usage: representation_plot.py [-h] [-i INPUT_FILE] [--data-folder DATA_FOLDER]
+                              [--color-episode] [--plot-against]
+                              [--correlation] [--projection]
+
+Plotting script for representation
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT_FILE, --input-file INPUT_FILE
+                        Path to a npz file containing states and rewards
+  --data-folder DATA_FOLDER
+                        Path to a dataset folder, it will plot ground truth
+                        states
+  --color-episode       Color states per episodes instead of reward
+  --plot-against        Plot against each dimension
+  --correlation         Plot the Pearson Matrix of correlation between the Ground truth and learned states.
+  --projection          Plot 1D projection of predicted state on ground truth
+
+```
 You can plot a learned representation with:
 ```
 python plotting/representation_plot.py -i path/to/states_rewards.npz
@@ -337,27 +365,6 @@ Example:
 python -m baselines.supervised --data-folder path/to/data/folder
 ```
 
-### Autoencoder
-
-Gaussian noise is added to the input with a factor `0.1`.
-
-Example:
-```
-python -m baselines.autoencoder --data-folder path/to/data/folder --state-dim 3 --noise-factor 0.1
-```
-
-### VAE
-
-Example:
-```
-python -m baselines.vae --data-folder path/to/data/folder --state-dim 3
-```
-
-You can also designate the beta weight for the KL divergence:
-```
-python -m baselines.vae --data-folder path/to/data/folder --state-dim 3 --beta 1.0
-```
-
 ### Principal Components Analysis
 
 PCA:
@@ -374,7 +381,7 @@ python server.py
 
 ## Running Tests
 
-Download test dataset [here](https://drive.google.com/open?id=154qMJHgUnzk0J_Hxmr2jCnV1ipS7o1D5) and put it in `data/` folder.
+Download the test datasets [kuka_gym_test](https://drive.google.com/open?id=154qMJHgUnzk0J_Hxmr2jCnV1ipS7o1D5) and [kuka_gym_dual_test](https://drive.google.com/open?id=15Fhqr4-kai4b8qQWiq2mEAWW5ZqH5qID) and put it in `data/` folder.
 ```
 ./run_tests.sh
 ```

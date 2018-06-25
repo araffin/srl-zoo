@@ -413,6 +413,8 @@ if __name__ == '__main__':
     assert not (("autoencoder" in losses or "vae" in losses)
                 and args.model_type == "resnet"), "Model cannot be an Autoencoder or VAE using ResNet Architecture !"
     assert not ("vae" in losses and args.model_type == "linear"), "Model cannot be VAE using Linear Architecture !"
+    assert not (args.multi_view and args.model_type == "resnet"), \
+        "Default ResNet input layer is not suitable for stacked images!"
 
     print('Loading data ... ')
     training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))

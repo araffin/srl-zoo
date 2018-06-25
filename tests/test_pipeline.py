@@ -60,6 +60,7 @@ def testExtraSRLTrain():
                 '--seed', SEED, '--val-size', 0.1,
                 '--state-dim', STATE_DIM, '--model-type', model_type, '-bs', 128,
                 '--losses', "forward", "inverse", "reward", "priors", "episode-prior", "reward-prior",
+                '--balanced-sampling',
                 '--l1-reg', 0.0001]
         args = list(map(str, args))
         ok = subprocess.call(['python', 'train.py'] + args)
