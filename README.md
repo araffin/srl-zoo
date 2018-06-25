@@ -259,7 +259,7 @@ The anchor and the positive observation are views of the scene at the same time 
 
 The negative example is an image from the same camera as the anchor but at a different time step selected randomly among images in the same record.
 
-In our case, to use the TCN-like architecture is made of a pre-trained ResNet with an extra fully connected layer (embedding).
+In our case, enable `triplet` as a loss (`--losses`) to use the TCN-like architecture made of a pre-trained ResNet with an extra fully connected layer (embedding).
 
 To use this functionality also enable `--multi-view`, and use a dataset generated for the purpose.
 Related papers:
