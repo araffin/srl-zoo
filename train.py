@@ -28,6 +28,7 @@ from pipeline import getLogFolderName, saveConfig, knnCall
 from plotting.losses_plot import plotLosses
 from plotting.representation_plot import plotRepresentation, plt, plotImage
 from preprocessing.data_loader import CustomDataLoader
+import preprocessing
 from preprocessing.utils import deNormalize
 from utils import parseDataFolder, \
     printYellow, createFolder, detachToNumpy, input
@@ -404,15 +405,9 @@ if __name__ == '__main__':
 
     if args.multi_view == True:
         if "triplet" in losses:
-            N_CHANNELS = 9
-            preprocessing.preprocess.N_CHANNELS = N_CHANNELS
-            preprocessing.preprocess.INPUT_DIM = preprocessing.preprocess.IMAGE_WIDTH * \
-                                                 preprocessing.preprocess.IMAGE_HEIGHT * N_CHANNELS
+            preprocessing.preprocess.N_CHANNELS = 9
         else:
-            N_CHANNELS = 6
-            preprocessing.preprocess.N_CHANNELS = N_CHANNELS
-            preprocessing.preprocess.INPUT_DIM = preprocessing.preprocess.IMAGE_WIDTH * \
-                                                 preprocessing.preprocess.IMAGE_HEIGHT * N_CHANNELS
+            preprocessing.preprocess.N_CHANNELS = 6
 
     assert not ("autoencoder" in losses and "vae" in losses), "Model cannot be both an Autoencoder and a VAE (come on!)"
     assert not (("autoencoder" in losses or "vae" in losses)
@@ -442,6 +437,7 @@ if __name__ == '__main__':
         exp_config['log-folder'] = log_folder
         exp_config['experiment-name'] = experiment_name
         exp_config['n_actions'] = n_actions
+        exp_config['multi-view'] = args.multi_view
         # Save config in log folder & results as well
         args.log_folder = log_folder
         saveConfig(exp_config, print_config=True)

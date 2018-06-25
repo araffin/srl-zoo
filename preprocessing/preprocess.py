@@ -14,4 +14,4 @@ def getNChannels():
     return N_CHANNELS
 
 def getInputDim():
-    return INPUT_DIM
+    return IMAGE_WIDTH * IMAGE_HEIGHT * N_CHANNELS

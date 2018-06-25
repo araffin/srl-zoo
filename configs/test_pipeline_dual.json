@@ -10,5 +10,5 @@
   "n-neighbors": 5,
   "n-to-plot": 1,
   "losses": ["priors"],
-  "multi-view": false
+  "multi-view": true
 }

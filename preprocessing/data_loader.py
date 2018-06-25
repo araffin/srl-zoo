@@ -617,9 +617,8 @@ class AutoEncoderDataLoader(CustomDataLoader):
 
         # Here the cache is not useful: we do not have observations
         # that are present in different minibatches
-        super(AutoEncoderDataLoader, self).__init__(minibatchlist, images_path, [], [],
-                                                    cache_capacity=0,
-                                                    n_workers=n_workers, auto_cleanup=auto_cleanup, multi_view=multi_view)
+        super(AutoEncoderDataLoader, self).__init__(minibatchlist, images_path, cache_capacity=0, n_workers=n_workers,
+                                                    auto_cleanup=auto_cleanup, multi_view=multi_view)
         # Training mode is the default one
         if not is_training:
             self.testMode()
