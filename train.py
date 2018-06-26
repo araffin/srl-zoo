@@ -310,17 +310,25 @@ class SRL4robotics(BaseLearner):
                         plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
                                            add_colorbar=epoch == 0,
                                            name="Learned State Representation (Training Data)")
+
                         if self.use_autoencoder or self.use_vae:
                             # Plot Reconstructed Image
-                            if self.multi_view:
-                                plotImage(deNormalize(detachToNumpy(obs[0][:3, :, :])), "Input Image 1 (Train)")
-                                plotImage(deNormalize(detachToNumpy(decoded_obs[0][:3, :, :])), "Reconstructed Image 1")
-
-                                plotImage(deNormalize(detachToNumpy(obs[0][3:, :, :])), "Input Image 2 (Train)")
-                                plotImage(deNormalize(detachToNumpy(decoded_obs[0][3:, :, :])), "Reconstructed Image 2")
-                            else:
-                                plotImage(deNormalize(detachToNumpy(obs[0][:3,:,:])), "Input Image (Train)")
+                            if obs[0].shape[0] == 3:  # RGB
+                                plotImage(deNormalize(detachToNumpy(obs[0])), "Input Image (Train)")
                                 plotImage(deNormalize(detachToNumpy(decoded_obs[0])), "Reconstructed Image")
+
+                            elif obs[0].shape[0] % 3 == 0:  # Multi-RGB
+                                for k in range(obs[0].shape[0] // 3):
+                                    plotImage(deNormalize(detachToNumpy(obs[0][k * 3:(k + 1) * 3, :, :])),
+                                              "Input Image {} (Train)".format(k + 1))
+                                    plotImage(deNormalize(detachToNumpy(decoded_obs[0][k * 3:(k + 1) * 3, :, :])),
+                                              "Reconstructed Image {}".format(k + 1))
+                            else:  # Other
+                                for k in range(obs[0].shape[0]):
+                                    plotImage(deNormalize(detachToNumpy(obs[0][k:(k + 1), :, :])),
+                                              "Input Image {} (Train)".format(k + 1))
+                                    plotImage(deNormalize(detachToNumpy(decoded_obs[0][k:(k + 1), :, :])),
+                                              "Reconstructed Image {}".format(k + 1))
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
@@ -402,7 +410,10 @@ if __name__ == '__main__':
     # Dealing with losses to use
     losses = list(set(args.losses))
 
-    if args.multi_view == True:
+    if args.multi_view is True:
+        # Setting variables involved data-loading from multiple cameras,
+        # involved also in adapting the input layers of NN to that data
+        # PS: those are stacked images - 3 if triplet loss, 2 otherwise
         if "triplet" in losses:
             preprocessing.preprocess.N_CHANNELS = 9
         else:

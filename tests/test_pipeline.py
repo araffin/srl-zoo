@@ -30,6 +30,8 @@ def testPipeLine():
     ok = subprocess.call(['python', 'pipeline.py'] + args)
     assertEq(ok, 0)
 
+
+def testPipeLineDual():
     args = ['--data-folder', TEST_DATA_FOLDER_DUAL,
             '--base-config', 'configs/test_pipeline_dual.json']
     args = list(map(str, args))
@@ -37,6 +39,8 @@ def testPipeLine():
     ok = subprocess.call(['python', 'pipeline.py'] + args)
     assertEq(ok, 0)
 
+
+def testBaselines():
     # Pipeline on baselines
     args = ['--data-folder', TEST_DATA_FOLDER,
             '--baselines',
@@ -92,17 +96,6 @@ def testExtraBaselineTrain():
         ok = subprocess.call(['python', 'train.py'] + args)
         assertEq(ok, 0)
 
-        # dual camera
-        args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
-                '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
-                '--seed', SEED, '--val-size', 0.1,
-                '--state-dim', STATE_DIM, '--model-type', 'mlp', '-bs', 64,
-                '--losses', baseline,
-                '--multi-view']
-        args = list(map(str, args))
-        ok = subprocess.call(['python', 'train.py'] + args)
-        assertEq(ok, 0)
-
     # Linear AE
     # single camera
     args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
@@ -114,6 +107,20 @@ def testExtraBaselineTrain():
     ok = subprocess.call(['python', 'train.py'] + args)
     assertEq(ok, 0)
 
+
+def testExtraBaselineDualTrain():
+    for baseline in ['vae', 'autoencoder']:
+        # dual camera
+        args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
+                '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
+                '--seed', SEED, '--val-size', 0.1,
+                '--state-dim', STATE_DIM, '--model-type', 'mlp', '-bs', 64,
+                '--losses', baseline,
+                '--multi-view']
+        args = list(map(str, args))
+        ok = subprocess.call(['python', 'train.py'] + args)
+        assertEq(ok, 0)
+    # Linear AE
     # dual camera
     args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
             '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,

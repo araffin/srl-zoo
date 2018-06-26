@@ -90,6 +90,7 @@ class SRLDenseNetwork(BaseModelSRL):
         )
 
         self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
+        self.fc = self.fc.to(self.device)
         self.noise = GaussianNoiseVariant(self.device, noise_std)
 
     def forward(self, x):
@@ -114,8 +115,8 @@ class SRLLinear(BaseModelSRL):
         super(SRLLinear, self).__init__()
 
         self.fc = nn.Linear(input_dim, state_dim)
-        if cuda:
-            self.fc.cuda()
+        self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
+        self.fc = self.fc.to(self.device)
 
     def forward(self, x):
         # Flatten input
