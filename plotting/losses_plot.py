@@ -2,6 +2,8 @@ from __future__ import print_function, division
 
 import argparse
 
+import matplotlib
+matplotlib.use('Agg')  # Fix when X11 server not available
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
