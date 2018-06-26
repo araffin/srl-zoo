@@ -30,8 +30,7 @@ from plotting.representation_plot import plotRepresentation, plt, plotImage
 from preprocessing.data_loader import CustomDataLoader
 import preprocessing
 from preprocessing.utils import deNormalize
-from utils import parseDataFolder, \
-    printYellow, createFolder, detachToNumpy, input
+from utils import parseDataFolder, printYellow, createFolder, detachToNumpy, input
 
 DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
