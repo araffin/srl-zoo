@@ -312,13 +312,13 @@ def vaeLoss(decoded, obs, mu, logvar, weight, loss_object, beta=1):
 def mutualInformationLoss(states, rewards_st, weight, loss_object):
     """
     Loss criterion to assess mutual information between predicted states and rewards
+    see: https://en.wikipedia.org/wiki/Mutual_information
     :param states: (th.Tensor)
     :param rewards_st:(th.Tensor)
     :param weight: coefficient to weight the loss (float)
     :param loss_object: loss criterion needed to log the loss value
     :return:
     """
-    # concat_var = th.cat((states, encodeOneHot(actions_st, n_dim=n_actions).float()), 1)
     X = states
     Y = rewards_st
     I = 0
@@ -334,7 +334,6 @@ def mutualInformationLoss(states, rewards_st, weight, loss_object):
                                           (th.std(th.cat([X, Y], dim=1), dim=0) + eps), 2), 2) / 2) + eps
             I += p_xy * th.log(p_xy / (p_x[x] * p_y[y]))
 
-    # VI = - th.sum(p_x * th.log(p_x)) - th.sum(p_y * th.log(p_y)) - 2*I
     reward_prior_loss = th.exp(-I)
     loss_object.addToLosses('reward_prior', weight, reward_prior_loss)
     return weight * reward_prior_loss

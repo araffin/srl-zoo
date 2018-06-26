@@ -88,9 +88,10 @@ def main():
         min_X = np.min(X, axis=0)
         max_X = np.max(X, axis=0)
 
+    fig_name = "".join([item + "_" for item in loss_type])[:-1]
     # opencv gui setup
-    cv2.namedWindow(args.log_dir, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(args.log_dir, 500, 500)
+    cv2.namedWindow(fig_name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(fig_name, 500, 500)
     cv2.namedWindow('sliders')
     # add a slider for each component of the latent space
     for i in range(state_dim):
@@ -120,10 +121,10 @@ def main():
             img = cv2.imread("data/" + img_path + ".jpg")
 
         # stop if user closed a window
-        if (cv2.getWindowProperty(args.log_dir, 0) < 0) or (cv2.getWindowProperty('sliders', 0) < 0):
+        if (cv2.getWindowProperty(fig_name, 0) < 0) or (cv2.getWindowProperty('sliders', 0) < 0):
             break
 
-        cv2.imshow(args.log_dir, img)
+        cv2.imshow(fig_name, img)
 
     # gracefully close
     cv2.destroyAllWindows()

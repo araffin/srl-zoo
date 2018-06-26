@@ -3,7 +3,7 @@ from __future__ import print_function, division, absolute_import
 from .models import *
 
 
-class EmbeddingNet(nn.Module):
+class EmbeddingNet(BaseModelSRL):
     def __init__(self, state_dim=2, embedding_size=128):
         """
         Resnet18 + FC layer (Embedding to learn a metric)
@@ -30,3 +30,11 @@ class EmbeddingNet(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.fc(x)
         return x
+
+    def getStates(self, observations):
+        """
+        :param observations: (PyTorch Tensor)
+        :return: (PyTorch Tensor)
+        """
+        # For inference, the forward pass is done one the positive observation (first view)
+        return self.forward(observations[:, :3:, :, :])

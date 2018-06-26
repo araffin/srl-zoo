@@ -3,15 +3,6 @@ from __future__ import print_function, division, absolute_import
 import torch
 
 from .models import *
-from .triplet import EmbeddingNet
-from .priors import SRLDenseNetwork, SRLConvolutionalNetwork, SRLLinear
-from .autoencoders import CNNAutoEncoder, DenseAutoEncoder, LinearAutoEncoder
-from .vae import CNNVAE, DenseVAE
-
-try:
-    from preprocessing.preprocess import getInputDim
-except ImportError:
-    from ..preprocessing.preprocess import getInputDim
 
 
 class BaseForwardModel(BaseModelSRL):
@@ -96,93 +87,3 @@ class BaseRewardModel(BaseModelSRL):
         :return: (th.Tensor)
         """
         return self.reward_net(state)
-
-
-class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
-    def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn", losses=None):
-        """
-        :param state_dim:
-        :param action_dim:
-        :param cuda:
-        """
-        self.model_type = model_type
-        self.losses = losses
-        BaseForwardModel.__init__(self)
-        BaseInverseModel.__init__(self)
-        BaseRewardModel.__init__(self)
-
-        self.cuda = cuda
-        self.device = th.device("cuda" if th.cuda.is_available() and self.cuda else "cpu")
-
-        self.initForwardNet(state_dim, action_dim)
-        self.initInverseNet(state_dim, action_dim)
-        self.initRewardNet(state_dim, action_dim)
-
-        # Architecture
-        if model_type == "custom_cnn":
-            if "autoencoder" in losses:
-                self.model = CNNAutoEncoder(state_dim)
-            elif "vae" in losses:
-                self.model = CNNVAE(state_dim)
-            else:
-                # for losses not depending on specific architecture (supevised, inv, fwd..)
-                self.model = CustomCNN(state_dim)
-
-        elif model_type == "mlp":
-            if "autoencoder" in losses:
-                self.model = DenseAutoEncoder(input_dim=getInputDim(), state_dim=state_dim)
-            elif "vae" in losses:
-                self.model = DenseVAE(input_dim=getInputDim(),
-                                      state_dim=state_dim)
-            else:
-                # for losses not depending on specific architecture (supevised, inv, fwd..)
-                self.model = SRLDenseNetwork(getInputDim(), state_dim, cuda=cuda)
-
-        elif model_type == "linear":
-            if "autoencoder" in losses:
-                self.model = LinearAutoEncoder(input_dim=getInputDim(), state_dim=state_dim)
-            else:
-                # for losses not depending on specific architecture (supevised, inv, fwd..)
-                self.model = SRLLinear(input_dim=getInputDim(), state_dim=state_dim, cuda=cuda)
-
-        elif model_type == "resnet":
-            self.model = SRLConvolutionalNetwork(state_dim, cuda)
-
-        if losses is not None and "triplet" in losses:
-            # pretrained resnet18 with fixed weights
-            self.model = EmbeddingNet(state_dim)
-
-        self.model = self.model.to(self.device)
-
-    def getStates(self, observations):
-        """
-        :param observations: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
-        """
-        if "autoencoder" in self.losses or "vae" in self.losses:
-            return self.model.getStates(observations)
-        elif "triplet" in self.losses:
-            # For inference, the forward pass is done one the positive observation (first view)
-            return self.encode(observations[:, :3:, :, :])
-        else:
-            return self.forward(observations)
-
-    def forward(self, x):
-        if self.model_type == 'linear' or self.model_type == 'mlp':
-            x = x.contiguous()
-        return self.model(x)
-
-    def encode(self, x):
-        if "triplet" in self.losses:
-            return self.model(x)
-        else:
-            raise NotImplementedError()
-
-    def forward_triplets(self, anchor, positive, negative):
-        """
-        Overriding the forward function in the case of Triplet loss
-        anchor : observation
-        positive : observation
-        negative : observation
-        """
-        return self.model(anchor), self.model(positive), self.model(negative)
