@@ -360,7 +360,7 @@ def buildConfig(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='PyTorch SRL with robotic priors')
+    parser = argparse.ArgumentParser(description='State Representation Learning with PyTorch')
     parser.add_argument('--epochs', type=int, default=50, metavar='N',
                         help='number of epochs to train (default: 50)')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
