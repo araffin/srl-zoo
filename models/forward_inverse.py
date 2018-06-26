@@ -122,13 +122,8 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         if model_type == "custom_cnn":
             if "autoencoder" in losses:
                 self.model = CNNAutoEncoder(state_dim)
-                self.model.encoder_fc = self.model.encoder_fc.to(self.device)
-                self.model.decoder_fc = self.model.decoder_fc.to(self.device)
             elif "vae" in losses:
                 self.model = CNNVAE(state_dim)
-                self.model.encoder_fc1 = self.model.encoder_fc1.to(self.device)
-                self.model.encoder_fc2 = self.model.encoder_fc2.to(self.device)
-                self.model.decoder_fc = self.model.decoder_fc.to(self.device)
             else:
                 # for losses not depending on specific architecture (supevised, inv, fwd..)
                 self.model = CustomCNN(state_dim)
@@ -136,15 +131,9 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         elif model_type == "mlp":
             if "autoencoder" in losses:
                 self.model = DenseAutoEncoder(input_dim=getInputDim(), state_dim=state_dim)
-                self.model.encoder = self.model.encoder.to(self.device)
-                self.model.decoder = self.model.decoder.to(self.device)
             elif "vae" in losses:
                 self.model = DenseVAE(input_dim=getInputDim(),
                                       state_dim=state_dim)
-                self.model.encoder_fc1 = self.model.encoder_fc1.to(self.device)
-                self.model.encoder_fc21 = self.model.encoder_fc21.to(self.device)
-                self.model.encoder_fc22 = self.model.encoder_fc22.to(self.device)
-                self.model.decoder = self.model.decoder.to(self.device)
             else:
                 # for losses not depending on specific architecture (supevised, inv, fwd..)
                 self.model = SRLDenseNetwork(getInputDim(), state_dim, cuda=cuda)
@@ -152,8 +141,6 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         elif model_type == "linear":
             if "autoencoder" in losses:
                 self.model = LinearAutoEncoder(input_dim=getInputDim(), state_dim=state_dim)
-                self.model.encoder = self.model.encoder.to(self.device)
-                self.model.decoder = self.model.decoder.to(self.device)
             else:
                 # for losses not depending on specific architecture (supevised, inv, fwd..)
                 self.model = SRLLinear(input_dim=getInputDim(), state_dim=state_dim, cuda=cuda)
