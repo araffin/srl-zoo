@@ -1,6 +1,6 @@
 # State Representation Learning Zoo with PyTorch
 
-A collection of state representation learning (SRL) methods for Reinforcement Learning, written using PyTorch.
+A collection of State Representation Learning (SRL) methods for Reinforcement Learning, written using PyTorch.
 
 Availables methods:
 
@@ -12,9 +12,10 @@ Availables methods:
 - Forward, Inverse Models
 - Triplet Network (for stereovision only)
 
-Related papers (robotic priors):
+Related papers:
+- "State Representation Learning for Control: An Overview" (Lesort et al., 2018), paper: [https://arxiv.org/pdf/1802.04181.pdf](https://arxiv.org/pdf/1802.04181.pdf)
 - "Learning State Representations with Robotic Priors" (Jonschkowski and Brock, 2015), paper: [http://tinyurl.com/gly9sma](http://tinyurl.com/gly9sma)
-- "Unsupervised state representation learning with robotic priors: a robustness benchmark" (Lesort, Seurin et al., 2017), paper: [https://arxiv.org/pdf/1709.05185.pdf](https://arxiv.org/pdf/1709.05185.pdf)
+
 
 
 Table of Contents
@@ -197,7 +198,7 @@ usage: train.py [-h] [--epochs N] [--seed S] [--state-dim STATE_DIM]
                 [--model-type {custom_cnn,resnet,mlp,linear}] --data-folder
                 DATA_FOLDER [--log-folder LOG_FOLDER] [--multi-view]
                 [--balanced-sampling]
-                [--losses {forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae} 
+                [--losses {forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae}
                 [--beta BETA]
 
 PyTorch SRL with robotic priors
