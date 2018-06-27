@@ -44,7 +44,6 @@ class BaseModelAutoEncoder(BaseModelSRL):
 
         # Inspired by ResNet:
         # conv3x3 followed by BatchNorm2d
-        # TODO: implement residual connection
         self.encoder_conv = nn.Sequential(
             # 224x224xN_CHANNELS -> 112x112x64
             nn.Conv2d(getNChannels(), 64, kernel_size=7, stride=2, padding=3, bias=False),

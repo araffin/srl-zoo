@@ -3,7 +3,7 @@ from .priors import SRLDenseNetwork, SRLConvolutionalNetwork, SRLLinear
 from .autoencoders import CNNAutoEncoder, DenseAutoEncoder, LinearAutoEncoder
 from .vae import CNNVAE, DenseVAE
 from .forward_inverse import BaseForwardModel, BaseInverseModel, BaseRewardModel
-from .models import CustomCNN
+from .models import *
 import torch as th
 
 try:
@@ -67,8 +67,8 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
     def getStates(self, observations):
         """
-        :param observations: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param observations: (th.Tensor)
+        :return: (th.Tensor)
         """
         return self.model.getStates(observations)
 
@@ -91,3 +91,79 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         negative : observation
         """
         return self.model(anchor), self.model(positive), self.model(negative)
+
+
+class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
+    def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn", losses=None, split_index=1):
+        self.model_type = model_type
+        self.losses = losses
+        BaseForwardModel.__init__(self)
+        BaseInverseModel.__init__(self)
+        BaseRewardModel.__init__(self)
+
+        # self.cuda = cuda
+        self.state_dim = state_dim
+
+        self.dim_first_method = split_index
+        self.dim_second_method = state_dim - split_index
+        self.first_split_indices = (slice(None, None), slice(None, split_index))  # [:, :split_index]
+        self.second_split_indices = (slice(None, None), slice(split_index, None))  # [:, split_index:]
+
+        self.initForwardNet(self.dim_second_method, action_dim)
+        self.initInverseNet(self.dim_second_method, action_dim)
+        self.initRewardNet(self.dim_second_method, action_dim)
+
+        # Architecture
+        if model_type == "custom_cnn":
+            if "autoencoder" in losses:
+                self.model = CNNAutoEncoder(state_dim)
+            elif "vae" in losses:
+                self.model = CNNVAE(state_dim)
+            else:
+                raise ValueError("You must use autoencoder/vae when splitting the representation")
+
+            self.model.decoder_fc = nn.Linear(self.dim_first_method, 6 * 6 * 64)
+
+
+    def getStates(self, observations):
+        """
+        :param observations: (th.Tensor)
+        :return: (th.Tensor)
+        """
+        return self.model.getStates(observations)
+
+    def forward(self, x):
+        if "autoencoder" in self.losses:
+            return self.forwardSplitAE(x)
+        elif "vae" in self.losses:
+            return self.forwardSplitVAE(x)
+
+    def forwardSplitVAE(self, x):
+        """
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
+        """
+        input_shape = x.size()
+        mu, logvar = self.model.encode(x)
+        z = self.model.reparameterize(mu[self.first_split_indices], logvar[self.first_split_indices])
+        decoded = self.model.decode(z).view(input_shape)
+        return decoded, mu[self.first_split_indices], logvar[self.first_split_indices]
+
+    def forwardSplitAE(self, x):
+        """
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
+        """
+        input_shape = x.size()
+        encoded = self.model.encode(x)
+        decoded = self.model.decode(encoded[self.first_split_indices]).view(input_shape)
+        return encoded, decoded
+
+    def inverseModel(self, state, next_state):
+        """
+        Predict action given current state and next state
+        :param state: (th.Tensor)
+        :param next_state: (th.Tensor)
+        :return: probability of each action
+        """
+        return self.inverse_net(th.cat((state[self.second_split_indices], next_state[self.second_split_indices]), 1))

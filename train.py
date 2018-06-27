@@ -21,7 +21,7 @@ from tqdm import tqdm
 import plotting.representation_plot as plot_script
 from losses.losses import autoEncoderLoss, RoboticPriorsLoss, tripletLoss, findPriorsPairs, \
     rewardModelLoss, rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss, vaeLoss
-from models import Discriminator, SRLModules
+from models import Discriminator, SRLModules, SRLModulesSplit
 from models.base_learner import BaseLearner
 from pipeline import NAN_ERROR
 from pipeline import getLogFolderName, saveConfig, knnCall
@@ -90,7 +90,7 @@ class SRL4robotics(BaseLearner):
             self.use_vae = "vae" in losses
             self.use_supervised = "supervised" in losses
             self.use_triplets = "triplet" in self.losses
-            self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
+            self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
                                     cuda=cuda, losses=losses)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
