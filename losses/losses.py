@@ -8,8 +8,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from models.priors import ReverseLayerF
-from pipeline import NO_PAIRS_ERROR
-from utils import printRed
 
 try:
     from functools import reduce
@@ -17,7 +15,7 @@ except ImportError:
     pass
 
 
-class RoboticPriorsLoss(nn.Module):
+class LossObject:
     """
     :param model: (PyTorch model)
     :param l1_reg: (float) l1 regularization coeff
@@ -25,7 +23,6 @@ class RoboticPriorsLoss(nn.Module):
     """
 
     def __init__(self, model, l1_reg=0.0, loss_history=None):
-        super(RoboticPriorsLoss, self).__init__()
         # Retrieve only trainable and regularizable parameters (we should exclude biases)
         self.reg_params = [param for name, param in model.named_parameters() if
                            ".bias" not in name and param.requires_grad]
@@ -33,6 +30,9 @@ class RoboticPriorsLoss(nn.Module):
         self.l1_coeff = (l1_reg / n_params)
         self.loss_history = loss_history
         self.names, self.weights, self.losses = [], [], []
+
+        if self.l1_coeff > 0:
+            l1Loss(self.reg_params, self.l1_coeff, self)
 
     def addToLosses(self, name, weight, loss_value):
         self.names.append(name)
@@ -54,151 +54,42 @@ class RoboticPriorsLoss(nn.Module):
     def resetLosses(self):
         self.names, self.weights, self.losses = [], [], []
 
-    def forward(self, states, next_states, minibatch_idx,
-                dissimilar_pairs, same_actions_pairs):
-        """
-        :param states: (th.Tensor)
-        :param next_states: (th.Tensor)
-        :param minibatch_idx: (int)
-        :param dissimilar_pairs: ([numpy array])
-        :param same_actions_pairs: ([numpy array])
-        :return: (th.Tensor)
-        """
-        dissimilar_pairs = th.from_numpy(dissimilar_pairs[minibatch_idx]).to(states.device)
-        same_actions_pairs = th.from_numpy(same_actions_pairs[minibatch_idx]).to(states.device)
 
-        state_diff = next_states - states
-        state_diff_norm = state_diff.norm(2, dim=1)
-        similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
-        temp_coherence_loss = (state_diff_norm ** 2).mean()
-        causality_loss = similarity(states[dissimilar_pairs[:, 0]],
-                                    states[dissimilar_pairs[:, 1]]).mean()
-        proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
-                                 state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
-
-        repeatability_loss = (
-                similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
-                (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2,
-                                                                                                   dim=1) ** 2).mean()
-        self.weights = [1, 1, 1, 1]
-        self.names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss', 'repeatability_loss']
-        self.losses = [temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss]
-
-        if self.l1_coeff > 0:
-            l1Loss(self.reg_params, self.l1_coeff, self)
-
-        return self.computeTotalLoss()
-
-
-def overSampling(batch_size, m_list, pairs, function_on_pairs, actions, rewards):
+def roboticsPriorsLoss(states, next_states, minibatch_idx,
+            dissimilar_pairs, same_actions_pairs, weight, loss_object):
     """
-    Look for minibatches missing pairs of observations with the similar/dissimilar rewards (see params)
-    Sample for each of those minibatches an observation from another batch that satisfies the
-    similarity/dissimilarity with the 1rst observation.
-    return the new pairs & the modified minibatch list
-    :param batch_size: (int)
-    :param m_list: (list) mini-batch list
-    :param pairs: similar / dissimilar pairs
-    :param function_on_pairs: (function) findDissimilar applied to pairs
-    :param actions: (numpy array)
-    :param rewards: (numpy array)
-    :return: (list, list) pairs, mini-batch list modified
+    :param states: (th.Tensor)
+    :param next_states: (th.Tensor)
+    :param minibatch_idx: (int)
+    :param dissimilar_pairs: ([numpy array])
+    :param same_actions_pairs: ([numpy array])
+    :return: (th.Tensor)
     """
-    # For a each minibatch_id
-    if function_on_pairs.__name__ == "findDissimilar":
-        pair_name = 'dissimilar pairs'
-    else:
-        pair_name = 'Unknown pairs'
-    counter = 0
-    for minibatch_id, d in enumerate(pairs):
-        do = True
-        if len(d) == 0:
-            counter += 1
-        # Do if it contains no similar pairs of samples
-        while do and len(d) == 0:
-            # for every minibatch & obs of a mini-batch list
-            for m_id, minibatch in enumerate(m_list):
-                for i in range(batch_size):
-                    # Look for similar samples j in other minibatches m_id
-                    for j in function_on_pairs(i, m_list[minibatch_id], minibatch, actions, rewards):
-                        # Copy samples - done once
-                        if (j != i) & (minibatch_id != m_id) and do:
-                            m_list[minibatch_id][j] = minibatch[j]
-                            pairs[minibatch_id] = np.array([[i, j]])
-                            do = False
-    print('Dealt with {} minibatches - {}'.format(counter, pair_name))
-    return pairs, m_list
+    dissimilar_pairs = th.from_numpy(dissimilar_pairs[minibatch_idx]).to(states.device)
+    same_actions_pairs = th.from_numpy(same_actions_pairs[minibatch_idx]).to(states.device)
 
+    state_diff = next_states - states
+    state_diff_norm = state_diff.norm(2, dim=1)
+    similarity = lambda x, y: th.exp(-(x - y).norm(2, dim=1) ** 2)
+    temp_coherence_loss = (state_diff_norm ** 2).mean()
+    causality_loss = similarity(states[dissimilar_pairs[:, 0]],
+                                states[dissimilar_pairs[:, 1]]).mean()
+    proportionality_loss = ((state_diff_norm[same_actions_pairs[:, 0]] -
+                             state_diff_norm[same_actions_pairs[:, 1]]) ** 2).mean()
 
-def findDissimilar(index, minibatch1, minibatch2, actions, rewards):
-    """
-    check which samples should be dissimilar
-    because they lead to different rewards after the same actions
-    :param index: (int)
-    :param minibatch1: (numpy array)
-    :param minibatch2: (numpy array)
-    :param actions: (numpy array)
-    :param rewards: (numpy array)
-    :return: (dict, numpy array)
-    """
-    return np.where((actions[minibatch2] == actions[minibatch1[index]]) *
-                    (rewards[minibatch2 + 1] != rewards[minibatch1[index] + 1]))[0]
+    repeatability_loss = (
+            similarity(states[same_actions_pairs[:, 0]], states[same_actions_pairs[:, 1]]) *
+            (state_diff[same_actions_pairs[:, 0]] - state_diff[same_actions_pairs[:, 1]]).norm(2,
+                                                                                               dim=1) ** 2).mean()
+    weights = [1, 1, 1, 1]
+    names = ['temp_coherence_loss', 'causality_loss', 'proportionality_loss', 'repeatability_loss']
+    losses = [temp_coherence_loss, causality_loss, proportionality_loss, repeatability_loss]
 
-
-def findSameActions(index, minibatch, actions):
-    """
-    Get observations indices where the same action was performed
-    as in a reference observation
-    :param index: (int)
-    :param minibatch: (numpy array)
-    :param actions: (numpy array)
-    :return: (numpy array)
-    """
-    return np.where(actions[minibatch] == actions[minibatch[index]])[0]
-
-
-def findPriorsPairs(batch_size, minibatchlist, actions, rewards, n_actions, n_pairs_per_action):
-    """
-
-    :param batch_size: (int)
-    :param minibatchlist: ([[int]])
-    :param actions: (numpy array)
-    :param rewards: (numpy array)
-    :param n_actions: (int)
-    :param n_pairs_per_action: ([int])
-    :return: ([numpy array], [numpy array])
-    """
-    dissimilar_pairs = [
-        np.array(
-            [[i, j] for i in range(batch_size) for j in findDissimilar(i, minibatch, minibatch, actions, rewards) if
-             j > i],
-            dtype='int64') for minibatch in minibatchlist]
-
-    # sampling relevant pairs to have at least a pair of dissimilar obs in every minibatches
-    dissimilar_pairs, minibatchlist = overSampling(batch_size, minibatchlist, dissimilar_pairs,
-                                                   findDissimilar, actions, rewards)
-    # same_actions: list of arrays, each containing one pair of observation ids
-    same_actions_pairs = [
-        np.array([[i, j] for i in range(batch_size) for j in findSameActions(i, minibatch, actions) if j > i],
-                 dtype='int64') for minibatch in minibatchlist]
-
-    for pair, minibatch in zip(same_actions_pairs, minibatchlist):
-        for i in range(n_actions):
-            n_pairs_per_action[i] += np.sum(actions[minibatch[pair[:, 0]]] == i)
-
-    # Stats about pairs
-    print("Number of pairs per action:")
-    print(n_pairs_per_action)
-    print("Pairs of {} unique actions".format(np.sum(n_pairs_per_action > 0)))
-
-    for item in same_actions_pairs + dissimilar_pairs:
-        if len(item) == 0:
-            msg = "No same actions or dissimilar pairs found for at least one minibatch (currently is {})\n".format(
-                batch_size)
-            msg += "=> Consider increasing the batch_size or changing the seed"
-            printRed(msg)
-            sys.exit(NO_PAIRS_ERROR)
-    return dissimilar_pairs, same_actions_pairs
+    total_loss = 0
+    for idx in range(len(weights)):
+        loss_object.addToLosses(names[idx], weights[idx], losses[idx])
+        total_loss += losses[idx]
+    return weight * total_loss
 
 
 def forwardModelLoss(next_states_pred, next_states, weight, loss_object):
@@ -313,7 +204,6 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
     kl_divergence += -0.5 * th.sum(1 + next_logvar - next_mu.pow(2) - next_logvar.exp())
 
     vae_loss = generation_loss + beta * kl_divergence
-    vae_loss /= 2.0
 
     loss_object.addToLosses('kl_loss', weight, vae_loss)
     return weight * vae_loss

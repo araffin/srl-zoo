@@ -19,8 +19,9 @@ import torch as th
 from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
-from losses.losses import autoEncoderLoss, RoboticPriorsLoss, tripletLoss, findPriorsPairs, \
-    rewardModelLoss, rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss, vaeLoss
+from losses.losses import LossObject, autoEncoderLoss, roboticsPriorsLoss, tripletLoss,rewardModelLoss, \
+    rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss, vaeLoss
+from losses.utils import findPriorsPairs
 from models import Discriminator, SRLModules
 from models.base_learner import BaseLearner
 from pipeline import NAN_ERROR
@@ -170,7 +171,7 @@ class SRL4robotics(BaseLearner):
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
-        loss_object = RoboticPriorsLoss(self.model, self.l1_reg, loss_history)
+        loss_object = LossObject(self.model, self.l1_reg, loss_history)
 
         best_error = np.inf
         best_model_path = "{}/srl_model.pth".format(self.log_folder)
@@ -215,8 +216,9 @@ class SRL4robotics(BaseLearner):
                 actions_st = th.from_numpy(actions_st).view(-1, 1).requires_grad_(False).to(self.device)
 
                 if not self.no_priors:
-                    loss_object.forward(states, next_states, minibatch_idx=minibatch_idx,
-                                        dissimilar_pairs=dissimilar_pairs, same_actions_pairs=same_actions_pairs)
+                    roboticsPriorsLoss(states, next_states, minibatch_idx=minibatch_idx,
+                                        dissimilar_pairs=dissimilar_pairs, same_actions_pairs=same_actions_pairs,
+                                        weight=1., loss_object=loss_object)
 
                 if self.use_forward_loss:
                     next_states_pred = self.model.forwardModel(states, actions_st)
@@ -237,7 +239,7 @@ class SRL4robotics(BaseLearner):
                 if self.use_autoencoder:
                     autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_object=loss_object)
                 if self.use_vae:
-                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=1,
+                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=0.5,
                             loss_object=loss_object, beta=self.beta)
                 if self.reward_prior:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
@@ -269,7 +271,7 @@ class SRL4robotics(BaseLearner):
 
             train_loss = epoch_loss / float(epoch_batches)
             val_loss /= float(n_val_batches)
-            # Even if loss_history is modified by RoboticPriorsLoss object
+            # Even if loss_history is modified by LossObject
             # we make it explicit
             loss_history = loss_object.loss_history
             loss_history['train_loss'].append(train_loss)
