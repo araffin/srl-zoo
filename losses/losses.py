@@ -302,6 +302,7 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
     :param beta: (float) used to weight the KL divergence for disentangling
     :return: (th.Tensor)
     """
+
     generation_loss = F.mse_loss(decoded, obs, size_average=False)
     generation_loss += F.mse_loss(next_decoded, next_obs, size_average=False)
 
@@ -312,6 +313,8 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
     kl_divergence += -0.5 * th.sum(1 + next_logvar - next_mu.pow(2) - next_logvar.exp())
 
     vae_loss = generation_loss + beta * kl_divergence
+    vae_loss /= 2.0
+
     loss_object.addToLosses('kl_loss', weight, vae_loss)
     return weight * vae_loss
 

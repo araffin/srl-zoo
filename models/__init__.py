@@ -4,4 +4,3 @@ from .priors import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, Disc
 from .supervised import ConvolutionalNetwork, DenseNetwork, CustomCNN
 from .autoencoders import LinearAutoEncoder, DenseAutoEncoder, CNNAutoEncoder
 from .vae import DenseVAE, CNNVAE
-from .forward_inverse import BaseForwardModel, BaseInverseModel, BaseRewardModel

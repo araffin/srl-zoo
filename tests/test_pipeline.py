@@ -114,7 +114,7 @@ def testExtraBaselineDualTrain():
         args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
                 '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
                 '--seed', SEED, '--val-size', 0.1,
-                '--state-dim', STATE_DIM, '--model-type', 'mlp', '-bs', 64,
+                '--state-dim', STATE_DIM, '--model-type', 'mlp', '-bs', 16,
                 '--losses', baseline,
                 '--multi-view']
         args = list(map(str, args))
@@ -125,7 +125,7 @@ def testExtraBaselineDualTrain():
     args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
             '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
             '--seed', SEED, '--val-size', 0.1,
-            '--state-dim', STATE_DIM, '--model-type', 'linear', '-bs', 64,
+            '--state-dim', STATE_DIM, '--model-type', 'linear', '-bs', 16,
             '--losses', 'autoencoder',
             '--multi-view']
     args = list(map(str, args))

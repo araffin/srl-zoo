@@ -386,7 +386,7 @@ if __name__ == '__main__':
                         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
                                  "autoencoder", "vae"], )
     parser.add_argument('--beta', type=float, default=1.0,
-                        help='(For VAE only) the Beta factor on the KL divergence, higher value means more disentangling.')
+                        help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
