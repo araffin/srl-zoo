@@ -285,24 +285,31 @@ def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_o
     return weight * ae_loss
 
 
-def vaeLoss(decoded, obs, mu, logvar, weight, loss_object, beta=1):
+def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logvar,
+            weight, loss_object, beta=1):
     """
     Reconstruction + KL divergence losses summed over all elements and batch
     :param decoded: (th.Tensor)
+    :param next_decoded: (th.Tensor)
     :param obs: (th.Tensor)
+    :param next_obs: (th.Tensor)
     :param mu: (th.Tensor)
+    :param next_mu: (th.Tensor)
     :param logvar: (th.Tensor)
+    :param next_logvar: (th.Tensor)
     :param weight: coefficient to weight the loss (float)
     :param loss_object: loss criterion needed to log the loss value
     :param beta: (float) used to weight the KL divergence for disentangling
     :return: (th.Tensor)
     """
     generation_loss = F.mse_loss(decoded, obs, size_average=False)
+    generation_loss += F.mse_loss(next_decoded, next_obs, size_average=False)
 
     # see Appendix B from VAE paper:
     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
     # https://arxiv.org/abs/1312.6114
     kl_divergence = -0.5 * th.sum(1 + logvar - mu.pow(2) - logvar.exp())
+    kl_divergence += -0.5 * th.sum(1 + next_logvar - next_mu.pow(2) - next_logvar.exp())
 
     vae_loss = generation_loss + beta * kl_divergence
     loss_object.addToLosses('kl_loss', weight, vae_loss)

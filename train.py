@@ -37,6 +37,7 @@ EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 256  #
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 VALIDATION_SIZE = 0.2  # 20% of training data for validation
+N_WORKERS = 4
 
 # Experimental: episode independent prior
 BALANCED_SAMPLING = False  # Whether to do Uniform (default) or balanced sampling
@@ -64,22 +65,11 @@ class SRL4robotics(BaseLearner):
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
         self.multi_view = multi_view
-        self.use_forward_loss = False
-        self.use_inverse_loss = False
-        self.use_reward_loss = False
-        self.use_autoencoder = False
-        self.use_vae = False
-        self.reward_prior = False
-        self.reward_loss = False
-        self.episode_prior = False
-        self.no_priors = False
-        self.use_supervised = False
-        self.use_triplets = False
         self.losses = losses
         self.dim_action = n_actions
         self.beta = beta
-        if model_type in ["autoencoder", "mlp", "resnet", "custom_cnn", "linear", "vae"] \
-                or "autoencoder" in losses or "vae" in losses or "supervised" in losses:
+        if model_type in ["linear", "mlp", "resnet", "custom_cnn"] \
+                or "autoencoder" in losses or "vae" in losses:
             self.use_forward_loss = "forward" in losses
             self.use_inverse_loss = "inverse" in losses
             self.use_reward_loss = "reward" in losses
@@ -88,7 +78,6 @@ class SRL4robotics(BaseLearner):
             self.reward_prior = "reward-prior" in losses
             self.use_autoencoder = "autoencoder" in losses
             self.use_vae = "vae" in losses
-            self.use_supervised = "supervised" in losses
             self.use_triplets = "triplet" in self.losses
             self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
                                     cuda=cuda, losses=losses)
@@ -176,7 +165,7 @@ class SRL4robotics(BaseLearner):
             minibatch_episodes = [[idx_to_episode[i] for i in minibatch] for minibatch in minibatchlist]
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
-                                       cache_capacity=100, multi_view=self.multi_view, n_workers=4,
+                                       cache_capacity=100, multi_view=self.multi_view, n_workers=N_WORKERS,
                                        triplets=self.use_triplets)
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
@@ -215,7 +204,8 @@ class SRL4robotics(BaseLearner):
                 elif self.use_autoencoder:
                     (states, decoded_obs), (next_states, decoded_next_obs) = self.model(obs), self.model(next_obs)
                 elif self.use_vae:
-                    decoded_obs, mu, logvar = self.model(obs)
+                    (decoded_obs, mu, logvar), (next_decoded_obs, next_mu, next_logvar) = self.model(obs), \
+                                                                                          self.model(next_obs)
                     states, next_states = self.model.getStates(obs), self.model.getStates(next_obs)
                 else:
                     states, next_states = self.model(obs), self.model(next_obs)
@@ -247,7 +237,8 @@ class SRL4robotics(BaseLearner):
                 if self.use_autoencoder:
                     autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_object=loss_object)
                 if self.use_vae:
-                    vaeLoss(decoded_obs, obs, mu, logvar, weight=1, loss_object=loss_object, beta=self.beta)
+                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=1,
+                            loss_object=loss_object, beta=self.beta)
                 if self.reward_prior:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
                     rewards_st = th.from_numpy(rewards_st).float().view(-1, 1).to(self.device)

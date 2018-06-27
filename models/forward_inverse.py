@@ -29,6 +29,7 @@ class BaseForwardModel(BaseModelSRL):
         :return: (th.Tensor)
         """
         # Predict the delta between the next state and current state
+        # by taking as input concatenation of state & action over the 1rst dimension
         concat = torch.cat((state, encodeOneHot(action, self.action_dim)), 1)
         return state + self.forward_net(concat)
 
@@ -56,6 +57,7 @@ class BaseInverseModel(BaseModelSRL):
         :param next_state: (th.Tensor)
         :return: probability of each action
         """
+        # input: concatenation of state & next state over the 1rst dimension
         return self.inverse_net(th.cat((state, next_state), 1))
 
 

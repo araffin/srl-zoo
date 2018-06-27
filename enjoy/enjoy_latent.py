@@ -13,7 +13,7 @@ from preprocessing.utils import deNormalize
 from models import SRLModules
 from utils import detachToNumpy
 
-VALID_MODEL = ["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
+VALID_MODELS = ["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
                "autoencoder", "vae"]
 
 
@@ -51,16 +51,15 @@ def main():
 
     with open(args.log_dir + 'exp_config.json', 'r') as f:
         exp_config = json.load(f)
-    try:
-        state_dim = exp_config['state-dim']
-        loss_type = exp_config['losses']
-        n_actions = exp_config['n_actions']
-        model_type = exp_config['model-type']
-        cuda = exp_config['model-type']
-    except KeyError:
-        pass
+
+    state_dim = exp_config['state-dim']
+    loss_type = exp_config['losses']
+    n_actions = exp_config['n_actions']
+    model_type = exp_config['model-type']
+    cuda = exp_config['cuda']
+
     # is this a valid model ?
-    assert set(VALID_MODEL).intersection(loss_type) != set(), "Error: losses not supported."
+    assert set(VALID_MODELS).intersection(loss_type) != set(), "Error: losses not supported."
 
     if os.path.exists(args.log_dir + 'srl_model.pth'):
         model_path = args.log_dir + 'srl_model.pth'
