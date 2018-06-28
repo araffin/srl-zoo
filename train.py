@@ -242,7 +242,7 @@ class SRL4robotics(BaseLearner):
                 if self.use_autoencoder:
                     autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_manager=loss_manager)
                 if self.use_vae:
-                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=0.5,
+                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=0.5e-6,
                             loss_manager=loss_manager, beta=self.beta)
                 if self.reward_prior:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
