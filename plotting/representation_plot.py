@@ -48,7 +48,7 @@ def pauseOrClose(fig):
 
 
 def plotRepresentation(states, rewards, name="Learned State Representation",
-                       add_colorbar=True, path=None, fit_pca=False, cmap='coolwarm', gt=None):
+                       add_colorbar=True, path=None, fit_pca=False, cmap='coolwarm', true_states=None):
     """
     Plot learned state representation using rewards for coloring
     :param states: (numpy array)
@@ -58,7 +58,7 @@ def plotRepresentation(states, rewards, name="Learned State Representation",
     :param path: (str)
     :param fit_pca: (bool)
     :param cmap: (str)
-    :param gt: project a 1D predicted states onto the ground_truth
+    :param true_states: project a 1D predicted states onto the ground_truth
     """
     state_dim = states.shape[1]
     if state_dim != 1 and (fit_pca or state_dim > 3):
@@ -70,7 +70,7 @@ def plotRepresentation(states, rewards, name="Learned State Representation",
         # Extend states as 2D:
         states_matrix = np.zeros((states.shape[0], 2))
         states_matrix[:, 0] = states[:, 0]
-        plot2dRepresentation(states_matrix, rewards, name, add_colorbar, path, cmap, gt=gt)
+        plot2dRepresentation(states_matrix, rewards, name, add_colorbar, path, cmap, true_states=true_states)
     elif state_dim == 2:
         plot2dRepresentation(states, rewards, name, add_colorbar, path, cmap)
     else:
@@ -78,12 +78,13 @@ def plotRepresentation(states, rewards, name="Learned State Representation",
 
 
 def plot2dRepresentation(states, rewards, name="Learned State Representation",
-                         add_colorbar=True, path=None, cmap='coolwarm', gt=None):
+                         add_colorbar=True, path=None, cmap='coolwarm', true_states=None):
     updateDisplayMode()
     fig = plt.figure(name)
     plt.clf()
-    if gt is not None:
-        plt.scatter(gt[:len(states), 0], gt[:len(states), 1], s=7, c=states[:, 0], cmap=cmap, linewidths=0.1)
+    if true_states is not None:
+        plt.scatter(true_states[:len(states), 0], true_states[:len(states), 1], s=7, c=states[:, 0], cmap=cmap,
+                    linewidths=0.1)
     else:
         plt.scatter(states[:, 0], states[:, 1], s=7, c=rewards, cmap=cmap, linewidths=0.1)
     plt.xlabel('State dimension 1')
@@ -199,6 +200,58 @@ def plotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='co
     plt.show()
 
 
+def plotCorrelation(states_rewards, ground_truth):
+    """
+    Correlation matrix: Target pos/GT vs. States predicted
+    :param states_rewards:
+    :param ground_truth:
+    :return:
+    """
+    for ground_truth_name in [" Agent's position ", "Target Position"]:
+        if ground_truth_name == "Target Position":
+            key = 'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'
+            X = ground_truth[key][:len(rewards)]
+        else:
+            X = button_pos_[:len(rewards)]
+
+        # adding epsillon in case of little variance in samples of X & Ys
+        eps = 1e-12
+        corr = np.corrcoef(x=X + eps, y=states_rewards['states'] + eps, rowvar=False)
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111)
+        labels = [r'$\tilde{s}_' + str(i_) + '$' for i_ in range(X.shape[1])]
+        labels += [r'$s_' + str(i_) + '$' for i_ in range(states_rewards['states'].shape[1])]
+        cax = ax.matshow(corr, cmap=cmap, vmin=-1, vmax=1)
+        ax.set_xticklabels([''] + labels)
+        ax.set_yticklabels([''] + labels)
+        ax.grid(False)
+        plt.title(r'Correlation Matrix: S = Predicted states | $\tilde{S}$ = ' + ground_truth_name)
+        fig.colorbar(cax, label='correlation coefficient')
+    pauseOrClose(fig)
+
+
+def loadData(data_folder):
+    """
+    :param data_folder:
+    :return: training_data, ground_truth, true_states, target_positions
+    """
+    training_data = np.load('data/{}/preprocessed_data.npz'.format(data_folder))
+    ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
+    # Backward compatibility with previous names
+    true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
+    target_positions = \
+        ground_truth['target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
+    return training_data, ground_truth, true_states, target_positions
+
+
+def loadOffsets(training_data, data_folder):
+    """
+    :param training_data:
+    :param data_folder:
+    :return: episode_starts, name
+    """
+    return training_data['episode_starts'], "Ground Truth States - {}".format(data_folder)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Plotting script for representation')
     parser.add_argument('-i', '--input-file', type=str, default="",
@@ -219,6 +272,9 @@ if __name__ == '__main__':
     cmap = "tab20" if args.color_episode else "coolwarm"
     assert not (args.color_episode and args.data_folder == ""), \
         "You must specify a datafolder when using per-episode color"
+    assert not (args.correlation and args.data_folder == ""), \
+        "You must specify a datafolder when using the correlation plot"
+
     # Remove `data/` from the path if needed
     if args.data_folder.startswith('data/'):
         args.data_folder = args.data_folder[5:]
@@ -237,77 +293,42 @@ if __name__ == '__main__':
             plotAgainst(states_rewards['states'], rewards, cmap=cmap)
 
         elif args.projection:
-            training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
-            ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
-            true_states = ground_truth['ground_truth_states']
-            gt = true_states
-            plotRepresentation(states_rewards['states'], rewards, cmap=cmap, gt=gt)
+            training_data, ground_truth, true_states, _ = loadData(args.data_folder)
+            plotRepresentation(states_rewards['states'], rewards, cmap=cmap, true_states=true_states)
 
-        else:
+        elif args.correlation:
+            training_data, ground_truth, true_states, target_positions = loadData(args.data_folder)
+            episode_starts, name = loadOffsets(training_data, args.data_folder)
+
+            with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
+                relative_pos = json.load(f).get('relative_pos', False)
+
             button_pos_ = []
-            if args.data_folder != "" and args.correlation:
-                training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
-                ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
-                true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys()
-                                           else 'arm_states']
-                name = "Ground Truth States - {}".format(args.data_folder)
-                episode_starts, rewards_ground = training_data['episode_starts'], training_data['rewards']
+            # True state is the relative position to the button
+            if relative_pos:
+                button_idx = -1
+                for i in range(len(episode_starts)):
+                    if episode_starts[i] == 1:
+                        button_idx += 1
+                    true_states[i] -= target_positions[button_idx]
+                    button_pos_.append(target_positions[button_idx])
+            button_pos_ = np.array(button_pos_[:len(rewards)])
 
-                button_positions = ground_truth['target_positions' if 'target_positions' in ground_truth.keys()
-                                                else 'button_positions']
-                with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
-                    relative_pos = json.load(f).get('relative_pos', False)
+            if args.color_episode:
+                rewards = colorPerEpisode(episode_starts)
 
-                # True state is the relative position to the button
-                if relative_pos:
-                    button_idx = -1
-                    for i in range(len(episode_starts)):
-                        if episode_starts[i] == 1:
-                            button_idx += 1
-                        true_states[i] -= button_positions[button_idx]
-                        button_pos_.append(button_positions[button_idx])
-                button_pos_ = np.array(button_pos_[:len(rewards)])
-
-                if args.color_episode:
-                    rewards = colorPerEpisode(episode_starts)
-
-                # Correlation matrix: Target pos/GT vs. States predicted
-                for fg in [" Agent's position ", "Target Position"]:
-                    if fg == " Agent's position ":
-                        key = 'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'
-                        X = ground_truth[key][:len(rewards)]
-                    else:
-                        X = button_pos_[:len(rewards)]
-                    eps = 1e-12
-                    corr = np.corrcoef(x=X + eps, y=states_rewards['states'] + eps, rowvar=False)
-                    fig = plt.figure(figsize=(8, 6))
-                    ax = fig.add_subplot(111)
-                    labels = [r'$s_' + str(i_) + '$' for i_ in range(X.shape[1])]
-                    labels += [r'$\tilde{s}_' + str(i_) + '$' for i_ in range(states_rewards['states'].shape[1])]
-                    cax = ax.matshow(corr, cmap=cmap, vmin=-1, vmax=1)
-                    ax.set_xticklabels([''] + labels)
-                    ax.set_yticklabels([''] + labels)
-                    ax.grid(False)
-                    plt.title(r'Correlation Matrix: S = Predicted states | $\tilde{S}$ = ' + fg)
-                    fig.colorbar(cax, label='correlation coefficient')
-                plt.show()
-
+            plotCorrelation(states_rewards, ground_truth)
+        else:
+            plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
         input('\nPress any key to exit.')
 
     elif args.data_folder != "":
 
         print("Plotting ground truth...")
-        training_data = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))
-        ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
-        # Backward compatibility with previous names
-        true_states = ground_truth[
-            'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
-        target_positions = ground_truth[
-            'target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
-        name = "Ground Truth States - {}".format(args.data_folder)
-        episode_starts, rewards = training_data['episode_starts'], training_data['rewards']
+        training_data, ground_truth, true_states, target_positions = loadData(args.data_folder)
+        episode_starts, name = loadOffsets(training_data, args.data_folder)
+        rewards = training_data['rewards']
 
-        button_positions = ground_truth['target_positions']
         with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
             relative_pos = json.load(f).get('relative_pos', False)
 
