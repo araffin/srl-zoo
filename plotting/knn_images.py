@@ -5,8 +5,6 @@ import json
 import random
 from textwrap import fill
 
-#import matplotlib
-#matplotlib.use('Agg')  # Fix when X11 server not available
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns

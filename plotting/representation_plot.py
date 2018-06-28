@@ -4,8 +4,6 @@ import json
 import argparse
 from textwrap import fill
 
-#import matplotlib
-#matplotlib.use('Agg')  # Fix when X11 server not available
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import seaborn as sns
