@@ -1,10 +1,6 @@
-from .triplet import EmbeddingNet
-from .priors import SRLDenseNetwork, SRLConvolutionalNetwork, SRLLinear
 from .autoencoders import CNNAutoEncoder, DenseAutoEncoder, LinearAutoEncoder
-from .vae import CNNVAE, DenseVAE
 from .forward_inverse import BaseForwardModel, BaseInverseModel, BaseRewardModel
 from .models import *
-import torch as th
 
 try:
     from preprocessing.preprocess import getInputDim

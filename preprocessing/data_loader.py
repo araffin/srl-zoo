@@ -597,7 +597,7 @@ class AutoEncoderDataLoader(CustomDataLoader):
     :param images_path: (numpy 1D array of str)
     :param batch_size: (int)
     :param noise_factor: (float)
-    :param is_training: (bool) Whether to create tensor that keep track of the gradient or not
+    :param is_training: (bool) Whether to create tensors that keep track of the gradient or not
     :param no_targets: (bool) Set to true, only inputs are generated
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch

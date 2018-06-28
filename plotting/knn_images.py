@@ -5,8 +5,8 @@ import json
 import random
 from textwrap import fill
 
-import matplotlib
-matplotlib.use('Agg')  # Fix when X11 server not available
+#import matplotlib
+#matplotlib.use('Agg')  # Fix when X11 server not available
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -127,8 +127,7 @@ for image_path, neigbour_indices, distance, image_idx in data:
     for i in range(0, n_neighbors):
         neighbor_idx = neigbour_indices[i + 1]
         neighbor_coord = true_states[neighbor_idx]
-        # TODO: add square here to have the real KNN-MSE formula
-        total_error += np.linalg.norm(neighbor_coord - ref_coord)
+        total_error += np.linalg.norm(neighbor_coord - ref_coord)**2
         n_images += 1
 
         if n_to_plot > 0:

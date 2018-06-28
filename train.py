@@ -19,8 +19,9 @@ import torch as th
 from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
-from losses.losses import autoEncoderLoss, RoboticPriorsLoss, tripletLoss, findPriorsPairs, \
-    rewardModelLoss, rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss, vaeLoss
+from losses.losses import LossManager, autoEncoderLoss, roboticPriorsLoss, tripletLoss,rewardModelLoss, \
+    rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss, vaeLoss, l1Loss
+from losses.utils import findPriorsPairs
 from models import Discriminator, SRLModules, SRLModulesSplit
 from models.base_learner import BaseLearner
 from pipeline import NAN_ERROR
@@ -37,6 +38,7 @@ EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 256  #
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 VALIDATION_SIZE = 0.2  # 20% of training data for validation
+N_WORKERS = 4
 
 # Experimental: episode independent prior
 BALANCED_SAMPLING = False  # Whether to do Uniform (default) or balanced sampling
@@ -64,22 +66,11 @@ class SRL4robotics(BaseLearner):
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
         self.multi_view = multi_view
-        self.use_forward_loss = False
-        self.use_inverse_loss = False
-        self.use_reward_loss = False
-        self.use_autoencoder = False
-        self.use_vae = False
-        self.reward_prior = False
-        self.reward_loss = False
-        self.episode_prior = False
-        self.no_priors = False
-        self.use_supervised = False
-        self.use_triplets = False
         self.losses = losses
         self.dim_action = n_actions
         self.beta = beta
-        if model_type in ["autoencoder", "mlp", "resnet", "custom_cnn", "linear", "vae"] \
-                or "autoencoder" in losses or "vae" in losses or "supervised" in losses:
+        if model_type in ["linear", "mlp", "resnet", "custom_cnn"] \
+                or "autoencoder" in losses or "vae" in losses:
             self.use_forward_loss = "forward" in losses
             self.use_inverse_loss = "inverse" in losses
             self.use_reward_loss = "reward" in losses
@@ -88,7 +79,6 @@ class SRL4robotics(BaseLearner):
             self.reward_prior = "reward-prior" in losses
             self.use_autoencoder = "autoencoder" in losses
             self.use_vae = "vae" in losses
-            self.use_supervised = "supervised" in losses
             self.use_triplets = "triplet" in self.losses
             self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
                                     cuda=cuda, losses=losses)
@@ -176,12 +166,15 @@ class SRL4robotics(BaseLearner):
             minibatch_episodes = [[idx_to_episode[i] for i in minibatch] for minibatch in minibatchlist]
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
-                                       cache_capacity=100, multi_view=self.multi_view, n_workers=4,
+                                       cache_capacity=100, multi_view=self.multi_view, n_workers=N_WORKERS,
                                        triplets=self.use_triplets)
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
-        loss_object = RoboticPriorsLoss(self.model, self.l1_reg, loss_history)
+        loss_manager = LossManager(self.model, self.l1_reg, loss_history)
+
+        if loss_manager.l1_coeff > 0:
+            l1Loss(loss_manager.reg_params, loss_manager.l1_coeff, loss_manager)
 
         best_error = np.inf
         best_model_path = "{}/srl_model.pth".format(self.log_folder)
@@ -198,7 +191,7 @@ class SRL4robotics(BaseLearner):
             for minibatch_num, (minibatch_idx, obs, next_obs) in enumerate(data_loader):
                 obs, next_obs = obs.to(self.device), next_obs.to(self.device)
                 self.optimizer.zero_grad()
-                loss_object.resetLosses()
+                loss_manager.resetLosses()
 
                 decoded_obs, decoded_next_obs = None, None
 
@@ -215,7 +208,8 @@ class SRL4robotics(BaseLearner):
                 elif self.use_autoencoder:
                     (states, decoded_obs), (next_states, decoded_next_obs) = self.model(obs), self.model(next_obs)
                 elif self.use_vae:
-                    decoded_obs, mu, logvar = self.model(obs)
+                    (decoded_obs, mu, logvar), (next_decoded_obs, next_mu, next_logvar) = self.model(obs), \
+                                                                                          self.model(next_obs)
                     states, next_states = self.model.getStates(obs), self.model.getStates(next_obs)
                 else:
                     states, next_states = self.model(obs), self.model(next_obs)
@@ -225,16 +219,17 @@ class SRL4robotics(BaseLearner):
                 actions_st = th.from_numpy(actions_st).view(-1, 1).requires_grad_(False).to(self.device)
 
                 if not self.no_priors:
-                    loss_object.forward(states, next_states, minibatch_idx=minibatch_idx,
-                                        dissimilar_pairs=dissimilar_pairs, same_actions_pairs=same_actions_pairs)
+                    roboticPriorsLoss(states, next_states, minibatch_idx=minibatch_idx,
+                                        dissimilar_pairs=dissimilar_pairs, same_actions_pairs=same_actions_pairs,
+                                        weight=1., loss_manager=loss_manager)
 
                 if self.use_forward_loss:
                     next_states_pred = self.model.forwardModel(states, actions_st)
-                    forwardModelLoss(next_states_pred, next_states, weight=1., loss_object=loss_object)
+                    forwardModelLoss(next_states_pred, next_states, weight=1., loss_manager=loss_manager)
 
                 if self.use_inverse_loss:
                     actions_pred = self.model.inverseModel(states, next_states)
-                    inverseModelLoss(actions_pred, actions_st, weight=1, loss_object=loss_object)
+                    inverseModelLoss(actions_pred, actions_st, weight=1, loss_manager=loss_manager)
 
                 if self.use_reward_loss:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
@@ -242,25 +237,26 @@ class SRL4robotics(BaseLearner):
                     rewards_st[rewards_st == -1] = 0
                     rewards_st = th.from_numpy(rewards_st).view(-1, 1).to(self.device)
                     rewards_pred = self.model.rewardModel(states)
-                    rewardModelLoss(rewards_pred, rewards_st.long(), weight=2.5, loss_object=loss_object)
+                    rewardModelLoss(rewards_pred, rewards_st.long(), weight=2.5, loss_manager=loss_manager)
 
                 if self.use_autoencoder:
-                    autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_object=loss_object)
+                    autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_manager=loss_manager)
                 if self.use_vae:
-                    vaeLoss(decoded_obs, obs, mu, logvar, weight=1, loss_object=loss_object, beta=self.beta)
+                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=0.5,
+                            loss_manager=loss_manager, beta=self.beta)
                 if self.reward_prior:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
                     rewards_st = th.from_numpy(rewards_st).float().view(-1, 1).to(self.device)
-                    rewardPriorLoss(states, rewards_st, weight=10., loss_object=loss_object)
+                    rewardPriorLoss(states, rewards_st, weight=10., loss_manager=loss_manager)
 
                 if self.episode_prior:
                     episodePriorLoss(minibatch_idx, minibatch_episodes, states, self.discriminator,
-                                     BALANCED_SAMPLING, weight=1, loss_object=loss_object)
+                                     BALANCED_SAMPLING, weight=1, loss_manager=loss_manager)
                 if self.use_triplets:
-                    tripletLoss(states, positive_states, negative_states, weight=1.0, loss_object=loss_object, alpha=0.2)
+                    tripletLoss(states, positive_states, negative_states, weight=1.0, loss_manager=loss_manager, alpha=0.2)
                 # Compute weighted average of losses
-                loss_object.updateLossHistory()
-                loss = loss_object.computeTotalLoss()
+                loss_manager.updateLossHistory()
+                loss = loss_manager.computeTotalLoss()
 
                 # We have to call backward in both train/val
                 # to avoid memory error
@@ -278,9 +274,9 @@ class SRL4robotics(BaseLearner):
 
             train_loss = epoch_loss / float(epoch_batches)
             val_loss /= float(n_val_batches)
-            # Even if loss_history is modified by RoboticPriorsLoss object
+            # Even if loss_history is modified by LossManager
             # we make it explicit
-            loss_history = loss_object.loss_history
+            loss_history = loss_manager.loss_history
             loss_history['train_loss'].append(train_loss)
             loss_history['val_loss'].append(val_loss)
             for key in loss_history.keys():
@@ -310,17 +306,25 @@ class SRL4robotics(BaseLearner):
                         plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
                                            add_colorbar=epoch == 0,
                                            name="Learned State Representation (Training Data)")
+
                         if self.use_autoencoder or self.use_vae:
                             # Plot Reconstructed Image
-                            if self.multi_view:
-                                plotImage(deNormalize(detachToNumpy(obs[0][:3, :, :])), "Input Image 1 (Train)")
-                                plotImage(deNormalize(detachToNumpy(decoded_obs[0][:3, :, :])), "Reconstructed Image 1")
-
-                                plotImage(deNormalize(detachToNumpy(obs[0][3:, :, :])), "Input Image 2 (Train)")
-                                plotImage(deNormalize(detachToNumpy(decoded_obs[0][3:, :, :])), "Reconstructed Image 2")
-                            else:
-                                plotImage(deNormalize(detachToNumpy(obs[0][:3,:,:])), "Input Image (Train)")
+                            if obs[0].shape[0] == 3:  # RGB
+                                plotImage(deNormalize(detachToNumpy(obs[0])), "Input Image (Train)")
                                 plotImage(deNormalize(detachToNumpy(decoded_obs[0])), "Reconstructed Image")
+
+                            elif obs[0].shape[0] % 3 == 0:  # Multi-RGB
+                                for k in range(obs[0].shape[0] // 3):
+                                    plotImage(deNormalize(detachToNumpy(obs[0][k * 3:(k + 1) * 3, :, :])),
+                                              "Input Image {} (Train)".format(k + 1))
+                                    plotImage(deNormalize(detachToNumpy(decoded_obs[0][k * 3:(k + 1) * 3, :, :])),
+                                              "Reconstructed Image {}".format(k + 1))
+                            else:  # Other
+                                for k in range(obs[0].shape[0]):
+                                    plotImage(deNormalize(detachToNumpy(obs[0][k:(k + 1), :, :])),
+                                              "Input Image {} (Train)".format(k + 1))
+                                    plotImage(deNormalize(detachToNumpy(decoded_obs[0][k:(k + 1), :, :])),
+                                              "Reconstructed Image {}".format(k + 1))
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 
@@ -387,7 +391,7 @@ if __name__ == '__main__':
                         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
                                  "autoencoder", "vae"], )
     parser.add_argument('--beta', type=float, default=1.0,
-                        help='(For VAE only) the Beta factor on the KL divergence, higher value means more disentangling.')
+                        help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -402,7 +406,10 @@ if __name__ == '__main__':
     # Dealing with losses to use
     losses = list(set(args.losses))
 
-    if args.multi_view == True:
+    if args.multi_view is True:
+        # Setting variables involved data-loading from multiple cameras,
+        # involved also in adapting the input layers of NN to that data
+        # PS: those are stacked images - 3 if triplet loss, 2 otherwise
         if "triplet" in losses:
             preprocessing.preprocess.N_CHANNELS = 9
         else:
