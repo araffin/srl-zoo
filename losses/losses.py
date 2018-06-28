@@ -15,14 +15,17 @@ except ImportError:
     pass
 
 
-class LossObject:
+class LossManager:
     """
-    :param model: (PyTorch model)
-    :param l1_reg: (float) l1 regularization coeff
-    :param loss_history: (dict) will be modified
+    Object in charge of Computing and Saving history of Losses
     """
 
     def __init__(self, model, l1_reg=0.0, loss_history=None):
+        """
+        :param model: (PyTorch model)
+        :param l1_reg: (float) l1 regularization coeff
+        :param loss_history: (dict)
+        """
         # Retrieve only trainable and regularizable parameters (we should exclude biases)
         self.reg_params = [param for name, param in model.named_parameters() if
                            ".bias" not in name and param.requires_grad]
@@ -31,10 +34,13 @@ class LossObject:
         self.loss_history = loss_history
         self.names, self.weights, self.losses = [], [], []
 
-        if self.l1_coeff > 0:
-            l1Loss(self.reg_params, self.l1_coeff, self)
-
     def addToLosses(self, name, weight, loss_value):
+        """
+        :param name: (str)
+        :param weight: (float)
+        :param loss_value: (FloatTensor)
+        :return:
+        """
         self.names.append(name)
         self.weights.append(weight)
         self.losses.append(loss_value)
@@ -55,14 +61,17 @@ class LossObject:
         self.names, self.weights, self.losses = [], [], []
 
 
-def roboticsPriorsLoss(states, next_states, minibatch_idx,
-            dissimilar_pairs, same_actions_pairs, weight, loss_object):
+def roboticPriorsLoss(states, next_states, minibatch_idx,
+            dissimilar_pairs, same_actions_pairs, weight, loss_manager):
     """
+    Computing the 4 Robotic priors: Temporal coherence, Causality, Proportionality, Repeatability
     :param states: (th.Tensor)
     :param next_states: (th.Tensor)
     :param minibatch_idx: (int)
     :param dissimilar_pairs: ([numpy array])
     :param same_actions_pairs: ([numpy array])
+    :param weight: coefficient to weight the loss
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return: (th.Tensor)
     """
     dissimilar_pairs = th.from_numpy(dissimilar_pairs[minibatch_idx]).to(states.device)
@@ -87,109 +96,106 @@ def roboticsPriorsLoss(states, next_states, minibatch_idx,
 
     total_loss = 0
     for idx in range(len(weights)):
-        loss_object.addToLosses(names[idx], weights[idx], losses[idx])
+        loss_manager.addToLosses(names[idx], weights[idx], losses[idx])
         total_loss += losses[idx]
     return weight * total_loss
 
 
-def forwardModelLoss(next_states_pred, next_states, weight, loss_object):
+def forwardModelLoss(next_states_pred, next_states, weight, loss_manager):
     """
     :param next_states_pred: (th.Tensor)
     :param next_states: (th.Tensor)
     :param weight: coefficient to weight the loss
-    :param loss_object: loss criterion needed to log the loss value
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return:
     """
     forward_loss = F.mse_loss(next_states_pred, next_states, size_average=True)
-    loss_object.addToLosses('forward_loss', weight, forward_loss)
+    loss_manager.addToLosses('forward_loss', weight, forward_loss)
     return weight * forward_loss
 
 
-def inverseModelLoss(actions_pred, actions_st, weight, loss_object):
+def inverseModelLoss(actions_pred, actions_st, weight, loss_manager):
     """
     Inverse model's loss: Cross-entropy between predicted categoriacal actions and true actions
     :param actions_pred: (th.Tensor)
     :param actions_st: (th.Tensor)
     :param weight: coefficient to weight the loss
-    :param loss_object: loss criterion needed to log the loss value
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return:
     """
     loss_fn = nn.CrossEntropyLoss()
     inverse_loss = loss_fn(actions_pred, actions_st.squeeze(1))
-    loss_object.addToLosses('inverse_loss', weight, inverse_loss)
+    loss_manager.addToLosses('inverse_loss', weight, inverse_loss)
     return weight * inverse_loss
 
 
-def l1Loss(params, weight, loss_object):
+def l1Loss(params, weight, loss_manager):
     """
     L1 regularization loss
     :param params: NN's weights to regularize
     :param weight: coefficient to weight the loss (float)
-    :param loss_object: loss criterion needed to log the loss value
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return:
     """
     l1_loss = sum([th.sum(th.abs(param)) for param in params])
-    loss_object.addToLosses('l1_loss', weight, l1_loss)
+    loss_manager.addToLosses('l1_loss', weight, l1_loss)
     return weight * l1_loss
 
 
-def rewardModelLoss(rewards_pred, rewards_st, weight, loss_object):
+def rewardModelLoss(rewards_pred, rewards_st, weight, loss_manager):
     """
     Categorical Reward prediction Loss (Cross-entropy)
     :param rewards_pred: predicted reward - categorical (th.Tensor)
     :param rewards_st: (th.Tensor)
     :param weight: coefficient to weight the loss
-    :param loss_object: loss criterion needed to log the loss value
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return:
     """
     loss_fn = nn.CrossEntropyLoss()
     reward_loss = loss_fn(rewards_pred, target=rewards_st.squeeze(1))
-    loss_object.addToLosses('reward_loss', weight, reward_loss)
+    loss_manager.addToLosses('reward_loss', weight, reward_loss)
     return weight * reward_loss
 
 
-# reconstructionLoss = nn.MSELoss(size_average=True)
-# Redefine MSE otherwise PyTorch won't less us compute gradient w.r.t. input
 def reconstructionLoss(_input, target):
     """
-    TODO: fill out
-    :param _input:
-    :param target:
+    Reconstruction Loss for Autoencoders
+    :param _input: Observation (th.Tensor)
+    :param target:  Reconstructed observation (th.Tensor)
     :return:
     """
-    return th.sum((_input - target) ** 2) / _input.data.nelement()
+    return F.mse_loss(_input, target, size_average=True)
 
 
-def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_object):
+def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_manager):
     """
-    TODO: fill out
-    :param obs:
-    :param decoded_obs:
-    :param next_obs:
-    :param decoded_next_obs:
+    :param obs: Observation (th.Tensor)
+    :param decoded_obs: reconstructed Observation (th.Tensor)
+    :param next_obs: next Observation (th.Tensor)
+    :param decoded_next_obs: next reconstructed Observation (th.Tensor)
     :param weight: coefficient to weight the loss (float)
-    :param loss_object: loss criterion needed to log the loss value
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return:
     """
     ae_loss = reconstructionLoss(obs, decoded_obs) + reconstructionLoss(next_obs, decoded_next_obs)
-    loss_object.addToLosses('reconstruction_loss', weight, ae_loss)
+    loss_manager.addToLosses('reconstruction_loss', weight, ae_loss)
     return weight * ae_loss
 
 
 def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logvar,
-            weight, loss_object, beta=1):
+            weight, loss_manager, beta=1):
     """
     Reconstruction + KL divergence losses summed over all elements and batch
-    :param decoded: (th.Tensor)
-    :param next_decoded: (th.Tensor)
-    :param obs: (th.Tensor)
-    :param next_obs: (th.Tensor)
-    :param mu: (th.Tensor)
-    :param next_mu: (th.Tensor)
-    :param logvar: (th.Tensor)
-    :param next_logvar: (th.Tensor)
+    :param decoded: reconstructed Observation (th.Tensor)
+    :param next_decoded: next reconstructed Observation (th.Tensor)
+    :param obs: Observation (th.Tensor)
+    :param next_obs: next Observation (th.Tensor)
+    :param mu: mean of the distribution of samples (th.Tensor)
+    :param next_mu: mean of the distribution of next samples (th.Tensor)
+    :param logvar: log std of the distribution of samples (th.Tensor)
+    :param next_logvar: log std of the distribution of next samples (th.Tensor)
     :param weight: coefficient to weight the loss (float)
-    :param loss_object: loss criterion needed to log the loss value
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :param beta: (float) used to weight the KL divergence for disentangling
     :return: (th.Tensor)
     """
@@ -205,18 +211,18 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
 
     vae_loss = generation_loss + beta * kl_divergence
 
-    loss_object.addToLosses('kl_loss', weight, vae_loss)
+    loss_manager.addToLosses('kl_loss', weight, vae_loss)
     return weight * vae_loss
 
 
-def mutualInformationLoss(states, rewards_st, weight, loss_object):
+def mutualInformationLoss(states, rewards_st, weight, loss_manager):
     """
     Loss criterion to assess mutual information between predicted states and rewards
     see: https://en.wikipedia.org/wiki/Mutual_information
     :param states: (th.Tensor)
     :param rewards_st:(th.Tensor)
     :param weight: coefficient to weight the loss (float)
-    :param loss_object: loss criterion needed to log the loss value
+    :param loss_manager: loss criterion needed to log the loss value
     :return:
     """
     X = states
@@ -235,37 +241,36 @@ def mutualInformationLoss(states, rewards_st, weight, loss_object):
             I += p_xy * th.log(p_xy / (p_x[x] * p_y[y]))
 
     reward_prior_loss = th.exp(-I)
-    loss_object.addToLosses('reward_prior', weight, reward_prior_loss)
+    loss_manager.addToLosses('reward_prior', weight, reward_prior_loss)
     return weight * reward_prior_loss
 
 
-def rewardPriorLoss(states, rewards_st, weight, loss_object):
+def rewardPriorLoss(states, rewards_st, weight, loss_manager):
     """
     Loss expressing Correlation between predicted states and reward
     :param states: (th.Tensor)
     :param rewards_st: rewards at timestep t (th.Tensor)
     :param weight: coefficient to weight the los s
-    :param loss_object: loss criterion needed to log the loss value
+    :param loss_manager: loss criterion needed to log the loss value
     :return:
     """
 
     reward_loss = th.mean(
         th.mm((states - th.mean(states, dim=0)).t(), (rewards_st - th.mean(rewards_st, dim=0))))
     reward_prior_loss = th.exp(-th.abs(reward_loss))
-    loss_object.addToLosses('reward_prior', weight, reward_prior_loss)
+    loss_manager.addToLosses('reward_prior', weight, reward_prior_loss)
     return weight * reward_prior_loss
 
 
-def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, balanced_sampling, weight, loss_object):
+def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, balanced_sampling, weight, loss_manager):
     """
-    TODO: fill out
     :param minibatch_idx:
     :param minibatch_episodes:
     :param states: (th.Tensor)
-    :param discriminator:
-    :param balanced_sampling:
-    :param weight: coefficient to weight the loss
-    :param loss_object: loss criterion needed to log the loss value
+    :param discriminator: (model)
+    :param balanced_sampling: (boool)
+    :param weight: coefficient to weight the loss (float)
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return:
     """
     # The "episode prior" idea is really close
@@ -308,11 +313,11 @@ def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, b
 
     # TODO: classification accuracy/loss
     episode_loss = criterion_episode(episode_output.squeeze(1), same_episodes)
-    loss_object.addToLosses('episode_prior', weight, episode_loss)
+    loss_manager.addToLosses('episode_prior', weight, episode_loss)
     return weight * episode_loss
 
 
-def tripletLoss(states, p_states, n_states, weight, loss_object, alpha=0.2):
+def tripletLoss(states, p_states, n_states, weight, loss_manager, alpha=0.2):
     """
     :param alpha: (float) margin that is enforced between positive & neg observation (TCN Triplet Loss)
     :param states: (th.Tensor) states for the anchor obs
@@ -325,5 +330,5 @@ def tripletLoss(states, p_states, n_states, weight, loss_object, alpha=0.2):
     distance_negative = (states - n_states).pow(2).sum(1)
     tcn_triplet_loss = F.relu(distance_positive - distance_negative + alpha)
     tcn_triplet_loss = tcn_triplet_loss.mean()
-    loss_object.addToLosses('triplet_loss', weight, tcn_triplet_loss)
+    loss_manager.addToLosses('triplet_loss', weight, tcn_triplet_loss)
     return weight * tcn_triplet_loss
