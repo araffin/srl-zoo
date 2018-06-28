@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 
 import os
+import subprocess
 
 import torch
 from termcolor import colored
@@ -11,6 +12,18 @@ try:
 except NameError:
     # Assign the built-in function to a variable
     input = input
+
+
+def importMaplotlib():
+    """
+    Fix for plotting when x11 is not available
+    """
+    p = subprocess.Popen(["xset", "-q"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p.communicate()
+    x11_available = p.returncode == 0
+    if not x11_available:
+        import matplotlib
+        matplotlib.use('Agg')
 
 
 def detachToNumpy(tensor):
