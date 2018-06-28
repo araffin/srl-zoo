@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 import plotting.representation_plot as plot_script
 from models import ConvolutionalNetwork, DenseNetwork, CustomCNN
-from models.base_learner import BaseLearner
+from models.learner import BaseLearner
 from pipeline import saveConfig
 from plotting.losses_plot import plotLosses
 from plotting.representation_plot import plotRepresentation, plt
@@ -190,7 +190,7 @@ if __name__ == '__main__':
     parser.add_argument('-bs', '--batch-size', type=int, default=32, help='batch_size (default: 32)')
     parser.add_argument('-lr', '--learning-rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
-    parser.add_argument('--no-plots', action='store_true', default=False, help='disables plots')
+    parser.add_argument('--no-display-plots', action='store_true', default=False, help='disables live plots of the representation learned')
     parser.add_argument('--model-type', type=str, default="resnet", help='Model architecture (default: "resnet")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--training-set-size', type=int, default=-1,
@@ -201,7 +201,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
-    DISPLAY_PLOTS = not args.no_plots
+    DISPLAY_PLOTS = not args.no_display_plots
     plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS
     N_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size

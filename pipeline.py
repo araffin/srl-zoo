@@ -86,7 +86,7 @@ def stateRepresentationLearningCall(exp_config):
     """
     printGreen("\nLearning a state representation...")
 
-    args = ['--no-plots']
+    args = ['--no-display-plots']
 
     if exp_config.get('multi-view', False):
         args.extend(['--multi-view'])
@@ -122,7 +122,7 @@ def baselineCall(exp_config, baseline="supervised"):
     """
     printGreen("\n Baseline {}...".format(baseline))
 
-    args = ['--no-plots']
+    args = ['--no-display-plots']
     config_args = ['epochs', 'seed', 'model-type',
                    'data-folder', 'training-set-size', 'batch-size']
 
@@ -154,7 +154,7 @@ def pcaCall(exp_config):
     """
     printGreen("\n Baseline PCA...")
 
-    args = ['--no-plots']
+    args = ['--no-display-plots']
     config_args = ['data-folder', 'training-set-size', 'state-dim']
 
     for arg in config_args:
