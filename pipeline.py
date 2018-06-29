@@ -164,6 +164,20 @@ def pcaCall(exp_config):
     printConfigOnError(ok, exp_config, "pcaCall")
 
 
+def createGroundTruthFolder(exp_config):
+    """
+    Create folder and save exp_config in order to compute knn-mse
+    :param exp_config: (dict)
+    :return: (dict)
+    """
+    log_folder = "logs/{}/baselines/ground_truth/".format(exp_config['data-folder'])
+    createFolder(log_folder, "")
+    exp_config['log-folder'] = log_folder
+    exp_config['ground-truth'] = True
+    saveConfig(exp_config)
+    return exp_config
+
+
 def knnCall(exp_config):
     """
     Evaluate the representation using knn
@@ -176,6 +190,9 @@ def knnCall(exp_config):
     printGreen("\nEvaluating the state representation with KNN")
 
     args = ['--seed', str(exp_config['knn-seed']), '--n-samples', str(exp_config['knn-samples'])]
+
+    if exp_config.get('ground-truth', False):
+        args.extend(['--ground-truth'])
 
     if exp_config.get('multi-view', False):
         args.extend(['--multi-view'])
@@ -274,8 +291,8 @@ if __name__ == '__main__':
     # Grid Search on Baselines
     if args.baselines and args.data_folder != "":
         exp_config = getBaseExpConfig(args)
-        # WARNING: batch_size and learning_rate in the base config
-        # are NOT currently taken into account for baselines
+        # WARNING: learning_rate in the base config
+        # is NOT currently taken into account for baselines
         base_config = exp_config.copy()
         createFolder("logs/{}/baselines".format(exp_config['data-folder']), "Baseline folder already exist")
         # Check that the dataset is already preprocessed
@@ -307,6 +324,11 @@ if __name__ == '__main__':
             exp_config['state-dim'] = state_dim
             pcaCall(exp_config)
             evaluateBaseline(base_config)
+
+        # KNN-MSE for ground_truth
+        exp_config = base_config.copy()
+        exp_config = createGroundTruthFolder(exp_config)
+        knnCall(exp_config)
 
     # Reproduce a previous experiment using "exp_config.json"
     elif args.exp_config != "":
