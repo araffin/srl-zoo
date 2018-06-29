@@ -29,7 +29,7 @@ def preprocessImage(image):
     return im
 
 
-def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplets=False):
+def imageWorker(image_queue, output_queue, exit_event, multi_view=False, use_triplets=False):
     """
     Worker that preprocess images
     :param image_queue: (multiprocessing.Queue) queue with the path to the images
@@ -37,7 +37,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                           will be added
     :param exit_event: (multiprocessing.Event) Event for exiting the loop
     :param multi_view: (bool) enables dual camera mode
-    :param triplets: (bool) enables loading of negative example (third image)
+    :param use_triplets: (bool) enables loading of negative example (third image)
     """
     while not exit_event.is_set():
         idx, image_path = image_queue.get()
@@ -59,7 +59,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             ####################
             # loading a negative observation
 
-            if triplets:
+            if use_triplets:
                 # End of file format for positive & negative observations (camera 1) - length : 6 characters
                 extra_chars = '_1.jpg'
 
@@ -107,7 +107,7 @@ class CustomDataLoader(object):
     :param test_batch_size: (int)
     :param cache_capacity: (int) number of images that can be cached
     :param multi_view: (bool) enables dual camera mode
-    :param triplets: (bool) enables loading of negative observation
+    :param use_triplets: (bool) enables loading of negative observation
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
     [WARNING] Set to False, you MUST clean up the loader manually (by calling cleanUp() method)
@@ -115,7 +115,7 @@ class CustomDataLoader(object):
     """
 
     def __init__(self, minibatchlist, images_path, test_batch_size=512, cache_capacity=5000,
-                 n_workers=5, auto_cleanup=True, multi_view=False, triplets=False):
+                 n_workers=5, auto_cleanup=True, multi_view=False, use_triplets=False):
         super(CustomDataLoader, self).__init__()
 
         self.n_minibatches = len(minibatchlist)
@@ -175,7 +175,7 @@ class CustomDataLoader(object):
         self.n_sent, self.n_received = 0, 0
         self.shutdown = False
         self.multi_view = multi_view
-        self.triplets = triplets
+        self.use_triplets = use_triplets
 
         if self.n_workers <= 0:
             raise ValueError("n_workers <= 0 in the data loader")
@@ -185,7 +185,7 @@ class CustomDataLoader(object):
         self.workers = []
         for i in range(self.n_workers):
             w = mp.Process(target=imageWorker, args=(self.image_queues[i], self.output_queue,
-                                                     self.exit_event, self.multi_view, self.triplets))
+                                                     self.exit_event, self.multi_view, self.use_triplets))
             w.daemon = True  # ensure that the worker exits on process exit
             w.start()
             self.workers.append(w)

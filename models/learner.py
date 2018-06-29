@@ -283,14 +283,11 @@ class SRL4robotics(BaseLearner):
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
                                        cache_capacity=100, multi_view=self.multi_view, n_workers=N_WORKERS,
-                                       triplets=self.use_triplets)
+                                       use_triplets=self.use_triplets)
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
         loss_manager = LossManager(self.model, self.l1_reg, loss_history)
-
-        if loss_manager.l1_coeff > 0:
-            l1Loss(loss_manager.reg_params, loss_manager.l1_coeff, loss_manager)
 
         best_error = np.inf
         best_model_path = "{}/srl_model.pth".format(self.log_folder)
@@ -333,6 +330,10 @@ class SRL4robotics(BaseLearner):
                 # Actions associated to the observations of the current minibatch
                 actions_st = actions[minibatchlist[minibatch_idx]]
                 actions_st = th.from_numpy(actions_st).view(-1, 1).requires_grad_(False).to(self.device)
+
+                # L1 regularization
+                if loss_manager.l1_coeff > 0:
+                    l1Loss(loss_manager.reg_params, loss_manager.l1_coeff, loss_manager)
 
                 if not self.no_priors:
                     roboticPriorsLoss(states, next_states, minibatch_idx=minibatch_idx,
@@ -435,12 +436,7 @@ class SRL4robotics(BaseLearner):
                                               "Input Image {} (Train)".format(k + 1))
                                     plotImage(deNormalize(detachToNumpy(decoded_obs[0][k * 3:(k + 1) * 3, :, :])),
                                               "Reconstructed Image {}".format(k + 1))
-                            else:  # Other
-                                for k in range(obs[0].shape[0]):
-                                    plotImage(deNormalize(detachToNumpy(obs[0][k:(k + 1), :, :])),
-                                              "Input Image {} (Train)".format(k + 1))
-                                    plotImage(deNormalize(detachToNumpy(decoded_obs[0][k:(k + 1), :, :])),
-                                              "Reconstructed Image {}".format(k + 1))
+
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 

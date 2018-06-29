@@ -43,8 +43,8 @@ def main():
     parser.add_argument('--no-cuda', default=False, action="store_true")
 
     args = parser.parse_args()
-
-    device = torch.device("cuda" if torch.cuda.is_available() and (not args.no_cuda) else "cpu")
+    use_cuda = not args.no_cuda
+    device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
 
     # making sure you chose the right folder
     assert os.path.exists(args.log_dir), "Error: folder '{}' does not exist".format(args.log_dir)
@@ -56,7 +56,6 @@ def main():
     loss_type = exp_config['losses']
     n_actions = exp_config['n_actions']
     model_type = exp_config['model-type']
-    cuda = exp_config['cuda']
 
     # is this a valid model ?
     assert set(VALID_MODELS).intersection(loss_type) != set(), "Error: losses not supported."
@@ -70,7 +69,7 @@ def main():
             args.log_dir + "exp_config.json"), "Error: could not find 'exp_config.json' in '{}'".format(
             args.log_dir)
         srl_model = SRLModules(state_dim=state_dim, action_dim=n_actions, model_type=model_type,
-                               cuda=cuda, losses=loss_type)
+                               cuda=use_cuda, losses=loss_type)
         srl_model.eval()
         srl_model.load_state_dict(torch.load(model_path))
         srl_model.to(device)
