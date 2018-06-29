@@ -42,7 +42,7 @@ def testPipeLine():
     assertEq(ok, 0)
 
 
-def testPipeLineDual():
+def testPipelineDual():
     removeFolderIfExist(LOG_FOLDER_DUAL)
     args = ['--data-folder', TEST_DATA_FOLDER_DUAL,
             '--base-config', 'configs/test_pipeline_dual.json']
