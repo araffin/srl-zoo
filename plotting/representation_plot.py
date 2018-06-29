@@ -241,15 +241,6 @@ def loadData(data_folder):
     return training_data, ground_truth, true_states, target_positions
 
 
-def loadOffsets(training_data, data_folder):
-    """
-    Loading indices where episodes start in training data,
-    :param training_data: Loaded training data (Numpy dictionary-like object)
-    :param data_folder: path to the data_folder to be loaded (Str)
-    :return: episode_starts (Numpy dictionary-like object)
-    """
-    return training_data['episode_starts']
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Plotting script for representation')
     parser.add_argument('-i', '--input-file', type=str, default="",
@@ -296,7 +287,7 @@ if __name__ == '__main__':
 
         elif args.correlation:
             training_data, ground_truth, true_states, target_positions = loadData(args.data_folder)
-            episode_starts = loadOffsets(training_data, args.data_folder)
+            episode_starts = training_data['episode_starts']
             with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
                 relative_pos = json.load(f).get('relative_pos', False)
 
@@ -323,7 +314,7 @@ if __name__ == '__main__':
 
         print("Plotting ground truth...")
         training_data, ground_truth, true_states, target_positions = loadData(args.data_folder)
-        episode_starts = loadOffsets(training_data, args.data_folder)
+        episode_starts = training_data['episode_starts']
         rewards = training_data['rewards']
         name = "Ground Truth States - {}".format(args.data_folder)
 
