@@ -154,7 +154,7 @@ def colorPerEpisode(episode_starts):
 def prettyPlotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='coolwarm'):
     """
     State dimensions are plotted one against the other (it creates a matrix of 2d representation)
-    using rewards for coloring
+    using rewards for coloring, the diagonal is a distribution plot, and the scatter plots have a density outline.
     :param states: (numpy tensor)
     :param rewards: (numpy array)
     :param title: (str)
@@ -323,7 +323,7 @@ if __name__ == '__main__':
     parser.add_argument('--plot-against', action='store_true', default=False,
                         help='Plot against each dimension')
     parser.add_argument('--pretty-plot-against', action='store_true', default=False,
-                        help='Plot against each dimension')
+                        help='Plot against each dimension (diagonals are distributions + cleaner look)')
     parser.add_argument('--correlation', action='store_true', default=False,
                         help='Plot correlation coeff against each dimension')
     parser.add_argument('--projection', action='store_true', default=False,
