@@ -5,7 +5,7 @@ import argparse
 from textwrap import fill
 
 import matplotlib.pyplot as plt
-from matplotlib import cm
+from matplotlib import cm, colors
 import seaborn as sns
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
@@ -151,6 +151,67 @@ def colorPerEpisode(episode_starts):
     return colors
 
 
+def prettyPlotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='coolwarm'):
+    """
+    State dimensions are plotted one against the other (it creates a matrix of 2d representation)
+    using rewards for coloring
+    :param states: (numpy tensor)
+    :param rewards: (numpy array)
+    :param title: (str)
+    :param fit_pca: (bool)
+    :param cmap: (str)
+    """
+    with sns.axes_style('white'):
+        n = states.shape[1]
+        fig, ax_mat = plt.subplots(n, n, figsize=(10, 10), sharex=False, sharey=False)
+        fig.subplots_adjust(hspace=0.2, wspace=0.2)
+
+        if fit_pca:
+            title += " (PCA)"
+            states = PCA(n_components=n).fit_transform(states)
+
+        c_idx = cm.get_cmap(cmap)
+        norm = colors.Normalize(vmin=np.min(rewards), vmax=np.max(rewards))
+
+        for i in range(n):
+            for j in range(n):
+                x, y = states[:, i], states[:, j]
+                ax = ax_mat[i, j]
+                if i != j:
+                    ax.scatter(x, y, c=rewards, cmap=cmap, s=5)
+                    sns.kdeplot(x, y, cmap="Greys", ax=ax, shade=True, shade_lowest=False, alpha=0.2)
+                    ax.set_xlim([np.min(x), np.max(x)])
+                    ax.set_ylim([np.min(y), np.max(y)])
+                else:
+                    if len(np.unique(rewards)) < 10:
+                        for r in np.unique(rewards):
+                            sns.distplot(x[rewards == r], color=c_idx(norm(r)), ax=ax)
+                    else:
+                        sns.distplot(x, ax=ax)
+
+                if i == 0:
+                    ax.set_title("Dim {}".format(j), y=1.2)
+                if i != j:
+                    # Hide ticks
+                    if i != 0 and i != n - 1:
+                        ax.xaxis.set_visible(False)
+                    if j != 0 and j != n - 1:
+                        ax.yaxis.set_visible(False)
+
+                    # Set up ticks only on one side for the "edge" subplots...
+                    if j == 0:
+                        ax.yaxis.set_ticks_position('left')
+                    if j == n - 1:
+                        ax.yaxis.set_ticks_position('right')
+                    if i == 0:
+                        ax.xaxis.set_ticks_position('top')
+                    if i == n - 1:
+                        ax.xaxis.set_ticks_position('bottom')
+
+        plt.suptitle(title, fontsize=16)
+        plt.show()
+
+
 def plotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='coolwarm'):
     """
     State dimensions are plotted one against the other (it creates a matrix of 2d representation)
@@ -250,6 +311,7 @@ def loadOffsets(training_data, data_folder):
     """
     return training_data['episode_starts'], "Ground Truth States - {}".format(data_folder)
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Plotting script for representation')
     parser.add_argument('-i', '--input-file', type=str, default="",
@@ -259,6 +321,8 @@ if __name__ == '__main__':
     parser.add_argument('--color-episode', action='store_true', default=False,
                         help='Color states per episodes instead of reward')
     parser.add_argument('--plot-against', action='store_true', default=False,
+                        help='Plot against each dimension')
+    parser.add_argument('--pretty-plot-against', action='store_true', default=False,
                         help='Plot against each dimension')
     parser.add_argument('--correlation', action='store_true', default=False,
                         help='Plot correlation coeff against each dimension')
@@ -289,6 +353,9 @@ if __name__ == '__main__':
         if args.plot_against:
             print("Plotting against")
             plotAgainst(states_rewards['states'], rewards, cmap=cmap)
+        elif args.pretty_plot_against:
+            print("Pretty plotting against")
+            prettyPlotAgainst(states_rewards['states'], rewards, cmap=cmap)
 
         elif args.projection:
             training_data, ground_truth, true_states, _ = loadData(args.data_folder)
@@ -343,6 +410,8 @@ if __name__ == '__main__':
 
         if args.plot_against:
             plotAgainst(true_states, rewards, cmap=cmap)
+        elif args.pretty_plot_against:
+            prettyPlotAgainst(true_states, rewards, cmap=cmap)
         else:
             plotRepresentation(true_states, rewards, name, fit_pca=False, cmap=cmap)
         input('\nPress any key to exit.')
