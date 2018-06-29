@@ -5,10 +5,7 @@ import argparse
 from textwrap import fill
 
 import matplotlib.pyplot as plt
-<<<<<<< HEAD
 from matplotlib import cm, colors
-=======
->>>>>>> c313b56b736dd2d4ca0d9ee20cc451fd6805a899
 import seaborn as sns
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
