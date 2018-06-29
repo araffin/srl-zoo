@@ -283,7 +283,7 @@ class SRL4robotics(BaseLearner):
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
                                        cache_capacity=100, multi_view=self.multi_view, n_workers=N_WORKERS,
-                                       triplets=self.use_triplets)
+                                       use_triplets=self.use_triplets)
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
@@ -435,12 +435,7 @@ class SRL4robotics(BaseLearner):
                                               "Input Image {} (Train)".format(k + 1))
                                     plotImage(deNormalize(detachToNumpy(decoded_obs[0][k * 3:(k + 1) * 3, :, :])),
                                               "Reconstructed Image {}".format(k + 1))
-                            else:  # Other
-                                for k in range(obs[0].shape[0]):
-                                    plotImage(deNormalize(detachToNumpy(obs[0][k:(k + 1), :, :])),
-                                              "Input Image {} (Train)".format(k + 1))
-                                    plotImage(deNormalize(detachToNumpy(decoded_obs[0][k:(k + 1), :, :])),
-                                              "Reconstructed Image {}".format(k + 1))
+
         if DISPLAY_PLOTS:
             plt.close("Learned State Representation (Training Data)")
 

@@ -17,7 +17,7 @@ except ImportError:
 
 class LossManager:
     """
-    Object in charge of Computing and Saving history of Losses
+    Class in charge of Computing and Saving history of Losses
     """
 
     def __init__(self, model, l1_reg=0.0, loss_history=None):

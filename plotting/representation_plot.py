@@ -5,7 +5,6 @@ import argparse
 from textwrap import fill
 
 import matplotlib.pyplot as plt
-from matplotlib import cm
 import seaborn as sns
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
@@ -206,13 +205,13 @@ def plotCorrelation(states_rewards, ground_truth):
     :return:
     """
     for ground_truth_name in [" Agent's position ", "Target Position"]:
-        if ground_truth_name == "Target Position":
+        if ground_truth_name == " Agent's position ":
             key = 'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'
             X = ground_truth[key][:len(rewards)]
         else:
             X = button_pos_[:len(rewards)]
 
-        # adding epsillon in case of little variance in samples of X & Ys
+        # adding epsilon in case of little variance in samples of X & Ys
         eps = 1e-12
         corr = np.corrcoef(x=X + eps, y=states_rewards['states'] + eps, rowvar=False)
         fig = plt.figure(figsize=(8, 6))
@@ -230,8 +229,8 @@ def plotCorrelation(states_rewards, ground_truth):
 
 def loadData(data_folder):
     """
-    :param data_folder:
-    :return: training_data, ground_truth, true_states, target_positions
+    :param data_folder: path to the data_folder to be loaded (Str)
+    :return: training_data, ground_truth, true_states, target_positions (Numpy dictionary-like objects) X 3
     """
     training_data = np.load('data/{}/preprocessed_data.npz'.format(data_folder))
     ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
@@ -244,11 +243,12 @@ def loadData(data_folder):
 
 def loadOffsets(training_data, data_folder):
     """
-    :param training_data:
-    :param data_folder:
-    :return: episode_starts, name
+    Loading indices where episodes start in training data,
+    :param training_data: Loaded training data (Numpy dictionary-like object)
+    :param data_folder: path to the data_folder to be loaded (Str)
+    :return: episode_starts (Numpy dictionary-like object)
     """
-    return training_data['episode_starts'], "Ground Truth States - {}".format(data_folder)
+    return training_data['episode_starts']
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Plotting script for representation')
@@ -296,8 +296,7 @@ if __name__ == '__main__':
 
         elif args.correlation:
             training_data, ground_truth, true_states, target_positions = loadData(args.data_folder)
-            episode_starts, name = loadOffsets(training_data, args.data_folder)
-
+            episode_starts = loadOffsets(training_data, args.data_folder)
             with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
                 relative_pos = json.load(f).get('relative_pos', False)
 
@@ -324,8 +323,9 @@ if __name__ == '__main__':
 
         print("Plotting ground truth...")
         training_data, ground_truth, true_states, target_positions = loadData(args.data_folder)
-        episode_starts, name = loadOffsets(training_data, args.data_folder)
+        episode_starts = loadOffsets(training_data, args.data_folder)
         rewards = training_data['rewards']
+        name = "Ground Truth States - {}".format(args.data_folder)
 
         with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
             relative_pos = json.load(f).get('relative_pos', False)
