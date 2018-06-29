@@ -1,11 +1,13 @@
 from __future__ import print_function, division, absolute_import
 
+import os
+import shutil
 import subprocess
 
 TEST_DATA_FOLDER = "data/kuka_gym_test"
-LOG_FOLDER = "logs/kuka_gym_test"
-
 TEST_DATA_FOLDER_DUAL = "data/kuka_gym_dual_test"
+LOG_FOLDER = "logs/kuka_gym_test"
+LOG_FOLDER_DUAL = "logs/kuka_gym_dual_test"
 NUM_EPOCHS = 1
 STATE_DIM = 2
 TRAINING_SET_SIZE = 2000
@@ -20,8 +22,17 @@ def assertEq(left, right):
 def assertNeq(left, right):
     assert left != right, "{} == {}".format(left, right)
 
+def removeFolderIfExist(path):
+    """
+    :param path: (str)
+    """
+    # cleanup to remove the cluter
+    if os.path.exists(path):
+        shutil.rmtree(path)
+
 
 def testPipeLine():
+    removeFolderIfExist(LOG_FOLDER)
     # Pipeline on test config
     args = ['--data-folder', TEST_DATA_FOLDER,
             '--base-config', 'configs/test_pipeline.json']
@@ -32,6 +43,7 @@ def testPipeLine():
 
 
 def testPipeLineDual():
+    removeFolderIfExist(LOG_FOLDER_DUAL)
     args = ['--data-folder', TEST_DATA_FOLDER_DUAL,
             '--base-config', 'configs/test_pipeline_dual.json']
     args = list(map(str, args))
