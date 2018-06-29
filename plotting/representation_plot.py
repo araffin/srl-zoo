@@ -5,7 +5,7 @@ import argparse
 from textwrap import fill
 
 import matplotlib.pyplot as plt
-from matplotlib import cm
+from matplotlib import cm, colors
 import seaborn as sns
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
@@ -151,6 +151,67 @@ def colorPerEpisode(episode_starts):
     return colors
 
 
+def prettyPlotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='coolwarm'):
+    """
+    State dimensions are plotted one against the other (it creates a matrix of 2d representation)
+    using rewards for coloring, the diagonal is a distribution plot, and the scatter plots have a density outline.
+    :param states: (numpy tensor)
+    :param rewards: (numpy array)
+    :param title: (str)
+    :param fit_pca: (bool)
+    :param cmap: (str)
+    """
+    with sns.axes_style('white'):
+        n = states.shape[1]
+        fig, ax_mat = plt.subplots(n, n, figsize=(10, 10), sharex=False, sharey=False)
+        fig.subplots_adjust(hspace=0.2, wspace=0.2)
+
+        if fit_pca:
+            title += " (PCA)"
+            states = PCA(n_components=n).fit_transform(states)
+
+        c_idx = cm.get_cmap(cmap)
+        norm = colors.Normalize(vmin=np.min(rewards), vmax=np.max(rewards))
+
+        for i in range(n):
+            for j in range(n):
+                x, y = states[:, i], states[:, j]
+                ax = ax_mat[i, j]
+                if i != j:
+                    ax.scatter(x, y, c=rewards, cmap=cmap, s=5)
+                    sns.kdeplot(x, y, cmap="Greys", ax=ax, shade=True, shade_lowest=False, alpha=0.2)
+                    ax.set_xlim([np.min(x), np.max(x)])
+                    ax.set_ylim([np.min(y), np.max(y)])
+                else:
+                    if len(np.unique(rewards)) < 10:
+                        for r in np.unique(rewards):
+                            sns.distplot(x[rewards == r], color=c_idx(norm(r)), ax=ax)
+                    else:
+                        sns.distplot(x, ax=ax)
+
+                if i == 0:
+                    ax.set_title("Dim {}".format(j), y=1.2)
+                if i != j:
+                    # Hide ticks
+                    if i != 0 and i != n - 1:
+                        ax.xaxis.set_visible(False)
+                    if j != 0 and j != n - 1:
+                        ax.yaxis.set_visible(False)
+
+                    # Set up ticks only on one side for the "edge" subplots...
+                    if j == 0:
+                        ax.yaxis.set_ticks_position('left')
+                    if j == n - 1:
+                        ax.yaxis.set_ticks_position('right')
+                    if i == 0:
+                        ax.xaxis.set_ticks_position('top')
+                    if i == n - 1:
+                        ax.xaxis.set_ticks_position('bottom')
+
+        plt.suptitle(title, fontsize=16)
+        plt.show()
+
+
 def plotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='coolwarm'):
     """
     State dimensions are plotted one against the other (it creates a matrix of 2d representation)
@@ -206,13 +267,13 @@ def plotCorrelation(states_rewards, ground_truth):
     :return:
     """
     for ground_truth_name in [" Agent's position ", "Target Position"]:
-        if ground_truth_name == "Target Position":
+        if ground_truth_name == " Agent's position ":
             key = 'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'
             X = ground_truth[key][:len(rewards)]
         else:
             X = button_pos_[:len(rewards)]
 
-        # adding epsillon in case of little variance in samples of X & Ys
+        # adding epsilon in case of little variance in samples of X & Ys
         eps = 1e-12
         corr = np.corrcoef(x=X + eps, y=states_rewards['states'] + eps, rowvar=False)
         fig = plt.figure(figsize=(8, 6))
@@ -230,8 +291,8 @@ def plotCorrelation(states_rewards, ground_truth):
 
 def loadData(data_folder):
     """
-    :param data_folder:
-    :return: training_data, ground_truth, true_states, target_positions
+    :param data_folder: path to the data_folder to be loaded (Str)
+    :return: training_data, ground_truth, true_states, target_positions (Numpy dictionary-like objects) X 3
     """
     training_data = np.load('data/{}/preprocessed_data.npz'.format(data_folder))
     ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
@@ -250,6 +311,7 @@ def loadOffsets(training_data, data_folder):
     """
     return training_data['episode_starts'], "Ground Truth States - {}".format(data_folder)
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Plotting script for representation')
     parser.add_argument('-i', '--input-file', type=str, default="",
@@ -260,6 +322,8 @@ if __name__ == '__main__':
                         help='Color states per episodes instead of reward')
     parser.add_argument('--plot-against', action='store_true', default=False,
                         help='Plot against each dimension')
+    parser.add_argument('--pretty-plot-against', action='store_true', default=False,
+                        help='Plot against each dimension (diagonals are distributions + cleaner look)')
     parser.add_argument('--correlation', action='store_true', default=False,
                         help='Plot correlation coeff against each dimension')
     parser.add_argument('--projection', action='store_true', default=False,
@@ -289,6 +353,9 @@ if __name__ == '__main__':
         if args.plot_against:
             print("Plotting against")
             plotAgainst(states_rewards['states'], rewards, cmap=cmap)
+        elif args.pretty_plot_against:
+            print("Pretty plotting against")
+            prettyPlotAgainst(states_rewards['states'], rewards, cmap=cmap)
 
         elif args.projection:
             training_data, ground_truth, true_states, _ = loadData(args.data_folder)
@@ -296,8 +363,7 @@ if __name__ == '__main__':
 
         elif args.correlation:
             training_data, ground_truth, true_states, target_positions = loadData(args.data_folder)
-            episode_starts, name = loadOffsets(training_data, args.data_folder)
-
+            episode_starts = training_data['episode_starts']
             with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
                 relative_pos = json.load(f).get('relative_pos', False)
 
@@ -324,8 +390,9 @@ if __name__ == '__main__':
 
         print("Plotting ground truth...")
         training_data, ground_truth, true_states, target_positions = loadData(args.data_folder)
-        episode_starts, name = loadOffsets(training_data, args.data_folder)
+        episode_starts = training_data['episode_starts']
         rewards = training_data['rewards']
+        name = "Ground Truth States - {}".format(args.data_folder)
 
         with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
             relative_pos = json.load(f).get('relative_pos', False)
@@ -343,6 +410,8 @@ if __name__ == '__main__':
 
         if args.plot_against:
             plotAgainst(true_states, rewards, cmap=cmap)
+        elif args.pretty_plot_against:
+            prettyPlotAgainst(true_states, rewards, cmap=cmap)
         else:
             plotRepresentation(true_states, rewards, name, fit_pca=False, cmap=cmap)
         input('\nPress any key to exit.')

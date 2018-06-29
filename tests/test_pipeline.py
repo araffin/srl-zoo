@@ -42,7 +42,7 @@ def testPipeLine():
     assertEq(ok, 0)
 
 
-def testPipeLineDual():
+def testPipelineDual():
     removeFolderIfExist(LOG_FOLDER_DUAL)
     args = ['--data-folder', TEST_DATA_FOLDER_DUAL,
             '--base-config', 'configs/test_pipeline_dual.json']
@@ -71,7 +71,7 @@ def testBaselines():
 
 def testExtraSRLTrain():
     for model_type in ['resnet', 'mlp']:
-        args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
+        args = ['--no-display-plots', '--data-folder', TEST_DATA_FOLDER,
                 '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
                 '--seed', SEED, '--val-size', 0.1,
                 '--state-dim', STATE_DIM, '--model-type', model_type, '-bs', 128,
@@ -84,7 +84,7 @@ def testExtraSRLTrain():
 
         # Tests for Dual camera
         for model_type in ['custom_cnn', 'mlp']:
-            args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
+            args = ['--no-display-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
                     '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
                     '--seed', SEED, '--val-size', 0.1,
                     '--state-dim', STATE_DIM, '--model-type', model_type, '-bs', 32,
@@ -99,7 +99,7 @@ def testExtraSRLTrain():
 def testExtraBaselineTrain():
     for baseline in ['vae', 'autoencoder']:
         # single camera
-        args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
+        args = ['--no-display-plots', '--data-folder', TEST_DATA_FOLDER,
                 '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
                 '--seed', SEED, '--val-size', 0.1,
                 '--state-dim', STATE_DIM, '--model-type', 'mlp', '-bs', 128,
@@ -110,7 +110,7 @@ def testExtraBaselineTrain():
 
     # Linear AE
     # single camera
-    args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
+    args = ['--no-display-plots', '--data-folder', TEST_DATA_FOLDER,
             '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
             '--seed', SEED, '--val-size', 0.1,
             '--state-dim', STATE_DIM, '--model-type', 'linear', '-bs', 128,
@@ -123,7 +123,7 @@ def testExtraBaselineTrain():
 def testExtraBaselineDualTrain():
     for baseline in ['vae', 'autoencoder']:
         # dual camera
-        args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
+        args = ['--no-display-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
                 '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
                 '--seed', SEED, '--val-size', 0.1,
                 '--state-dim', STATE_DIM, '--model-type', 'mlp', '-bs', 16,
@@ -134,7 +134,7 @@ def testExtraBaselineDualTrain():
         assertEq(ok, 0)
     # Linear AE
     # dual camera
-    args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
+    args = ['--no-display-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
             '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
             '--seed', SEED, '--val-size', 0.1,
             '--state-dim', STATE_DIM, '--model-type', 'linear', '-bs', 16,
@@ -146,7 +146,7 @@ def testExtraBaselineDualTrain():
 
 
 def testExtraSupervisedTrain():
-    args = ['--no-plots', '--data-folder', TEST_DATA_FOLDER,
+    args = ['--no-display-plots', '--data-folder', TEST_DATA_FOLDER,
             '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
             '--seed', SEED, '--model-type', 'mlp']
     args = list(map(str, args))
