@@ -152,7 +152,7 @@ def rewardModelLoss(rewards_pred, rewards_st, weight, loss_manager):
     :return:
     """
     loss_fn = nn.CrossEntropyLoss()
-    reward_loss = loss_fn(rewards_pred, target=rewards_st.squeeze(1))
+    reward_loss = loss_fn(rewards_pred, target=rewards_st)
     loss_manager.addToLosses('reward_loss', weight, reward_loss)
     return weight * reward_loss
 

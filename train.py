@@ -13,8 +13,8 @@ import argparse
 import numpy as np
 import torch as th
 
-from models import SRL4robotics
 import models.learner as learner
+from models.learner import SRL4robotics
 from pipeline import getLogFolderName, saveConfig, knnCall
 from plotting.losses_plot import plotLosses
 import plotting.representation_plot as plot_script
@@ -41,7 +41,8 @@ def buildConfig(args):
         "l1-reg": 0,
         "losses": args.losses,
         "n-neighbors": 5,
-        "n-to-plot": 5
+        "n-to-plot": 5,
+        "split-index": args.split_index
     }
     return exp_config
 
@@ -76,6 +77,9 @@ if __name__ == '__main__':
                                  "autoencoder", "vae"], )
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
+    parser.add_argument('--split-index', type=int, default=-1,
+                        help='Split representation models (default: -1, no split)')
+
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -142,7 +146,7 @@ if __name__ == '__main__':
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       losses=losses, n_actions=n_actions, beta=args.beta)
+                       losses=losses, n_actions=n_actions, beta=args.beta, split_index=args.split_index)
 
     if args.training_set_size > 0:
         limit = args.training_set_size

@@ -1,4 +1,3 @@
-from .learner import SRL4robotics
 from .models import CustomCNN
 from .modules import SRLModules, SRLModulesSplit
 from .priors import SRLConvolutionalNetwork, SRLDenseNetwork, SRLCustomCNN, Discriminator

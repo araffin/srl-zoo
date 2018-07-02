@@ -14,7 +14,6 @@ class BaseForwardModel(BaseModelSRL):
         super(BaseForwardModel, self).__init__()
 
     def initForwardNet(self, state_dim, action_dim):
-        self.state_dim = state_dim
         self.action_dim = action_dim
         self.forward_net = nn.Linear(state_dim + action_dim, state_dim)
 
@@ -44,8 +43,6 @@ class BaseInverseModel(BaseModelSRL):
 
     def initInverseNet(self, state_dim, action_dim):
         self.inverse_net = nn.Linear(state_dim * 2, action_dim)
-        self.state_dim = state_dim
-        self.action_dim = action_dim
 
     def forward(self, x):
         raise NotImplementedError()
@@ -69,14 +66,12 @@ class BaseRewardModel(BaseModelSRL):
         """
         super(BaseRewardModel, self).__init__()
 
-    def initRewardNet(self, state_dim, action_dim):
-        self.state_dim = state_dim
-        self.action_dim = action_dim
-        self.reward_net = nn.Sequential(nn.Linear(state_dim, 2),
+    def initRewardNet(self, state_dim, n_rewards=2):
+        self.reward_net = nn.Sequential(nn.Linear(state_dim, 4),
                                         nn.ReLU(),
-                                        nn.Linear(2, 2),
+                                        nn.Linear(4, 4),
                                         nn.ReLU(),
-                                        nn.Linear(2, 2))
+                                        nn.Linear(4, n_rewards))
 
     def forward(self, x):
         raise NotImplementedError()

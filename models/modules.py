@@ -1,4 +1,5 @@
 from .autoencoders import CNNAutoEncoder, DenseAutoEncoder, LinearAutoEncoder
+from .vae import CNNVAE, DenseVAE
 from .forward_inverse import BaseForwardModel, BaseInverseModel, BaseRewardModel
 from .models import *
 
@@ -25,7 +26,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         self.initForwardNet(state_dim, action_dim)
         self.initInverseNet(state_dim, action_dim)
-        self.initRewardNet(state_dim, action_dim)
+        self.initRewardNet(state_dim)
 
         # Architecture
         if model_type == "custom_cnn":
@@ -100,6 +101,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         # self.cuda = cuda
         self.state_dim = state_dim
 
+        # TODO: try with .detach() to give all the state to the decoder
+        # but backpropagate only on part of it
         self.dim_first_method = split_index
         self.dim_second_method = state_dim - split_index
         self.first_split_indices = (slice(None, None), slice(None, split_index))  # [:, :split_index]
@@ -107,7 +110,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         self.initForwardNet(self.dim_second_method, action_dim)
         self.initInverseNet(self.dim_second_method, action_dim)
-        self.initRewardNet(self.dim_second_method, action_dim)
+        self.initRewardNet(self.state_dim)
 
         # Architecture
         if model_type == "custom_cnn":
@@ -162,4 +165,24 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param next_state: (th.Tensor)
         :return: probability of each action
         """
-        return self.inverse_net(th.cat((state[self.second_split_indices], next_state[self.second_split_indices]), 1))
+        return self.inverse_net(th.cat((state[self.second_split_indices], next_state[self.second_split_indices]), dim=1))
+
+    def forwardModel(self, state, action):
+        """
+        Predict next state given current state and action
+        :param state: (th.Tensor)
+        :param action: (th Tensor)
+        :return: (th.Tensor)
+        """
+        # Predict the delta between the next state and current state
+        concat = torch.cat((state[self.second_split_indices], encodeOneHot(action, self.action_dim)), dim=1)
+        return state[self.second_split_indices] + self.forward_net(concat)
+
+    def rewardModel(self, state):
+        """
+        Predict reward given current state and action
+        :param state: (th.Tensor)
+        :param action: (th Tensor)
+        :return: (th.Tensor)
+        """
+        return self.reward_net(state)

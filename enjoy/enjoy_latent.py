@@ -10,7 +10,7 @@ import torch
 from sklearn.neighbors import KNeighborsClassifier
 
 from preprocessing.utils import deNormalize
-from models import SRLModules
+from models import SRLModules, SRLModulesSplit
 from utils import detachToNumpy
 
 VALID_MODELS = ["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
@@ -56,6 +56,7 @@ def main():
     loss_type = exp_config['losses']
     n_actions = exp_config['n_actions']
     model_type = exp_config['model-type']
+    split_index = exp_config.get('split-index', -1)
 
     # is this a valid model ?
     assert set(VALID_MODELS).intersection(loss_type) != set(), "Error: losses not supported."
@@ -68,11 +69,16 @@ def main():
         assert os.path.exists(
             args.log_dir + "exp_config.json"), "Error: could not find 'exp_config.json' in '{}'".format(
             args.log_dir)
-        srl_model = SRLModules(state_dim=state_dim, action_dim=n_actions, model_type=model_type,
-                               cuda=use_cuda, losses=loss_type)
+
+        if split_index > 0:
+            srl_model = SRLModulesSplit(state_dim=state_dim, action_dim=n_actions, model_type=model_type,
+                                   cuda=use_cuda, losses=loss_type, split_index=split_index)
+        else:
+            srl_model = SRLModulesSplit(state_dim=state_dim, action_dim=n_actions, model_type=model_type,
+                                   cuda=use_cuda, losses=loss_type)
         srl_model.eval()
         srl_model.load_state_dict(torch.load(model_path))
-        srl_model.to(device)
+        srl_model = srl_model.to(device)
 
     else:
         data = json.load(open(args.log_dir + 'image_to_state.json'))
@@ -91,14 +97,16 @@ def main():
     cv2.namedWindow(fig_name, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(fig_name, 500, 500)
     cv2.namedWindow('sliders')
+
+    state_dim = split_index if split_index > 0 else state_dim
     # add a slider for each component of the latent space
     for i in range(state_dim):
         # the sliders MUST be between 0 and max, so we placed max at 100, and start at 50
         # So that when we substract 50 and divide 10 we get [-5,5] for each component
-        cv2.createTrackbar(str(i), 'sliders', 50, 100, (lambda a: None))
+        cv2.createTrackbar(str(i), 'sliders', 200, 400, (lambda a: None))
 
     # run the param through the network
-    while 1:
+    while True:
         # stop if escape is pressed
         k = cv2.waitKey(1) & 0xFF
         if k == 27:
@@ -109,7 +117,7 @@ def main():
         for i in range(state_dim):
             mu.append(cv2.getTrackbarPos(str(i), 'sliders'))
         if 'autoencoder' in loss_type or 'vae' in loss_type:
-            mu = (np.array(mu) - 50) / 10
+            mu = (np.array(mu) - 200) / 25
             img = getImage(srl_model.model, mu, device)
         else:
             # rescale for the bounds of the priors representation, and find nearest image

@@ -177,7 +177,7 @@ class SRL4robotics(BaseLearner):
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False,
-                 multi_view=False, losses=None, n_actions=6, beta=1):
+                 multi_view=False, losses=None, n_actions=6, beta=1, split_index=-1):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -196,8 +196,12 @@ class SRL4robotics(BaseLearner):
             self.use_autoencoder = "autoencoder" in losses
             self.use_vae = "vae" in losses
             self.use_triplets = "triplet" in self.losses
-            self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
-                                    cuda=cuda, losses=losses)
+            if split_index > 0:
+                self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
+                                        cuda=cuda, losses=losses, split_index=split_index)
+            else:
+                self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
+                                        cuda=cuda, losses=losses)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
@@ -349,17 +353,17 @@ class SRL4robotics(BaseLearner):
                     inverseModelLoss(actions_pred, actions_st, weight=1, loss_manager=loss_manager)
 
                 if self.use_reward_loss:
-                    rewards_st = rewards[minibatchlist[minibatch_idx]]
+                    rewards_st = rewards[minibatchlist[minibatch_idx]].copy()
                     # Removing negative reward
                     rewards_st[rewards_st == -1] = 0
-                    rewards_st = th.from_numpy(rewards_st).view(-1, 1).to(self.device)
+                    rewards_st = th.from_numpy(rewards_st).to(self.device)
                     rewards_pred = self.model.rewardModel(states)
                     rewardModelLoss(rewards_pred, rewards_st.long(), weight=2.5, loss_manager=loss_manager)
 
                 if self.use_autoencoder:
                     autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_manager=loss_manager)
                 if self.use_vae:
-                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=0.5,
+                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=0.5e-6,
                             loss_manager=loss_manager, beta=self.beta)
                 if self.reward_prior:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
