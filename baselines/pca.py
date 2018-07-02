@@ -17,7 +17,7 @@ from pipeline import saveConfig
 import plotting.representation_plot as plot_script
 from plotting.representation_plot import plotRepresentation
 from preprocessing.data_loader import AutoEncoderDataLoader
-from utils import parseDataFolder, createFolder, input
+from utils import parseDataFolder, createFolder, getInputBuiltin
 
 
 def getModelName(args):
@@ -61,6 +61,7 @@ parser.add_argument('--data-folder', type=str, default="", help='Dataset folder'
 parser.add_argument('--training-set-size', type=int, default=-1, help='Limit size of the training set (default: -1)')
 parser.add_argument('--state-dim', type=int, default=3, help='State dimension')
 
+input = getInputBuiltin()
 args = parser.parse_args()
 DISPLAY_PLOTS = not args.no_display_plots
 plot_script.INTERACTIVE_PLOT = DISPLAY_PLOTS

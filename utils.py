@@ -2,16 +2,20 @@ from __future__ import print_function, division
 
 import os
 import subprocess
-
 import torch
 from termcolor import colored
 
-# Python 2/3 compatibility
-try:
-    input = raw_input
-except NameError:
-    # Assign the built-in function to a variable
-    input = input
+
+def getInputBuiltin():
+    """
+    Python 2/3 compatibility
+    Returns the python 'input' builtin
+    :return: (input)
+    """
+    try:
+        return raw_input
+    except NameError:
+        return input
 
 
 def importMaplotlib():

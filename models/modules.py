@@ -5,8 +5,11 @@ from .priors import SRLConvolutionalNetwork, SRLDenseNetwork, SRLLinear
 from .triplet import EmbeddingNet
 from .vae import CNNVAE, DenseVAE
 
+# In case of importing into the SRL repository
 try:
     from preprocessing.preprocess import getInputDim
+# In case of importing material from modules.py into the external Robotics RL repository,
+# consider the relative path to the package
 except ImportError:
     from ..preprocessing.preprocess import getInputDim
 

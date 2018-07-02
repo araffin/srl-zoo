@@ -15,7 +15,7 @@ from pipeline import NAN_ERROR
 from plotting.representation_plot import plotRepresentation, plt, plotImage
 from preprocessing.data_loader import CustomDataLoader
 from preprocessing.utils import deNormalize
-from utils import parseDataFolder, printYellow, createFolder, detachToNumpy, input
+from utils import parseDataFolder, printYellow, createFolder, detachToNumpy
 
 from .modules import SRLModules
 from .priors import Discriminator

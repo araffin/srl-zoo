@@ -37,6 +37,24 @@ def getImage(srl_model, mu, device):
     return img[:, :, ::-1]
 
 
+def createFigureAndSlider(name, state_dim):
+    """
+    Creating a window for the latent space visualization, an another for the slider to control it
+    :param name: name of model (str)
+    :param state_dim: (int)
+    :return:
+    """
+    # opencv gui setup
+    cv2.namedWindow(name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(name, 500, 500)
+    cv2.namedWindow('slider for ' + name)
+    # add a slider for each component of the latent space
+    for i in range(state_dim):
+        # the sliders MUST be between 0 and max, so we placed max at 100, and start at 50
+        # So that when we substract 50 and divide 10 we get [-5,5] for each component
+        cv2.createTrackbar(str(i), 'slider for ' + name, 50, 100, (lambda a: None))
+
+
 def main():
     parser = argparse.ArgumentParser(description="latent space enjoy")
     parser.add_argument('--log-dir', default='', type=str, help='directory to load model')
@@ -58,13 +76,15 @@ def main():
     model_type = exp_config['model-type']
 
     # is this a valid model ?
-    assert set(VALID_MODELS).intersection(loss_type) != set(), "Error: losses not supported."
+    difference = set(loss_type).symmetric_difference(VALID_MODELS)
+    assert set(loss_type).intersection(VALID_MODELS) != set(), "Error: Not supported losses " + ", ".join(difference)
 
     if os.path.exists(args.log_dir + 'srl_model.pth'):
         model_path = args.log_dir + 'srl_model.pth'
 
     # model param and info
-    if 'autoencoder' in loss_type or 'vae' in loss_type:
+    is_auto_encoder = 'autoencoder' in loss_type or 'vae' in loss_type
+    if is_auto_encoder:
         assert os.path.exists(
             args.log_dir + "exp_config.json"), "Error: could not find 'exp_config.json' in '{}'".format(
             args.log_dir)
@@ -74,7 +94,10 @@ def main():
         srl_model.load_state_dict(torch.load(model_path))
         srl_model.to(device)
 
-    else:
+        ae_type = 'autoencoder' if 'autoencoder' in loss_type else 'vae'
+        createFigureAndSlider(ae_type, state_dim)
+
+    if not is_auto_encoder or len(loss_type) > 1:
         data = json.load(open(args.log_dir + 'image_to_state.json'))
         srl_model_knn = KNeighborsClassifier()
 
@@ -86,16 +109,9 @@ def main():
         min_X = np.min(X, axis=0)
         max_X = np.max(X, axis=0)
 
-    fig_name = "".join([item + "_" for item in loss_type])[:-1]
-    # opencv gui setup
-    cv2.namedWindow(fig_name, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(fig_name, 500, 500)
-    cv2.namedWindow('sliders')
-    # add a slider for each component of the latent space
-    for i in range(state_dim):
-        # the sliders MUST be between 0 and max, so we placed max at 100, and start at 50
-        # So that when we substract 50 and divide 10 we get [-5,5] for each component
-        cv2.createTrackbar(str(i), 'sliders', 50, 100, (lambda a: None))
+        fig_name = "KNN on " + ", ".join([item + " " for item in loss_type])[:-1]
+        createFigureAndSlider(fig_name, state_dim)
+
 
     # run the param through the network
     while 1:
@@ -105,24 +121,35 @@ def main():
             break
 
         # make the image
-        mu = []
-        for i in range(state_dim):
-            mu.append(cv2.getTrackbarPos(str(i), 'sliders'))
-        if 'autoencoder' in loss_type or 'vae' in loss_type:
-            mu = (np.array(mu) - 50) / 10
-            img = getImage(srl_model.model, mu, device)
-        else:
+        if is_auto_encoder:
+            mu_ae = []
+            for i in range(state_dim):
+                mu_ae.append(cv2.getTrackbarPos(str(i), 'slider for ' + ae_type))
+            mu_ae = (np.array(mu_ae) - 50) / 10
+            img_ae = getImage(srl_model.model, mu_ae, device)
+
+            # stop if user closed a window
+            if (cv2.getWindowProperty(ae_type, 0) < 0) or (cv2.getWindowProperty('slider for ' + ae_type, 0) < 0):
+                break
+
+            cv2.imshow(ae_type, img_ae)
+
+        if not is_auto_encoder or len(loss_type) > 1:
+            mu = []
+            for i in range(state_dim):
+                mu.append(cv2.getTrackbarPos(str(i), 'slider for ' + fig_name))
+
             # rescale for the bounds of the priors representation, and find nearest image
             img_path = y[srl_model_knn.predict([(np.array(mu) / 100) * (max_X - min_X) + min_X])[0]]
             # Remove trailing .jpg if present
             img_path = img_path.split('.jpg')[0]
             img = cv2.imread("data/" + img_path + ".jpg")
 
-        # stop if user closed a window
-        if (cv2.getWindowProperty(fig_name, 0) < 0) or (cv2.getWindowProperty('sliders', 0) < 0):
-            break
+            # stop if user closed a window
+            if (cv2.getWindowProperty(fig_name, 0) < 0) or (cv2.getWindowProperty('slider for ' + fig_name, 0) < 0):
+                break
 
-        cv2.imshow(fig_name, img)
+            cv2.imshow(fig_name, img)
 
     # gracefully close
     cv2.destroyAllWindows()

@@ -20,7 +20,7 @@ from plotting.losses_plot import plotLosses
 import plotting.representation_plot as plot_script
 from plotting.representation_plot import plotRepresentation, plt, plotImage
 import preprocessing
-from utils import parseDataFolder, printYellow, createFolder, detachToNumpy, input
+from utils import parseDataFolder, printYellow, createFolder, detachToNumpy, getInputBuiltin
 
 def buildConfig(args):
     """
@@ -66,7 +66,9 @@ if __name__ == '__main__':
                         help='Model architecture (default: "custom_cnn")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log-folder', type=str, default="",
-                        help='Folder within logs/ where the experiment model and plots will be saved')
+                        help='Folder where the experiment model and plots will be saved. ' +
+                             'By default, automatically computing KNN-MSE and saving logs at location ' +
+                             'logs/DatasetName/YY-MM-DD_HHhMM_SS_ModelType_ST_DIMN_LOSEES')
     parser.add_argument('--multi-view', action='store_true', default=False,
                         help='Enable use of multiple camera')
     parser.add_argument('--balanced-sampling', action='store_true', default=False,
@@ -77,6 +79,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
 
+    input = getInputBuiltin()
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     args.data_folder = parseDataFolder(args.data_folder)

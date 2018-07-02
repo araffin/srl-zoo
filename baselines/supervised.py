@@ -17,7 +17,7 @@ from plotting.losses_plot import plotLosses
 from plotting.representation_plot import plotRepresentation, plt
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import getInputDim
-from utils import parseDataFolder, createFolder, input
+from utils import parseDataFolder, createFolder, getInputBuiltin
 
 DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
@@ -199,6 +199,7 @@ if __name__ == '__main__':
                         help='Use relative position as ground_truth')
     parser.add_argument('--log-folder', type=str, default='', help='Override the default log-folder')
 
+    input = getInputBuiltin()
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     DISPLAY_PLOTS = not args.no_display_plots
