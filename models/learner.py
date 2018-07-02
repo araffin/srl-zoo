@@ -20,15 +20,17 @@ from utils import parseDataFolder, printYellow, createFolder, detachToNumpy
 from .modules import SRLModules
 from .priors import Discriminator
 
-MAX_BATCH_SIZE_GPU = 512  # For plotting, max batch_size before having memory issues
 
-DISPLAY_PLOTS = True
+
+MAX_BATCH_SIZE_GPU = 512  # For plotting, max batch_size before having memory issues
 EPOCH_FLAG = 1  # Plot every 1 epoch
+N_WORKERS = 4
+
+# The following variables are defined using arguments of the main script train.py
+DISPLAY_PLOTS = True
 BATCH_SIZE = 256  #
 NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 VALIDATION_SIZE = 0.2  # 20% of training data for validation
-N_WORKERS = 4
-
 # Experimental: episode independent prior
 BALANCED_SAMPLING = False  # Whether to do Uniform (default) or balanced sampling
 
