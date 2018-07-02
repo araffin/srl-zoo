@@ -1,4 +1,2 @@
 #!/bin/bash
-coverage run --source=./ --branch -m pytest tests/ --capture=no
-echo ""
-coverage report --omit=tests/*
+pytest --cov-config .coveragerc --cov-report html --cov-report term --cov=. tests/ --capture=no

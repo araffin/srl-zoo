@@ -6,7 +6,7 @@
   "l1-reg": 0,
   "training-set-size": 600,
   "learning-rate": 0.001,
-  "model-approach": "priors",
+  "losses": ["priors"],
   "model-type": "triplet-cnn",
   "n-neighbors": 5,
   "n-to-plot": 5,

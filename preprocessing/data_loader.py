@@ -12,7 +12,7 @@ import numpy as np
 import torch as th
 
 from .utils import preprocessInput
-from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS
+from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels
 
 
 def preprocessImage(image):
@@ -29,7 +29,7 @@ def preprocessImage(image):
     return im
 
 
-def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplets=False):
+def imageWorker(image_queue, output_queue, exit_event, multi_view=False, use_triplets=False):
     """
     Worker that preprocess images
     :param image_queue: (multiprocessing.Queue) queue with the path to the images
@@ -37,7 +37,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
                           will be added
     :param exit_event: (multiprocessing.Event) Event for exiting the loop
     :param multi_view: (bool) enables dual camera mode
-    :param triplets: (bool) enables loading of negative example (third image)
+    :param use_triplets: (bool) enables loading of negative example (third image)
     """
     while not exit_event.is_set():
         idx, image_path = image_queue.get()
@@ -47,7 +47,6 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             break
         # Remove trailing .jpg if present
         image_path = image_path.split('.jpg')[0]
-
         if multi_view:
 
             images = []
@@ -60,7 +59,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
             ####################
             # loading a negative observation
 
-            if triplets:
+            if use_triplets:
                 # End of file format for positive & negative observations (camera 1) - length : 6 characters
                 extra_chars = '_1.jpg'
 
@@ -76,7 +75,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, triplet
 
                 # negative timestep by random sampling
                 length_set_steps = len(all_frame_steps)
-                negative = all_frame_steps[random.randint(0, length_set_steps-1)]
+                negative = all_frame_steps[random.randint(0, length_set_steps - 1)]
                 negative_path = '{}{:06d}'.format(image_path[:-6], negative)
 
                 im3 = cv2.imread(negative_path + "_1.jpg")
@@ -105,21 +104,18 @@ class CustomDataLoader(object):
 
     :param minibatchlist: [[int]] list of list of int (observations ids)
     :param images_path: (numpy 1D array of str)
-    :param same_actions: [numpy matrix]
-    :param dissimilar: [numpy matrix]
     :param test_batch_size: (int)
     :param cache_capacity: (int) number of images that can be cached
     :param multi_view: (bool) enables dual camera mode
-    :param triplets: (bool) enables loading of negative observation
+    :param use_triplets: (bool) enables loading of negative observation
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
     [WARNING] Set to False, you MUST clean up the loader manually (by calling cleanUp() method)
     It may also produce deadlocks
     """
 
-    def __init__(self, minibatchlist, images_path, same_actions,
-                 dissimilar, test_batch_size=512, cache_capacity=5000,
-                 n_workers=5, auto_cleanup=True, multi_view=False, triplets=False):
+    def __init__(self, minibatchlist, images_path, test_batch_size=512, cache_capacity=5000,
+                 n_workers=5, auto_cleanup=True, multi_view=False, use_triplets=False):
         super(CustomDataLoader, self).__init__()
 
         self.n_minibatches = len(minibatchlist)
@@ -130,13 +126,9 @@ class CustomDataLoader(object):
         self.minibatchlist = np.array(minibatchlist[:])
         # Copy useful array to avoid side effects
         self.images_path = images_path[:]
-        self.dissimilar_pairs = np.array(dissimilar[:])
-        self.same_actions = np.array(same_actions[:])
         # Save minibatches original order
         self.minibatches_indices = np.arange(len(minibatchlist), dtype=np.int64)
         self.original_minibatchlist = self.minibatchlist.copy()
-        self.original_same_actions = self.same_actions.copy()
-        self.original_dissimilar_pairs = self.dissimilar_pairs.copy()
 
         # Index of the minibatch in the iterator
         self.current_idx = 0
@@ -183,7 +175,7 @@ class CustomDataLoader(object):
         self.n_sent, self.n_received = 0, 0
         self.shutdown = False
         self.multi_view = multi_view
-        self.triplets = triplets
+        self.use_triplets = use_triplets
 
         if self.n_workers <= 0:
             raise ValueError("n_workers <= 0 in the data loader")
@@ -193,10 +185,17 @@ class CustomDataLoader(object):
         self.workers = []
         for i in range(self.n_workers):
             w = mp.Process(target=imageWorker, args=(self.image_queues[i], self.output_queue,
-                                                     self.exit_event, self.multi_view, self.triplets))
+                                                     self.exit_event, self.multi_view, self.use_triplets))
             w.daemon = True  # ensure that the worker exits on process exit
             w.start()
             self.workers.append(w)
+
+    def resetMinibatches(self):
+        """
+        Restore minibatches to their original order
+        """
+        self.minibatches_indices = np.arange(len(self.minibatchlist), dtype=np.int64)
+        self.minibatchlist = self.original_minibatchlist.copy()
 
     def trainMode(self):
         """
@@ -204,17 +203,14 @@ class CustomDataLoader(object):
         It uses the minibatchlist pass at initialization
         """
         self.is_training = True
-        self.minibatches_indices = np.arange(len(self.minibatchlist), dtype=np.int64)
-        self.minibatchlist = self.original_minibatchlist.copy()
-        self.same_actions = self.original_same_actions.copy()
-        self.dissimilar_pairs = self.original_dissimilar_pairs.copy()
+        self.resetMinibatches()
         # Reset the iterator
         self.resetIterator()
 
     def testMode(self):
         """
         Switch to test mode (faster mode) and reset the iterator
-        Next observations, same and dissimilar pairs are not computed
+        Next observations are not computed
         """
         self.is_training = False
         self.minibatchlist = []
@@ -296,11 +292,10 @@ class CustomDataLoader(object):
         """
         Shuffle list of minibatches
         """
+        self.resetMinibatches()
         indices = np.random.permutation(self.n_minibatches).astype(np.int64)
         self.minibatches_indices = indices
         self.minibatchlist = self.minibatchlist[indices]
-        self.same_actions = self.same_actions[indices]
-        self.dissimilar_pairs = self.dissimilar_pairs[indices]
 
     def resetQueues(self):
         """
@@ -360,7 +355,7 @@ class CustomDataLoader(object):
         # Preprocessing loop, it fills workers queues
         for indices, key in zip(indices_list, obs_dict.keys()):
 
-            obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS), dtype=np.float32)
+            obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels()), dtype=np.float32)
             # Reset queues and received count
             self.resetQueues()
 
@@ -388,7 +383,7 @@ class CustomDataLoader(object):
                 self.n_received += 1
             # Channel first
             obs = np.transpose(obs, (0, 3, 2, 1))
-            obs_dict[key] = th.from_numpy(obs).requires_grad_(self.is_training)
+            obs_dict[key] = th.from_numpy(obs)
             # Free memory
             del obs
 
@@ -414,26 +409,20 @@ class CustomDataLoader(object):
 
         batch_size = len(obs_indices)
         # If we are training we need addional tensors
-        # (next obs, dissimilar and similar pairs)
+        # (next obs)
         if self.is_training:
-            diss_pairs = self.dissimilar_pairs[i][np.random.permutation(self.dissimilar_pairs[i].shape[0])]
-            same_actions = self.same_actions[i][np.random.permutation(self.same_actions[i].shape[0])]
-            # Convert to torch tensor
-            diss_pairs, same_actions = th.from_numpy(diss_pairs), th.from_numpy(same_actions)
-
             # Retrieve observations
             # Define a dict to modify it in the for loop
-            obs_dict = {'obs': None, 'next_obs': None}
+            obs_dict = OrderedDict([('obs', None), ('next_obs', None)])
             indices_list = [obs_indices, obs_indices + 1]
         else:
-            obs_dict = {'obs': None}
+            obs_dict = OrderedDict([('obs', None)])
             indices_list = [obs_indices]
 
         self._sendToWorkers(batch_size, indices_list, obs_dict)
 
         if self.is_training:
-            self.preprocess_result = self.minibatches_indices[i], obs_dict['obs'], obs_dict['next_obs'],\
-                                     diss_pairs.clone(), same_actions.clone()
+            self.preprocess_result = self.minibatches_indices[i], obs_dict['obs'], obs_dict['next_obs']
         else:
             self.preprocess_result = obs_dict['obs']
 
@@ -520,7 +509,7 @@ class SupervisedDataLoader(CustomDataLoader):
     :param y_values: (numpy tensor)
     :param images_path: (numpy 1D array of str)
     :param batch_size: (int)
-    :param is_training: (bool) Whether to create volatile variables or not
+    :param is_training: (bool) Whether to create tensor that keep track of the gradient or not
     :param no_targets: (bool) Set to true, only inputs are generated
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
@@ -536,20 +525,28 @@ class SupervisedDataLoader(CustomDataLoader):
         # (not needed when plotting or predicting states)
         self.no_targets = no_targets
         self.targets = np.array(targets)
+        self.original_targets = self.targets.copy()
 
         # Here the cache is not useful: we do not have observations
         # that are present in different minibatches
-        super(SupervisedDataLoader, self).__init__(minibatchlist, images_path, [], [],
-                                                   cache_capacity=0,
+        super(SupervisedDataLoader, self).__init__(minibatchlist, images_path, cache_capacity=0,
                                                    n_workers=n_workers, auto_cleanup=auto_cleanup)
         # Training mode is the default one
         if not is_training:
             self.testMode()
 
+    def resetMinibatches(self):
+        """
+        Restore minibatches to their original order
+        """
+        self.minibatchlist = self.original_minibatchlist.copy()
+        self.targets = self.original_targets.copy()
+
     def shuffleMinitbatchesOrder(self):
         """
         Shuffle list of minibatches and targets
         """
+        self.resetMinibatches()
         indices = np.random.permutation(self.n_minibatches).astype(np.int64)
         self.minibatchlist = self.minibatchlist[indices]
         self.targets = self.targets[indices]
@@ -564,7 +561,7 @@ class SupervisedDataLoader(CustomDataLoader):
         targets = th.from_numpy(self.targets[i]).requires_grad_(self.is_training)
 
         batch_size = len(obs_indices)
-        obs_dict = {'obs': None}
+        obs_dict = OrderedDict([('obs', None)])
         indices_list = [obs_indices]
 
         self._sendToWorkers(batch_size, indices_list, obs_dict)
@@ -587,7 +584,7 @@ class SupervisedDataLoader(CustomDataLoader):
     def testMode(self):
         """
         Switch to test mode
-        Variables will be created with the volatile keyword
+        Tensors will not keep track of the gradient
         """
         self.is_training = False
 
@@ -600,7 +597,7 @@ class AutoEncoderDataLoader(CustomDataLoader):
     :param images_path: (numpy 1D array of str)
     :param batch_size: (int)
     :param noise_factor: (float)
-    :param is_training: (bool) Whether to create volatile variables or not
+    :param is_training: (bool) Whether to create tensors that keep track of the gradient or not
     :param no_targets: (bool) Set to true, only inputs are generated
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
@@ -608,7 +605,7 @@ class AutoEncoderDataLoader(CustomDataLoader):
     """
 
     def __init__(self, x_indices, images_path, batch_size, noise_factor=0.0, is_training=True,
-                 no_targets=False, n_workers=5, auto_cleanup=True):
+                 no_targets=False, n_workers=5, auto_cleanup=True, multi_view=False):
         # Create minibatch list
         minibatchlist, _ = self.createMinibatchList(x_indices, x_indices, batch_size)
 
@@ -616,20 +613,27 @@ class AutoEncoderDataLoader(CustomDataLoader):
         # (not needed when plotting or predicting states)
         self.no_targets = no_targets
         self.noise_factor = noise_factor
+        self.multi_view = multi_view
 
         # Here the cache is not useful: we do not have observations
         # that are present in different minibatches
-        super(AutoEncoderDataLoader, self).__init__(minibatchlist, images_path, [], [],
-                                                    cache_capacity=0,
-                                                    n_workers=n_workers, auto_cleanup=auto_cleanup)
+        super(AutoEncoderDataLoader, self).__init__(minibatchlist, images_path, cache_capacity=0, n_workers=n_workers,
+                                                    auto_cleanup=auto_cleanup, multi_view=multi_view)
         # Training mode is the default one
         if not is_training:
             self.testMode()
+
+    def resetMinibatches(self):
+        """
+        Restore minibatches to their original order
+        """
+        self.minibatchlist = self.original_minibatchlist.copy()
 
     def shuffleMinitbatchesOrder(self):
         """
         Shuffle list of minibatches
         """
+        self.resetMinibatches()
         indices = np.random.permutation(self.n_minibatches).astype(np.int64)
         self.minibatchlist = self.minibatchlist[indices]
 
@@ -643,12 +647,12 @@ class AutoEncoderDataLoader(CustomDataLoader):
         # Warning: the noise is not consistent
         # for validation set (different at each iteration)
         if self.noise_factor > 0:
-            noise_shape = (len(obs_indices), N_CHANNELS, IMAGE_HEIGHT, IMAGE_WIDTH)
+            noise_shape = (len(obs_indices), getNChannels(), IMAGE_HEIGHT, IMAGE_WIDTH)
             noise = self.noise_factor * np.random.normal(loc=0.0, scale=1.0, size=noise_shape).astype(np.float32)
             noise = th.from_numpy(noise).requires_grad_(self.is_training)
 
         batch_size = len(obs_indices)
-        obs_dict = {'obs': None}
+        obs_dict = OrderedDict([('obs', None)])
         indices_list = [obs_indices]
 
         self._sendToWorkers(batch_size, indices_list, obs_dict)
@@ -674,6 +678,6 @@ class AutoEncoderDataLoader(CustomDataLoader):
     def testMode(self):
         """
         Switch to test mode
-        Variables will be created with the volatile keyword
+        Tensors will not keep track of the gradient
         """
         self.is_training = False

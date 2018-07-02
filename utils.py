@@ -1,9 +1,33 @@
 from __future__ import print_function, division
 
 import os
-
+import subprocess
 import torch
 from termcolor import colored
+
+
+def getInputBuiltin():
+    """
+    Python 2/3 compatibility
+    Returns the python 'input' builtin
+    :return: (input)
+    """
+    try:
+        return raw_input
+    except NameError:
+        return input
+
+
+def importMaplotlib():
+    """
+    Fix for plotting when x11 is not available
+    """
+    p = subprocess.Popen(["xset", "-q"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p.communicate()
+    x11_available = p.returncode == 0
+    if not x11_available:
+        import matplotlib
+        matplotlib.use('Agg')
 
 
 def detachToNumpy(tensor):
@@ -13,6 +37,7 @@ def detachToNumpy(tensor):
     :return: (numpy float)
     """
     return tensor.to(torch.device('cpu')).detach().numpy()
+
 
 def parseDataFolder(path):
     """
@@ -66,17 +91,3 @@ def printBlue(string):
     :param string: (str)
     """
     print(colored(string, 'blue'))
-
-
-def priorsToString(priors_list):
-    """
-    Convert a list of priors to a string
-    (for the experiment name)
-    :param priors_list: [str]
-    :return: (str)
-    """
-    string = '_'
-    for index, priors in enumerate(priors_list):
-        # Keep only first three letters
-        string = string + priors[0:3]
-    return string

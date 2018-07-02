@@ -10,10 +10,12 @@ import torch
 from sklearn.neighbors import KNeighborsClassifier
 
 from preprocessing.utils import deNormalize
-from models import CNNAutoEncoder, CNNVAE
+from models import SRLModules
 from utils import detachToNumpy
 
-VALID_MODEL = ['vae', 'autoencoder', 'priors']
+VALID_MODELS = ["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
+               "autoencoder", "vae"]
+
 
 def getImage(srl_model, mu, device):
     """
@@ -35,58 +37,68 @@ def getImage(srl_model, mu, device):
     return img[:, :, ::-1]
 
 
+def createFigureAndSlider(name, state_dim):
+    """
+    Creating a window for the latent space visualization, an another for the slider to control it
+    :param name: name of model (str)
+    :param state_dim: (int)
+    :return:
+    """
+    # opencv gui setup
+    cv2.namedWindow(name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(name, 500, 500)
+    cv2.namedWindow('slider for ' + name)
+    # add a slider for each component of the latent space
+    for i in range(state_dim):
+        # the sliders MUST be between 0 and max, so we placed max at 100, and start at 50
+        # So that when we substract 50 and divide 10 we get [-5,5] for each component
+        cv2.createTrackbar(str(i), 'slider for ' + name, 50, 100, (lambda a: None))
+
+
 def main():
     parser = argparse.ArgumentParser(description="latent space enjoy")
     parser.add_argument('--log-dir', default='', type=str, help='directory to load model')
     parser.add_argument('--no-cuda', default=False, action="store_true")
 
     args = parser.parse_args()
-
-    device = torch.device("cuda" if torch.cuda.is_available() and (not args.no_cuda) else "cpu")
+    use_cuda = not args.no_cuda
+    device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
 
     # making sure you chose the right folder
     assert os.path.exists(args.log_dir), "Error: folder '{}' does not exist".format(args.log_dir)
 
-    srl_model_type = None
-    for name, filename in zip(['priors', 'vae', 'autoencoder'], ['', '_vae', '_ae']):
-        filename = "srl{}_model.pth".format(filename)
-        if os.path.exists(args.log_dir + filename):
-            srl_model_type = name
-            model_path = args.log_dir + filename
+    with open(args.log_dir + 'exp_config.json', 'r') as f:
+        exp_config = json.load(f)
 
-    assert srl_model_type is not None, "Error: the folder did not containe any \"srl_model.pth\", could not determine model type."
-    print("Found srl model type: " + srl_model_type)
+    state_dim = exp_config['state-dim']
+    loss_type = exp_config['losses']
+    n_actions = exp_config['n_actions']
+    model_type = exp_config['model-type']
 
-    # is this a valid model
-    assert srl_model_type in VALID_MODEL, "Error: '{}' model is not supported."
+    # is this a valid model ?
+    difference = set(loss_type).symmetric_difference(VALID_MODELS)
+    assert set(loss_type).intersection(VALID_MODELS) != set(), "Error: Not supported losses " + ", ".join(difference)
 
-    data = json.load(open(args.log_dir + 'image_to_state.json'))
-    state_dim = len(list(data.values())[0])
+    if os.path.exists(args.log_dir + 'srl_model.pth'):
+        model_path = args.log_dir + 'srl_model.pth'
 
     # model param and info
-    if srl_model_type != 'priors':
+    is_auto_encoder = 'autoencoder' in loss_type or 'vae' in loss_type
+    if is_auto_encoder:
         assert os.path.exists(
             args.log_dir + "exp_config.json"), "Error: could not find 'exp_config.json' in '{}'".format(
             args.log_dir)
-
-        data = json.load(open(args.log_dir + 'exp_config.json'))
-        try:
-            state_dim = data["state-dim"]
-        except KeyError:
-            # old format
-            state_dim = data["state_dim"]
-
-        # loading the model
-        if srl_model_type == "autoencoder":
-            srl_model = CNNAutoEncoder(state_dim)
-        elif srl_model_type == "vae":
-            srl_model = CNNVAE(state_dim)
+        srl_model = SRLModules(state_dim=state_dim, action_dim=n_actions, model_type=model_type,
+                               cuda=use_cuda, losses=loss_type)
         srl_model.eval()
         srl_model.load_state_dict(torch.load(model_path))
         srl_model.to(device)
 
-    else:
+        ae_type = 'autoencoder' if 'autoencoder' in loss_type else 'vae'
+        createFigureAndSlider(ae_type, state_dim)
 
+    if not is_auto_encoder or len(loss_type) > 1:
+        data = json.load(open(args.log_dir + 'image_to_state.json'))
         srl_model_knn = KNeighborsClassifier()
 
         # Load all the points and images, find bounds and train KNN model
@@ -97,15 +109,9 @@ def main():
         min_X = np.min(X, axis=0)
         max_X = np.max(X, axis=0)
 
-    # opencv gui setup
-    cv2.namedWindow(srl_model_type, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(srl_model_type, 500, 500)
-    cv2.namedWindow('sliders')
-    # add a slider for each component of the latent space
-    for i in range(state_dim):
-        # the sliders MUST be between 0 and max, so we placed max at 100, and start at 50
-        # So that when we substract 50 and divide 10 we get [-5,5] for each component
-        cv2.createTrackbar(str(i), 'sliders', 50, 100, (lambda a: None))
+        fig_name = "KNN on " + ", ".join([item + " " for item in loss_type])[:-1]
+        createFigureAndSlider(fig_name, state_dim)
+
 
     # run the param through the network
     while 1:
@@ -115,24 +121,35 @@ def main():
             break
 
         # make the image
-        mu = []
-        for i in range(state_dim):
-            mu.append(cv2.getTrackbarPos(str(i), 'sliders'))
-        if srl_model_type != 'priors':
-            mu = (np.array(mu) - 50) / 10
-            img = getImage(srl_model, mu, device)
-        else:
+        if is_auto_encoder:
+            mu_ae = []
+            for i in range(state_dim):
+                mu_ae.append(cv2.getTrackbarPos(str(i), 'slider for ' + ae_type))
+            mu_ae = (np.array(mu_ae) - 50) / 10
+            img_ae = getImage(srl_model.model, mu_ae, device)
+
+            # stop if user closed a window
+            if (cv2.getWindowProperty(ae_type, 0) < 0) or (cv2.getWindowProperty('slider for ' + ae_type, 0) < 0):
+                break
+
+            cv2.imshow(ae_type, img_ae)
+
+        if not is_auto_encoder or len(loss_type) > 1:
+            mu = []
+            for i in range(state_dim):
+                mu.append(cv2.getTrackbarPos(str(i), 'slider for ' + fig_name))
+
             # rescale for the bounds of the priors representation, and find nearest image
             img_path = y[srl_model_knn.predict([(np.array(mu) / 100) * (max_X - min_X) + min_X])[0]]
             # Remove trailing .jpg if present
             img_path = img_path.split('.jpg')[0]
             img = cv2.imread("data/" + img_path + ".jpg")
 
-        # stop if user closed a window
-        if (cv2.getWindowProperty(srl_model_type, 0) < 0) or (cv2.getWindowProperty('sliders', 0) < 0):
-            break
+            # stop if user closed a window
+            if (cv2.getWindowProperty(fig_name, 0) < 0) or (cv2.getWindowProperty('slider for ' + fig_name, 0) < 0):
+                break
 
-        cv2.imshow(srl_model_type, img)
+            cv2.imshow(fig_name, img)
 
     # gracefully close
     cv2.destroyAllWindows()

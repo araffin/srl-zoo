@@ -7,15 +7,15 @@ from __future__ import print_function, division
 
 import argparse
 import datetime
-import subprocess
 import json
 import os
+import subprocess
 import sys
 from collections import OrderedDict
 from pprint import pprint
 
 from utils import printRed, printGreen, printBlue, parseDataFolder, \
-    printYellow, priorsToString, createFolder
+    printYellow, createFolder
 
 # Fix for matplotlib non-zero return
 # Apparently due to segmentation fault
@@ -36,20 +36,18 @@ def getLogFolderName(exp_config):
     date = datetime.datetime.now().strftime("%y-%m-%d_%Hh%M_%S")
     model_str = "_{}".format(exp_config['model-type'])
 
-    srl_str = "ST_DIM{}_SEED{}".format(exp_config['state-dim'],
-                                       exp_config['seed'])
+    srl_str = "ST_DIM{}".format(exp_config['state-dim'])
 
     # baselines
     if "priors" not in exp_config:
         for name in ['vae', 'autoencoder', 'supervised']:
-            if name in exp_config['log-folder']:
+            if name in exp_config["losses"]:
                 srl_str = "_" + name + "_" + srl_str
                 break
-    # priors
-    elif len(exp_config["priors"]) > 0:
-        srl_str = priorsToString(exp_config['priors']) + "_" + srl_str
-
-    experiment_name = "{}{}{}_{}".format(date, model_str, srl_str, exp_config['model-approach'])
+    losses = exp_config["losses"]
+    if losses is not str():
+        losses = "_".join(losses)
+    experiment_name = "{}{}{}_{}".format(date, model_str, srl_str, losses)
 
     printBlue("\nExperiment: {}\n".format(experiment_name))
     log_folder = "logs/{}/{}".format(exp_config['data-folder'], experiment_name)
@@ -88,13 +86,10 @@ def stateRepresentationLearningCall(exp_config):
     """
     printGreen("\nLearning a state representation...")
 
-    args = ['--no-plots']
+    args = ['--no-display-plots']
 
     if exp_config.get('multi-view', False):
         args.extend(['--multi-view'])
-
-    if len(exp_config["priors"]) == 0:
-        args.extend(['--no-priors'])
 
     for arg in ['learning-rate', 'l1-reg', 'batch-size',
                 'state-dim', 'epochs', 'seed', 'model-type',
@@ -127,37 +122,60 @@ def baselineCall(exp_config, baseline="supervised"):
     """
     printGreen("\n Baseline {}...".format(baseline))
 
-    args = ['--no-plots']
+    args = ['--no-display-plots']
     config_args = ['epochs', 'seed', 'model-type',
-                   'data-folder', 'training-set-size', 'log-folder']
+                   'data-folder', 'training-set-size', 'batch-size']
+
+    if 'log-folder' in exp_config.keys():
+        config_args += ['log-folder']
 
     if baseline in ["autoencoder", "vae"]:
         config_args += ['state-dim']
-    elif baseline == "supervised" and exp_config['relative-pos']:
+        exp_config['losses'] = [baseline]
+        for arg in config_args:
+            args.extend(['--{}'.format(arg), str(exp_config[arg])])
+        args += ['--losses', baseline]
+        ok = subprocess.call(['python', 'train.py'.format(baseline)] + args)
+
+    if exp_config['relative-pos']:
         args += ['--relative-pos']
 
-    for arg in config_args:
-        args.extend(['--{}'.format(arg), str(exp_config[arg])])
+    if baseline == "supervised":
+        for arg in config_args:
+            args.extend(['--{}'.format(arg), str(exp_config[arg])])
+        ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
 
-    ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
     printConfigOnError(ok, exp_config, "baselineCall")
 
 
-def dimReductionCall(exp_config, baseline="pca"):
+def pcaCall(exp_config):
     """
     :param exp_config: (dict)
-    :param baseline: (str) one of "pca" or "tsne"
     """
-    printGreen("\n Baseline {}...".format(baseline))
+    printGreen("\n Baseline PCA...")
 
-    args = ['--no-plots', '--method', baseline]
+    args = ['--no-display-plots']
     config_args = ['data-folder', 'training-set-size', 'state-dim']
 
     for arg in config_args:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
-    ok = subprocess.call(['python', '-m', 'baselines.pca_tsne'] + args)
-    printConfigOnError(ok, exp_config, "dimReductionCall")
+    ok = subprocess.call(['python', '-m', 'baselines.pca'] + args)
+    printConfigOnError(ok, exp_config, "pcaCall")
+
+
+def createGroundTruthFolder(exp_config):
+    """
+    Create folder and save exp_config in order to compute knn-mse
+    :param exp_config: (dict)
+    :return: (dict)
+    """
+    log_folder = "logs/{}/baselines/ground_truth/".format(exp_config['data-folder'])
+    createFolder(log_folder, "")
+    exp_config['log-folder'] = log_folder
+    exp_config['ground-truth'] = True
+    saveConfig(exp_config)
+    return exp_config
 
 
 def knnCall(exp_config):
@@ -172,6 +190,9 @@ def knnCall(exp_config):
     printGreen("\nEvaluating the state representation with KNN")
 
     args = ['--seed', str(exp_config['knn-seed']), '--n-samples', str(exp_config['knn-samples'])]
+
+    if exp_config.get('ground-truth', False):
+        args.extend(['--ground-truth'])
 
     if exp_config.get('multi-view', False):
         args.extend(['--multi-view'])
@@ -224,7 +245,6 @@ def getBaseExpConfig(args):
     args.data_folder = parseDataFolder(args.data_folder)
     dataset_path = "data/{}".format(args.data_folder)
     assert os.path.isdir(dataset_path), "Path to dataset folder is not valid: {}".format(dataset_path)
-
     with open(args.base_config, 'r') as f:
         exp_config = json.load(f)
     exp_config['data-folder'] = args.data_folder
@@ -271,8 +291,8 @@ if __name__ == '__main__':
     # Grid Search on Baselines
     if args.baselines and args.data_folder != "":
         exp_config = getBaseExpConfig(args)
-        # WARNING: batch_size and learning_rate in the base config
-        # are NOT currently taken into account for baselines
+        # WARNING: learning_rate in the base config
+        # is NOT currently taken into account for baselines
         base_config = exp_config.copy()
         createFolder("logs/{}/baselines".format(exp_config['data-folder']), "Baseline folder already exist")
         # Check that the dataset is already preprocessed
@@ -290,7 +310,7 @@ if __name__ == '__main__':
                 evaluateBaseline(base_config)
 
             # Autoencoder and VAE
-            exp_config['model-type'] = "cnn"
+            exp_config['model-type'] = "custom_cnn"
             for baseline in ['autoencoder', 'vae']:
                 for state_dim in [2, 3, 6, 12, 32]:
                     # Update config
@@ -302,15 +322,13 @@ if __name__ == '__main__':
         for state_dim in [2, 6, 12, 32]:
             # Update config
             exp_config['state-dim'] = state_dim
-            dimReductionCall(exp_config, 'pca')
+            pcaCall(exp_config)
             evaluateBaseline(base_config)
 
-        # # t-SNE
-        # for state_dim in [2, 3]:
-        #     # Update config
-        #     exp_config['state-dim'] = state_dim
-        #     dimReductionCall(exp_config, 'tsne')
-        #     evaluateBaseline(base_config)
+        # KNN-MSE for ground_truth
+        exp_config = base_config.copy()
+        exp_config = createGroundTruthFolder(exp_config)
+        knnCall(exp_config)
 
     # Reproduce a previous experiment using "exp_config.json"
     elif args.exp_config != "":

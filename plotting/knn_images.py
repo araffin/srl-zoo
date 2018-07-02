@@ -36,7 +36,7 @@ parser.add_argument('-k', '--n-neighbors', type=int, default=5, help='Number of 
 parser.add_argument('-n', '--n-samples', type=int, default=5, help='Number of test samples (default: 5)')
 parser.add_argument('--n-to-plot', type=int, default=5, help='Number of samples to plot (default: 5)')
 parser.add_argument('--relative-pos', action='store_true', default=False, help='Use relative position as ground_truth')
-parser.add_argument('--ground_truth', action='store_true', default=False, help='Compute KNN-MSE for ground truth')
+parser.add_argument('--ground-truth', action='store_true', default=False, help='Compute KNN-MSE for ground truth')
 parser.add_argument('--multi-view', action='store_true', default=False, help='To deal with multi view data format')
 
 args = parser.parse_args()
@@ -57,22 +57,23 @@ ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
 true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
 images_path = ground_truth['images_path']
 
-if args.ground_truth:
-    states = true_states.copy()
-else:
-    states = np.load('{}/states_rewards.npz'.format(args.log_folder))['states']
 
 if args.relative_pos:
     print("Using relative position")
     episode_starts = np.load('data/{}/preprocessed_data.npz'.format(data_folder))['episode_starts']
     # Backward compatibility with previous name
     target_positions = ground_truth['target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
-    button_idx = -1
+    episode_idx = -1
     for i in range(len(episode_starts)):
         if episode_starts[i] == 1:
-            button_idx += 1
-        true_states[i] -= target_positions[button_idx]
+            episode_idx += 1
+        true_states[i] -= target_positions[episode_idx]
 
+if args.ground_truth:
+    print("Using ground_truth")
+    states = true_states.copy()
+else:
+    states = np.load('{}/states_rewards.npz'.format(args.log_folder))['states']
 
 knn_path = '{}/NearestNeighbors'.format(args.log_folder)
 
@@ -124,7 +125,7 @@ for image_path, neigbour_indices, distance, image_idx in data:
     for i in range(0, n_neighbors):
         neighbor_idx = neigbour_indices[i + 1]
         neighbor_coord = true_states[neighbor_idx]
-        total_error += np.linalg.norm(neighbor_coord - ref_coord)
+        total_error += np.linalg.norm(neighbor_coord - ref_coord)**2
         n_images += 1
 
         if n_to_plot > 0:

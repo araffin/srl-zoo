@@ -31,10 +31,10 @@ class GaussianNoise(nn.Module):
 class GaussianNoiseVariant(nn.Module):
     """
     Variant of the Gaussian Noise layer that does not require fixed batch_size
-    It recreates a variable at each call
+    It recreates a tensor at each call
+    :param device: (pytorch device)
     :param std: (float) standard deviation
     :param mean: (float)
-    :param device: (pytorch device)
     """
 
     def __init__(self, device, std, mean=0):

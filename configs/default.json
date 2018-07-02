@@ -6,14 +6,9 @@
   "l1-reg": 0,
   "training-set-size": 10000,
   "learning-rate": 0.001,
-  "model-approach": "priors",
   "model-type": "custom_cnn",
   "n-neighbors": 5,
   "n-to-plot": 5,
-  "priors": [
-    "Proportionality",
-    "Temporal",
-    "Causality",
-    "Repeatability"
-  ]
+  "losses": ["priors"]
+
 }

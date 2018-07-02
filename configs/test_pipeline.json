@@ -1,0 +1,14 @@
+{
+  "batch-size": 16,
+  "epochs": 1,
+  "knn-samples": 1,
+  "knn-seed": 1,
+  "l1-reg": 0,
+  "training-set-size": 1000,
+  "learning-rate": 0.001,
+  "model-type": "custom_cnn",
+  "n-neighbors": 5,
+  "n-to-plot": 1,
+  "losses": ["priors"],
+  "multi-view": false
+}
