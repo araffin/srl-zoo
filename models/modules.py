@@ -3,8 +3,11 @@ from .vae import CNNVAE, DenseVAE
 from .forward_inverse import BaseForwardModel, BaseInverseModel, BaseRewardModel
 from .models import *
 
+# In case of importing into the SRL repository
 try:
     from preprocessing.preprocess import getInputDim
+# In case of importing material from modules.py into the external Robotics RL repository,
+# consider the relative path to the package
 except ImportError:
     from ..preprocessing.preprocess import getInputDim
 

@@ -157,14 +157,14 @@ def rewardModelLoss(rewards_pred, rewards_st, weight, loss_manager):
     return weight * reward_loss
 
 
-def reconstructionLoss(_input, target):
+def reconstructionLoss(input_image, target_image):
     """
     Reconstruction Loss for Autoencoders
-    :param _input: Observation (th.Tensor)
-    :param target:  Reconstructed observation (th.Tensor)
+    :param input_image: Observation (th.Tensor)
+    :param target_image:  Reconstructed observation (th.Tensor)
     :return:
     """
-    return F.mse_loss(_input, target, size_average=True)
+    return F.mse_loss(input_image, target_image, size_average=True)
 
 
 def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_manager):
@@ -217,6 +217,7 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
 
 def mutualInformationLoss(states, rewards_st, weight, loss_manager):
     """
+    TODO: Equation needs to be fixed for faster computation
     Loss criterion to assess mutual information between predicted states and rewards
     see: https://en.wikipedia.org/wiki/Mutual_information
     :param states: (th.Tensor)
