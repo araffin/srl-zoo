@@ -143,7 +143,7 @@ def baselineCall(exp_config, baseline="supervised"):
     if baseline == "supervised":
         for arg in config_args:
             args.extend(['--{}'.format(arg), str(exp_config[arg])])
-        ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
+        ok = subprocess.call(['python', 'm', 'srl_baselines.{}'.format(baseline)] + args)
 
     printConfigOnError(ok, exp_config, "baselineCall")
 
@@ -160,7 +160,7 @@ def pcaCall(exp_config):
     for arg in config_args:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
-    ok = subprocess.call(['python', '-m', 'baselines.pca'] + args)
+    ok = subprocess.call(['python', 'm', 'srl_baselines.pca'] + args)
     printConfigOnError(ok, exp_config, "pcaCall")
 
 

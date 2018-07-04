@@ -150,5 +150,5 @@ def testExtraSupervisedTrain():
             '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
             '--seed', SEED, '--model-type', 'mlp']
     args = list(map(str, args))
-    ok = subprocess.call(['python', '-m', 'baselines.supervised'] + args)
+    ok = subprocess.call(['python', 'm', 'srl_baselines.supervised'] + args)
     assertEq(ok, 0)
