@@ -117,6 +117,7 @@ def baselineCall(exp_config, baseline="supervised"):
     printGreen("\n Baseline {}...".format(baseline))
     ok = False
     args = ['--no-display-plots']
+
     config_args = ['epochs', 'seed', 'model-type',
                    'data-folder', 'training-set-size', 'batch-size']
 
@@ -125,7 +126,10 @@ def baselineCall(exp_config, baseline="supervised"):
 
     if baseline in ["supervised", "autoencoder", "vae"]:
 
-        if baseline != "supervised":
+        if baseline == "supervised":
+            if exp_config['relative-pos']:
+                args += ['--relative-pos']
+        else:
             config_args += ['state-dim']
             # because ae & vae use the script train.py with loss argument
             args += ['--losses', baseline]
@@ -138,9 +142,6 @@ def baselineCall(exp_config, baseline="supervised"):
             ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
         else:
             ok = subprocess.call(['python', 'train.py'.format(baseline)] + args)
-
-    if exp_config['relative-pos']:
-        args += ['--relative-pos']
 
     printConfigOnError(ok, exp_config, "baselineCall")
 
