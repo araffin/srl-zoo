@@ -34,16 +34,10 @@ def getLogFolderName(exp_config):
     :return: (str, str)
     """
     date = datetime.datetime.now().strftime("%y-%m-%d_%Hh%M_%S")
-    model_str = "_{}".format(exp_config['model-type'])
+    model_str = "_{}_".format(exp_config['model-type'])
 
     srl_str = "ST_DIM{}".format(exp_config['state-dim'])
 
-    # baselines
-    if "priors" not in exp_config:
-        for name in ['vae', 'autoencoder', 'supervised']:
-            if name in exp_config["losses"]:
-                srl_str = "_" + name + "_" + srl_str
-                break
     losses = exp_config["losses"]
     if losses is not str():
         losses = "_".join(losses)
@@ -118,10 +112,10 @@ def stateRepresentationLearningCall(exp_config):
 def baselineCall(exp_config, baseline="supervised"):
     """
     :param exp_config: (dict)
-    :param baseline: (str) one of "supervised" or "autoencoder"
+    :param baseline: (str) one of "supervised" , "autoencoder" or "vae"
     """
     printGreen("\n Baseline {}...".format(baseline))
-
+    ok = False
     args = ['--no-display-plots']
     config_args = ['epochs', 'seed', 'model-type',
                    'data-folder', 'training-set-size', 'batch-size']
@@ -129,21 +123,24 @@ def baselineCall(exp_config, baseline="supervised"):
     if 'log-folder' in exp_config.keys():
         config_args += ['log-folder']
 
-    if baseline in ["autoencoder", "vae"]:
-        config_args += ['state-dim']
+    if baseline in ["supervised", "autoencoder", "vae"]:
+
+        if baseline != "supervised":
+            config_args += ['state-dim']
+            # because ae & vae use the script train.py with loss argument
+            args += ['--losses', baseline]
         exp_config['losses'] = [baseline]
+
         for arg in config_args:
             args.extend(['--{}'.format(arg), str(exp_config[arg])])
-        args += ['--losses', baseline]
-        ok = subprocess.call(['python', 'train.py'.format(baseline)] + args)
+
+        if baseline == "supervised":
+            ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
+        else:
+            ok = subprocess.call(['python', 'train.py'.format(baseline)] + args)
 
     if exp_config['relative-pos']:
         args += ['--relative-pos']
-
-    if baseline == "supervised":
-        for arg in config_args:
-            args.extend(['--{}'.format(arg), str(exp_config[arg])])
-        ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
 
     printConfigOnError(ok, exp_config, "baselineCall")
 

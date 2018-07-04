@@ -13,8 +13,8 @@ import argparse
 import numpy as np
 import torch as th
 
-from models import SRL4robotics
 import models.learner as learner
+from models.learner import SRL4robotics
 from pipeline import getLogFolderName, saveConfig, knnCall
 from plotting.losses_plot import plotLosses
 import plotting.representation_plot as plot_script

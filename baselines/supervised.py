@@ -17,6 +17,7 @@ from plotting.losses_plot import plotLosses
 from plotting.representation_plot import plotRepresentation, plt
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import getInputDim
+from train import buildConfig
 from utils import parseDataFolder, createFolder, getInputBuiltin
 
 DISPLAY_PLOTS = True
@@ -161,26 +162,6 @@ def getModelName(args):
     return name
 
 
-def saveExpConfig(args, log_folder):
-    """
-    :param args: (parsed args object)
-    :param log_folder: (str)
-    """
-    exp_config = {
-        "batch-size": args.batch_size,
-        "data-folder": args.data_folder,
-        "epochs": args.epochs,
-        "learning-rate": args.learning_rate,
-        "training-set-size": args.training_set_size,
-        "log-folder": log_folder,
-        "model-type": args.model_type,
-        "seed": args.seed,
-        "state-dim": args.state_dim,
-    }
-
-    saveConfig(exp_config, print_config=True)
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Supervised Learning')
     parser.add_argument('--epochs', type=int, default=50, metavar='N',
@@ -247,7 +228,10 @@ if __name__ == '__main__':
         rewards = rewards[:limit]
 
     args.state_dim = state_dim
-    saveExpConfig(args, log_folder)
+    args.losses = ["supervised"]
+    exp_config = buildConfig(args)
+    exp_config["log-folder"] = log_folder
+    saveConfig(exp_config, print_config=True)
 
     print('Learning a state representation ... ')
     srl = SupervisedLearning(state_dim, model_type=args.model_type, seed=args.seed,
