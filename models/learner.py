@@ -15,7 +15,7 @@ from pipeline import NAN_ERROR
 from plotting.representation_plot import plotRepresentation, plt, plotImage
 from preprocessing.data_loader import CustomDataLoader
 from preprocessing.utils import deNormalize
-from utils import parseDataFolder, printYellow, createFolder, detachToNumpy
+from utils import parseDataFolder, printYellow, printRed, createFolder, detachToNumpy
 
 from .modules import SRLModules, SRLModulesSplit
 from .priors import Discriminator
@@ -29,7 +29,6 @@ N_WORKERS = 4
 # The following variables are defined using arguments of the main script train.py
 DISPLAY_PLOTS = True
 BATCH_SIZE = 256  #
-NOISE_STD = 1e-6  # To avoid NaN (states must be different)
 VALIDATION_SIZE = 0.2  # 20% of training data for validation
 # Experimental: episode independent prior
 BALANCED_SAMPLING = False  # Whether to do Uniform (default) or balanced sampling
@@ -202,7 +201,7 @@ class SRL4robotics(BaseLearner):
                 self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
                                         cuda=cuda, losses=losses, split_index=split_index)
             else:
-                self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
+                self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
                                         cuda=cuda, losses=losses)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
@@ -415,7 +414,7 @@ class SRL4robotics(BaseLearner):
                 th.save(self.model.state_dict(), best_model_path)
 
             if np.isnan(train_loss):
-                print("NaN Loss, consider increasing NOISE_STD in the gaussian noise layer")
+                printRed("NaN Loss, consider increasing NOISE_STD in the gaussian noise layer")
                 sys.exit(NAN_ERROR)
 
             # Then we print the results for this epoch:

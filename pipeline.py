@@ -158,7 +158,7 @@ def pcaCall(exp_config):
     for arg in config_args:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
-    ok = subprocess.call(['python', 'm', 'srl_baselines.pca'] + args)
+    ok = subprocess.call(['python', '-m', 'srl_baselines.pca'] + args)
     printConfigOnError(ok, exp_config, "pcaCall")
 
 

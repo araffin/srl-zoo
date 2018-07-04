@@ -4,10 +4,10 @@ import os
 import shutil
 import subprocess
 
-TEST_DATA_FOLDER = "data/kuka_gym_test"
-TEST_DATA_FOLDER_DUAL = "data/kuka_gym_dual_test"
-LOG_FOLDER = "logs/kuka_gym_test"
-LOG_FOLDER_DUAL = "logs/kuka_gym_dual_test"
+TEST_DATA_FOLDER = 'data/kuka_gym_test'
+TEST_DATA_FOLDER_DUAL = 'data/kuka_gym_dual_test'
+LOG_FOLDER = 'logs/kuka_gym_test'
+LOG_FOLDER_DUAL = 'logs/kuka_gym_dual_test'
 NUM_EPOCHS = 1
 STATE_DIM = 2
 TRAINING_SET_SIZE = 2000
@@ -16,11 +16,11 @@ SEED = 0
 
 
 def assertEq(left, right):
-    assert left == right, "{} != {}".format(left, right)
+    assert left == right, '{} != {}'.format(left, right)
 
 
 def assertNeq(left, right):
-    assert left != right, "{} == {}".format(left, right)
+    assert left != right, '{} == {}'.format(left, right)
 
 def removeFolderIfExist(path):
     """
@@ -75,7 +75,7 @@ def testExtraSRLTrain():
                 '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
                 '--seed', SEED, '--val-size', 0.1,
                 '--state-dim', STATE_DIM, '--model-type', model_type, '-bs', 128,
-                '--losses', "forward", "inverse", "reward", "priors", "episode-prior", "reward-prior",
+                '--losses', 'forward', 'inverse', 'reward', 'priors', 'episode-prior', 'reward-prior',
                 '--balanced-sampling',
                 '--l1-reg', 0.0001]
         args = list(map(str, args))
@@ -88,7 +88,7 @@ def testExtraSRLTrain():
                     '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
                     '--seed', SEED, '--val-size', 0.1,
                     '--state-dim', STATE_DIM, '--model-type', model_type, '-bs', 32,
-                    '--losses', "forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
+                    '--losses', 'forward', 'inverse', 'reward', 'priors', 'episode-prior', 'reward-prior', 'triplet',
                     '--l1-reg', 0.0001,
                     '--multi-view']
             args = list(map(str, args))
@@ -125,7 +125,7 @@ def testExtraBaselineDualTrain():
         # dual camera
         args = ['--no-display-plots', '--data-folder', TEST_DATA_FOLDER_DUAL,
                 '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
-                '--seed', SEED, '--val-size', 0.1,
+                '--seed', SEED, '--val-size', 0.1, '-lr', 0.0001,
                 '--state-dim', STATE_DIM, '--model-type', 'mlp', '-bs', 16,
                 '--losses', baseline,
                 '--multi-view']
@@ -150,5 +150,17 @@ def testExtraSupervisedTrain():
             '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
             '--seed', SEED, '--model-type', 'mlp']
     args = list(map(str, args))
-    ok = subprocess.call(['python', 'm', 'srl_baselines.supervised'] + args)
+    ok = subprocess.call(['python', '-m', 'srl_baselines.supervised'] + args)
+    assertEq(ok, 0)
+
+
+def testStackedModels():
+    args = ['--no-display-plots', '--data-folder', TEST_DATA_FOLDER,
+            '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
+            '--seed', SEED, '--val-size', 0.1,
+            '--state-dim', 3, '--model-type', 'custom_cnn', '-bs', 128,
+            '--losses', 'autoencoder', 'inverse',
+            '--split-index', 1]
+    args = list(map(str, args))
+    ok = subprocess.call(['python', 'train.py'] + args)
     assertEq(ok, 0)

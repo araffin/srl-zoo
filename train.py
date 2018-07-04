@@ -26,6 +26,8 @@ def buildConfig(args):
     """
     :param args: (parsed args object)
     """
+    # Fix to use this function in srl_baselines/
+    split_index = args.split_index if hasattr(args, "split_index") else -1
     exp_config = {
         "batch-size": args.batch_size,
         "data-folder": args.data_folder,
@@ -42,7 +44,7 @@ def buildConfig(args):
         "losses": args.losses,
         "n-neighbors": 5,
         "n-to-plot": 5,
-        "split-index": args.split_index
+        "split-index": split_index
     }
     return exp_config
 

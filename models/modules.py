@@ -1,6 +1,8 @@
 from .autoencoders import CNNAutoEncoder, DenseAutoEncoder, LinearAutoEncoder
 from .vae import CNNVAE, DenseVAE
 from .forward_inverse import BaseForwardModel, BaseInverseModel, BaseRewardModel
+from .priors import SRLConvolutionalNetwork, SRLDenseNetwork, SRLLinear
+from .triplet import EmbeddingNet
 from .models import *
 
 # In case of importing into the SRL repository
