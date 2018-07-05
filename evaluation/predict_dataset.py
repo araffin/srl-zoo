@@ -43,3 +43,17 @@ with th.no_grad():
     learned_states = srl_model.predStatesWithDataLoader(data_loader, restore_train=False)
 
 srl_model.saveStates(learned_states, images_path, rewards, args.log_dir, name="_test")
+
+# Print and save some stats
+mean_states = np.mean(learned_states, axis=0)
+std_states = np.std(learned_states, axis=0)
+min_states = np.min(learned_states, axis=0)
+max_states = np.max(learned_states, axis=0)
+
+print("Mean:", mean_states)
+print("Std:", std_states)
+print("Min:", min_states)
+print("Max:", max_states)
+
+print("Stats saved (states_stats.npz)")
+np.savez(args.log_dir + '/states_stats.npz', **{'mean': mean_states, 'std': std_states, 'min': min_states, 'max': max_states})
