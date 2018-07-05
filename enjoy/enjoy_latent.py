@@ -33,7 +33,7 @@ def getImage(srl_model, mu, device):
 
         img = detachToNumpy(net_out)[0].T
 
-    img = deNormalize(img)
+    img = deNormalize(img, mode="image_net")
     return img[:, :, ::-1]
 
 

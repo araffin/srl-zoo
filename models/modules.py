@@ -180,7 +180,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :return: (th.Tensor)
         """
         # Predict the delta between the next state and current state
-        concat = torch.cat((state[self.second_split_indices], encodeOneHot(action, self.action_dim)), dim=1)
+        concat = th.cat((state[self.second_split_indices], encodeOneHot(action, self.action_dim)), dim=1)
         return state[self.second_split_indices] + self.forward_net(concat)
 
     def rewardModel(self, state):

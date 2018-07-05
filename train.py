@@ -10,21 +10,24 @@ https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
 from __future__ import print_function, division, absolute_import
 
 import argparse
+
 import numpy as np
 import torch as th
 
 import models.learner as learner
-from models.learner import SRL4robotics
-from pipeline import getLogFolderName, saveConfig, knnCall
-from plotting.losses_plot import plotLosses
 import plotting.representation_plot as plot_script
-from plotting.representation_plot import plotRepresentation, plt, plotImage
 import preprocessing
-from utils import parseDataFolder, printYellow, createFolder, detachToNumpy, getInputBuiltin
+from models.learner import SRL4robotics
+from pipeline import getLogFolderName, saveConfig
+from plotting.losses_plot import plotLosses
+from plotting.representation_plot import plotRepresentation
+from utils import parseDataFolder, createFolder, getInputBuiltin
+
 
 def buildConfig(args):
     """
     :param args: (parsed args object)
+    :return: (dict)
     """
     # Fix to use this function in srl_baselines/
     split_index = args.split_index if hasattr(args, "split_index") else -1
@@ -63,7 +66,8 @@ if __name__ == '__main__':
     parser.add_argument('-lr', '--learning-rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1-reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
-    parser.add_argument('--no-display-plots', action='store_true', default=False, help='disables live plots of the representation learned')
+    parser.add_argument('--no-display-plots', action='store_true', default=False,
+                        help='disables live plots of the representation learned')
     parser.add_argument('--model-type', type=str, default="custom_cnn",
                         choices=['custom_cnn', 'resnet', 'mlp', 'linear'],
                         help='Model architecture (default: "custom_cnn")')
@@ -84,8 +88,6 @@ if __name__ == '__main__':
     parser.add_argument('--split-index', type=int, default=-1,
                         help='Split representation models (default: -1, no split)')
 
-
-    input = getInputBuiltin()
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     args.data_folder = parseDataFolder(args.data_folder)
@@ -176,4 +178,4 @@ if __name__ == '__main__':
 
     # Do not close plot at the end of training
     if learner.DISPLAY_PLOTS:
-        input('\nPress any key to exit.')
+        getInputBuiltin()('\nPress any key to exit.')
