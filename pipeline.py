@@ -201,7 +201,7 @@ def knnCall(exp_config):
     for arg in ['log-folder', 'n-neighbors', 'n-to-plot']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
-    ok = subprocess.call(['python', '-m', 'plotting.knn_images'] + args)
+    ok = subprocess.call(['python', '-m', 'evaluation.knn_images'] + args)
     printConfigOnError(ok, exp_config, "knnCall")
 
 

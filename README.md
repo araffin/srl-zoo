@@ -342,7 +342,7 @@ python plotting/interactive_plot.py --data-folder path/to/datasetFolder/
 
 Usage:
 ```
-python plotting/knn_images.py [-h] --log-folder LOG_FOLDER [--seed SEED]
+python evaluation/knn_images.py [-h] --log-folder LOG_FOLDER [--seed SEED]
                      [-k N_NEIGHBORS] [-n N_SAMPLES] [--n-to-plot N_TO_PLOT]
                      [--relative-pos] [--ground-truth] [--multi-view]
 

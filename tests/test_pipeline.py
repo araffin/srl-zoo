@@ -143,5 +143,5 @@ def testStackedModels():
     # Get Latest edited folder
     path = max([LOG_FOLDER + "/" + d for d in os.listdir(LOG_FOLDER) if not d.startswith('baselines')], key=os.path.getmtime)
 
-    ok = subprocess.call(['python', '-m', 'evaluation.predict_dataset', '-n', 10, '--log-dir', path])
+    ok = subprocess.call(['python', '-m', 'evaluation.predict_dataset', '-n', str(10), '--log-dir', path + "/"])
     assertEq(ok, 0)
