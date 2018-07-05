@@ -6,11 +6,11 @@ import os
 
 import numpy as np
 import cv2
-import torch
+import torch as th
 from sklearn.neighbors import KNeighborsClassifier
 
 from preprocessing.utils import deNormalize
-from models import SRLModules, SRLModulesSplit
+from models.learner import SRL4robotics
 from utils import detachToNumpy
 
 VALID_MODELS = ["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
@@ -25,8 +25,8 @@ def getImage(srl_model, mu, device):
     :param device: (pytorch device)
     :return: ([float])
     """
-    with torch.no_grad():
-        mu = torch.from_numpy(np.array(mu).reshape(1, -1)).float()
+    with th.no_grad():
+        mu = th.from_numpy(np.array(mu).reshape(1, -1)).float()
         mu = mu.to(device)
 
         net_out = srl_model.decode(mu)
@@ -62,10 +62,14 @@ def main():
 
     args = parser.parse_args()
     use_cuda = not args.no_cuda
-    device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
+    device = th.device("cuda" if th.cuda.is_available() and use_cuda else "cpu")
 
     # making sure you chose the right folder
     assert os.path.exists(args.log_dir), "Error: folder '{}' does not exist".format(args.log_dir)
+    assert os.path.exists(args.log_dir + "exp_config.json"),\
+        "Error: could not find 'exp_config.json' in '{}'".format(args.log_dir)
+    assert os.path.exists(args.log_dir + "srl_model.pth"),\
+        "Error: could not find 'srl_model.pth' in '{}'".format(args.log_dir)
 
     with open(args.log_dir + 'exp_config.json', 'r') as f:
         exp_config = json.load(f)
@@ -74,31 +78,21 @@ def main():
     losses = exp_config['losses']
     n_actions = exp_config['n_actions']
     model_type = exp_config['model-type']
+    multi_view = exp_config.get('multi-view', False)
     split_index = exp_config.get('split-index', -1)
+    model_path = args.log_dir + 'srl_model.pth'
 
     # is this a valid model ?
     difference = set(losses).symmetric_difference(VALID_MODELS)
     assert set(losses).intersection(VALID_MODELS) != set(), "Error: Not supported losses " + ", ".join(difference)
 
-    if os.path.exists(args.log_dir + 'srl_model.pth'):
-        model_path = args.log_dir + 'srl_model.pth'
 
     # model param and info
     is_auto_encoder = 'autoencoder' in losses or 'vae' in losses
     if is_auto_encoder:
-        assert os.path.exists(
-            args.log_dir + "exp_config.json"), "Error: could not find 'exp_config.json' in '{}'".format(
-            args.log_dir)
-
-        if split_index > 0:
-            srl_model = SRLModulesSplit(state_dim=state_dim, action_dim=n_actions, model_type=model_type,
-                                   cuda=use_cuda, losses=losses, split_index=split_index)
-        else:
-            srl_model = SRLModules(state_dim=state_dim, action_dim=n_actions, model_type=model_type,
-                                   cuda=use_cuda, losses=losses)
-        srl_model.eval()
-        srl_model.load_state_dict(torch.load(model_path))
-        srl_model = srl_model.to(device)
+        srl_model = SRL4robotics(state_dim, model_type=model_type, cuda=use_cuda, multi_view=multi_view,
+                           losses=losses, n_actions=n_actions, split_index=split_index).model
+        srl_model.load_state_dict(th.load(model_path))
 
         ae_type = 'autoencoder' if 'autoencoder' in losses else 'vae'
         state_dim_first_split = split_index if split_index > 0 else state_dim
