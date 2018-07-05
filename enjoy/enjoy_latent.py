@@ -2,19 +2,18 @@ from __future__ import print_function, division, absolute_import
 
 import argparse
 import json
-import os
 
-import numpy as np
 import cv2
+import numpy as np
 import torch as th
 from sklearn.neighbors import KNeighborsClassifier
 
-from preprocessing.utils import deNormalize
 from models.learner import SRL4robotics
+from preprocessing.utils import deNormalize
 from utils import detachToNumpy
 
 VALID_MODELS = ["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-               "autoencoder", "vae"]
+                "autoencoder", "vae"]
 
 
 def getImage(srl_model, mu, device):
@@ -64,42 +63,22 @@ def main():
     use_cuda = not args.no_cuda
     device = th.device("cuda" if th.cuda.is_available() and use_cuda else "cpu")
 
-    # making sure you chose the right folder
-    assert os.path.exists(args.log_dir), "Error: folder '{}' does not exist".format(args.log_dir)
-    assert os.path.exists(args.log_dir + "exp_config.json"),\
-        "Error: could not find 'exp_config.json' in '{}'".format(args.log_dir)
-    assert os.path.exists(args.log_dir + "srl_model.pth"),\
-        "Error: could not find 'srl_model.pth' in '{}'".format(args.log_dir)
-
-    with open(args.log_dir + 'exp_config.json', 'r') as f:
-        exp_config = json.load(f)
-
-    state_dim = exp_config['state-dim']
+    srl_model, exp_config = SRL4robotics.loadSavedModel(args.log_dir, VALID_MODELS, cuda=use_cuda)
+    # Retrieve the pytorch model
+    srl_model = srl_model.model
     losses = exp_config['losses']
-    n_actions = exp_config['n_actions']
-    model_type = exp_config['model-type']
-    multi_view = exp_config.get('multi-view', False)
-    split_index = exp_config.get('split-index', -1)
-    model_path = args.log_dir + 'srl_model.pth'
-
-    # is this a valid model ?
-    difference = set(losses).symmetric_difference(VALID_MODELS)
-    assert set(losses).intersection(VALID_MODELS) != set(), "Error: Not supported losses " + ", ".join(difference)
-
+    state_dim = exp_config['state-dim']
 
     # model param and info
     is_auto_encoder = 'autoencoder' in losses or 'vae' in losses
-    if is_auto_encoder:
-        srl_model = SRL4robotics(state_dim, model_type=model_type, cuda=use_cuda, multi_view=multi_view,
-                           losses=losses, n_actions=n_actions, split_index=split_index).model
-        srl_model.load_state_dict(th.load(model_path))
 
+    if is_auto_encoder:
         ae_type = 'autoencoder' if 'autoencoder' in losses else 'vae'
-        state_dim_first_split = split_index if split_index > 0 else state_dim
+        state_dim_first_split = exp_config['split-index'] if exp_config['split-index'] > 0 else state_dim
         createFigureAndSlider(ae_type, state_dim_first_split)
 
     if not is_auto_encoder or len(losses) > 1:
-        state_dim_second_split = state_dim - split_index if split_index > 0 else state_dim
+        state_dim_second_split = state_dim - exp_config['split-index'] if exp_config['split-index'] > 0 else state_dim
         data = json.load(open(args.log_dir + 'image_to_state.json'))
         srl_model_knn = KNeighborsClassifier()
 
@@ -109,13 +88,11 @@ def main():
         print(X[:, -state_dim_second_split:].shape)
         srl_model_knn.fit(X[:, -state_dim_second_split:], np.arange(X.shape[0]))
 
-
         min_X = np.min(X[:, -state_dim_second_split:], axis=0)
         max_X = np.max(X[:, -state_dim_second_split:], axis=0)
 
         fig_name = "KNN on " + ", ".join([item + " " for item in losses])[:-1]
         createFigureAndSlider(fig_name, state_dim_second_split)
-
 
     # run the param through the network
     while True:

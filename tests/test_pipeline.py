@@ -1,35 +1,9 @@
 from __future__ import print_function, division, absolute_import
 
-import os
-import shutil
+
 import subprocess
 
-TEST_DATA_FOLDER = 'data/kuka_gym_test'
-TEST_DATA_FOLDER_DUAL = 'data/kuka_gym_dual_test'
-LOG_FOLDER = 'logs/kuka_gym_test'
-LOG_FOLDER_DUAL = 'logs/kuka_gym_dual_test'
-NUM_EPOCHS = 1
-STATE_DIM = 2
-TRAINING_SET_SIZE = 2000
-KNN_SAMPLES = 1000
-SEED = 0
-
-
-def assertEq(left, right):
-    assert left == right, '{} != {}'.format(left, right)
-
-
-def assertNeq(left, right):
-    assert left != right, '{} == {}'.format(left, right)
-
-def removeFolderIfExist(path):
-    """
-    :param path: (str)
-    """
-    # cleanup to remove the cluter
-    if os.path.exists(path):
-        shutil.rmtree(path)
-
+from .common import *
 
 def testPipeLine():
     removeFolderIfExist(LOG_FOLDER)
@@ -163,4 +137,11 @@ def testStackedModels():
             '--split-index', 1]
     args = list(map(str, args))
     ok = subprocess.call(['python', 'train.py'] + args)
+    assertEq(ok, 0)
+
+    # Test predict dataset on last trained model
+    # Get Latest edited folder
+    path = max([LOG_FOLDER + "/" + d for d in os.listdir(LOG_FOLDER) if not d.startswith('baselines')], key=os.path.getmtime)
+
+    ok = subprocess.call(['python', '-m', 'evaluation.predict_dataset', '-n', 10, '--log-dir', path])
     assertEq(ok, 0)

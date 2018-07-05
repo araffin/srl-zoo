@@ -1,5 +1,6 @@
 from __future__ import print_function, division, absolute_import
 
+import os
 import json
 import sys
 import time
@@ -189,6 +190,41 @@ class SRL4robotics(BaseLearner):
         self.l1_reg = l1_reg
         self.log_folder = log_folder
         self.model_type = model_type
+
+    @staticmethod
+    def loadSavedModel(log_folder, valid_models, cuda=True):
+        """
+        :param log_folder: (str)
+        :param valid_models: ([str])
+        :param cuda: (bool)
+        :return: (SRL4robotics object, dict)
+        """
+        # Sanity checks
+        assert os.path.exists(log_folder), "Error: folder '{}' does not exist".format(log_folder)
+        assert os.path.exists(log_folder + "exp_config.json"), \
+            "Error: could not find 'exp_config.json' in '{}'".format(log_folder)
+        assert os.path.exists(log_folder + "srl_model.pth"), \
+            "Error: could not find 'srl_model.pth' in '{}'".format(log_folder)
+
+        with open(log_folder + 'exp_config.json', 'r') as f:
+            exp_config = json.load(f)
+
+        state_dim = exp_config['state-dim']
+        losses = exp_config['losses']
+        n_actions = exp_config['n_actions']
+        model_type = exp_config['model-type']
+        multi_view = exp_config.get('multi-view', False)
+        split_index = exp_config.get('split-index', -1)
+        model_path = log_folder + 'srl_model.pth'
+
+        difference = set(losses).symmetric_difference(valid_models)
+        assert set(losses).intersection(valid_models) != set(), "Error: Not supported losses " + ", ".join(difference)
+
+        srl_model = SRL4robotics(state_dim, model_type=model_type, cuda=cuda, multi_view=multi_view,
+                                 losses=losses, n_actions=n_actions, split_index=split_index)
+        srl_model.model.load_state_dict(th.load(model_path))
+
+        return srl_model, exp_config
 
     def learn(self, images_path, actions, rewards, episode_starts):
         """

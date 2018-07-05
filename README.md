@@ -243,6 +243,13 @@ Example:
 python train.py --data-folder data/path/to/dataset
 ```
 
+If you trained your model on a subset of a dataset, you can predict states for the whole dataset (or on a subset) using:
+```
+python -m evaluation.predict_dataset --log-dir logs/path/to/log_folder/
+```
+use  `-n 1000` to predict on the first 1000 samples only.
+
+
 ## Multiple Cameras
 
 ### Stacked Observations

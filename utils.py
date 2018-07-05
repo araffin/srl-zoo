@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 import os
 import subprocess
+
 import torch
 from termcolor import colored
 
@@ -33,7 +34,7 @@ def importMaplotlib():
 def detachToNumpy(tensor):
     """
     gets a pytorch tensor and returns a numpy array
-    :param tensor: (pytorch tensor)
+    :param tensor: (th.Tensor)
     :return: (numpy float)
     """
     return tensor.to(torch.device('cpu')).detach().numpy()
