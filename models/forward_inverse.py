@@ -59,7 +59,7 @@ class BaseInverseModel(BaseModelSRL):
 
 
 class BaseRewardModel(BaseModelSRL):
-    def __init__(self, state_dim=2, action_dim=6):
+    def __init__(self):
         """
         :param state_dim: (int)
         :param action_dim: (int)
@@ -67,7 +67,7 @@ class BaseRewardModel(BaseModelSRL):
         super(BaseRewardModel, self).__init__()
 
     def initRewardNet(self, state_dim, n_rewards=2, n_hidden=16):
-        self.reward_net = nn.Sequential(nn.Linear(state_dim, n_hidden),
+        self.reward_net = nn.Sequential(nn.Linear(2 * state_dim, n_hidden),
                                         nn.ReLU(),
                                         nn.Linear(n_hidden, n_hidden),
                                         nn.ReLU(),
@@ -76,11 +76,11 @@ class BaseRewardModel(BaseModelSRL):
     def forward(self, x):
         raise NotImplementedError()
 
-    def rewardModel(self, state):
+    def rewardModel(self, state, next_state):
         """
-        Predict reward given current state and action
+        Predict reward given current state and next state
         :param state: (th.Tensor)
         :param action: (th Tensor)
         :return: (th.Tensor)
         """
-        return self.reward_net(state)
+        return self.reward_net(th.cat((state, next_state), dim=1))

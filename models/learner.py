@@ -16,7 +16,7 @@ from pipeline import NAN_ERROR
 from plotting.representation_plot import plotRepresentation, plt, plotImage
 from preprocessing.data_loader import CustomDataLoader
 from preprocessing.utils import deNormalize
-from utils import printYellow, printRed, detachToNumpy
+from utils import printRed, detachToNumpy
 from .modules import SRLModules, SRLModulesSplit
 from .priors import Discriminator
 
@@ -31,6 +31,7 @@ N_EPOCHS = 1
 VALIDATION_SIZE = 0.2  # 20% of training data for validation
 # Experimental: episode independent prior
 BALANCED_SAMPLING = False  # Whether to do Uniform (default) or balanced sampling
+
 
 class BaseLearner(object):
     """
@@ -72,21 +73,6 @@ class BaseLearner(object):
         # Move the tensor back to the cpu
         return detachToNumpy(states)
 
-    def predStates(self, observations):
-        """
-        Predict states for given observations
-        WARNING: you should use _batchPredStates
-        if observations tensor is large to avoid memory issues
-        :param observations: (numpy tensor)
-        :return: (numpy tensor)
-        """
-        observations = observations.astype(np.float32)
-        with th.no_grad():
-            obs_var = th.from_numpy(observations)
-            obs_var = obs_var.to(self.device)
-            states = self._predFn(obs_var, restore_train=False)
-        return states
-
     def predStatesWithDataLoader(self, data_loader, restore_train=False):
         """
         Predict states using minibatches to avoid memory issues
@@ -122,11 +108,15 @@ class BaseLearner(object):
         :param log_folder: (str)
         :param name: (str)
         """
-        print("Saving image path to state representation")
+        print("Saving image path to state representation (image_to_state{}.json)".format(name))
+
         image_to_state = {path: list(map(str, state)) for path, state in zip(images_path, states)}
+
         with open("{}/image_to_state{}.json".format(log_folder, name), 'w') as f:
             json.dump(image_to_state, f, sort_keys=True)
-        print("Saving states and rewards")
+
+        print("Saving states and rewards (states_rewards{}.npz)".format(name))
+
         states_rewards = {'states': states, 'rewards': rewards}
         np.savez('{}/states_rewards{}.npz'.format(log_folder, name), **states_rewards)
 
@@ -225,10 +215,6 @@ class SRL4robotics(BaseLearner):
         # list is the id of the observation preserved through the training
         minibatchlist = [np.array(sorted(indices[start_idx:start_idx + self.batch_size]))
                          for start_idx in range(0, len(indices) - self.batch_size + 1, self.batch_size)]
-
-        if len(minibatchlist[-1]) < self.batch_size:
-            printYellow("Removing last minibatch of size {} < batch_size".format(len(minibatchlist[-1])))
-            del minibatchlist[-1]
 
         # Number of minibatches used for validation:
         n_val_batches = np.round(VALIDATION_SIZE * len(minibatchlist)).astype(np.int64)
@@ -334,8 +320,8 @@ class SRL4robotics(BaseLearner):
                     # Removing negative reward
                     rewards_st[rewards_st == -1] = 0
                     rewards_st = th.from_numpy(rewards_st).to(self.device)
-                    rewards_pred = self.model.rewardModel(states)
-                    rewardModelLoss(rewards_pred, rewards_st.long(), weight=0.5, loss_manager=loss_manager)
+                    rewards_pred = self.model.rewardModel(states, next_states)
+                    rewardModelLoss(rewards_pred, rewards_st.long(), weight=4, loss_manager=loss_manager)
 
                 if self.use_autoencoder:
                     autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_manager=loss_manager)

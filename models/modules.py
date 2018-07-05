@@ -183,11 +183,11 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         concat = th.cat((state[self.second_split_indices], encodeOneHot(action, self.action_dim)), dim=1)
         return state[self.second_split_indices] + self.forward_net(concat)
 
-    def rewardModel(self, state):
+    def rewardModel(self, state, next_state):
         """
-        Predict reward given current state and action
+        Predict reward given current state and next state
         :param state: (th.Tensor)
         :param action: (th Tensor)
         :return: (th.Tensor)
         """
-        return self.reward_net(state)
+        return self.reward_net(th.cat((state, next_state), dim=1))
