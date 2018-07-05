@@ -71,20 +71,20 @@ def main():
         exp_config = json.load(f)
 
     state_dim = exp_config['state-dim']
-    loss_type = exp_config['losses']
+    losses = exp_config['losses']
     n_actions = exp_config['n_actions']
     model_type = exp_config['model-type']
     split_index = exp_config.get('split-index', -1)
 
     # is this a valid model ?
-    difference = set(loss_type).symmetric_difference(VALID_MODELS)
-    assert set(loss_type).intersection(VALID_MODELS) != set(), "Error: Not supported losses " + ", ".join(difference)
+    difference = set(losses).symmetric_difference(VALID_MODELS)
+    assert set(losses).intersection(VALID_MODELS) != set(), "Error: Not supported losses " + ", ".join(difference)
 
     if os.path.exists(args.log_dir + 'srl_model.pth'):
         model_path = args.log_dir + 'srl_model.pth'
 
     # model param and info
-    is_auto_encoder = 'autoencoder' in loss_type or 'vae' in loss_type
+    is_auto_encoder = 'autoencoder' in losses or 'vae' in losses
     if is_auto_encoder:
         assert os.path.exists(
             args.log_dir + "exp_config.json"), "Error: could not find 'exp_config.json' in '{}'".format(
@@ -92,19 +92,19 @@ def main():
 
         if split_index > 0:
             srl_model = SRLModulesSplit(state_dim=state_dim, action_dim=n_actions, model_type=model_type,
-                                   cuda=use_cuda, losses=loss_type, split_index=split_index)
+                                   cuda=use_cuda, losses=losses, split_index=split_index)
         else:
             srl_model = SRLModules(state_dim=state_dim, action_dim=n_actions, model_type=model_type,
-                                   cuda=use_cuda, losses=loss_type)
+                                   cuda=use_cuda, losses=losses)
         srl_model.eval()
         srl_model.load_state_dict(torch.load(model_path))
         srl_model = srl_model.to(device)
 
-        ae_type = 'autoencoder' if 'autoencoder' in loss_type else 'vae'
+        ae_type = 'autoencoder' if 'autoencoder' in losses else 'vae'
         state_dim_first_split = split_index if split_index > 0 else state_dim
         createFigureAndSlider(ae_type, state_dim_first_split)
 
-    if not is_auto_encoder or len(loss_type) > 1:
+    if not is_auto_encoder or len(losses) > 1:
         state_dim_second_split = state_dim - split_index if split_index > 0 else state_dim
         data = json.load(open(args.log_dir + 'image_to_state.json'))
         srl_model_knn = KNeighborsClassifier()
@@ -119,7 +119,7 @@ def main():
         min_X = np.min(X[:, -state_dim_second_split:], axis=0)
         max_X = np.max(X[:, -state_dim_second_split:], axis=0)
 
-        fig_name = "KNN on " + ", ".join([item + " " for item in loss_type])[:-1]
+        fig_name = "KNN on " + ", ".join([item + " " for item in losses])[:-1]
         createFigureAndSlider(fig_name, state_dim_second_split)
 
 
@@ -144,7 +144,7 @@ def main():
 
             cv2.imshow(ae_type, img_ae)
 
-        if not is_auto_encoder or len(loss_type) > 1:
+        if not is_auto_encoder or len(losses) > 1:
             mu = []
             for i in range(state_dim_second_split):
                 mu.append(cv2.getTrackbarPos(str(i), 'slider for ' + fig_name))

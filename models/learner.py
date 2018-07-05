@@ -26,7 +26,7 @@ N_WORKERS = 4
 
 # The following variables are defined using arguments of the main script train.py
 DISPLAY_PLOTS = True
-BATCH_SIZE = 256  #
+BATCH_SIZE = 256
 N_EPOCHS = 1
 VALIDATION_SIZE = 0.2  # 20% of training data for validation
 # Experimental: episode independent prior
@@ -335,7 +335,7 @@ class SRL4robotics(BaseLearner):
                     rewards_st[rewards_st == -1] = 0
                     rewards_st = th.from_numpy(rewards_st).to(self.device)
                     rewards_pred = self.model.rewardModel(states)
-                    rewardModelLoss(rewards_pred, rewards_st.long(), weight=2, loss_manager=loss_manager)
+                    rewardModelLoss(rewards_pred, rewards_st.long(), weight=0.5, loss_manager=loss_manager)
 
                 if self.use_autoencoder:
                     autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_manager=loss_manager)
