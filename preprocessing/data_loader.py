@@ -17,6 +17,15 @@ from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels
 
 
+def channelFirst(tensor):
+    """
+    Permute the dimension to match pytorch convention
+    for images (BCHW: Batch x Channel x Height x Width).
+    :param tensor: (th.Tensor)
+    :return: (th.Tensor)
+    """
+    return tensor.permute(0, 3, 1, 2)
+
 class DataLoader(object):
     def __init__(self, minibatchlist, images_path, n_workers=1, multi_view=False, use_triplets=False, infinite_loop=True, max_queue_len=3, cache_capacity=0):
         super(DataLoader, self).__init__()
@@ -32,55 +41,51 @@ class DataLoader(object):
 
     def startProcess(self):
         self.p = Process(target=self._run)
-        self.p.daemon = True
+        self.p.daemon = False  # If set to True, joblib run with n_workers=1
         self.p.start()
 
     def _run(self):
         start = True
-        while start or self.infinite_loop:
-            start = False
-            if self.training:
-                indices = np.random.permutation(self.n_minibatches).astype(np.int64)
-            else:
-                indices = np.arange(len(self.minibatchlist), dtype=np.int64)
-
-            for minibatch_idx in indices:
+        with Parallel(n_jobs=self.n_workers, batch_size="auto") as parallel:
+            while start or self.infinite_loop:
+                start = False
                 if self.training:
-                    images = [(self.images_path[image_idx], self.images_path[image_idx + 1]) for image_idx in self.minibatchlist[minibatch_idx]]
+                    indices = np.random.permutation(self.n_minibatches).astype(np.int64)
                 else:
-                    images = [self.images_path[self.minibatchlist]]
+                    indices = np.arange(len(self.minibatchlist), dtype=np.int64)
 
-                if self.n_workers <= 1:
-                    batch = zip(*[self._makeBatchElement(image_path) for image_path in images])
-                else:
-                    batch = zip(*Parallel(n_jobs=self.n_workers, backend="threading")(
-                                            delayed(self._makeBatchElement)(image_path) for image_path in images))
+                for minibatch_idx in indices:
+                    if self.training:
+                        images = np.stack((self.images_path[self.minibatchlist[minibatch_idx]], self.images_path[self.minibatchlist[minibatch_idx] + 1]))
+                        images = images.flatten()
+                    else:
+                        images = [self.images_path[self.minibatchlist[minibatch_idx]]]
 
-                if self.training:
-                    batch_obs, batch_next_obs = batch
-                    self.pipe.put((minibatch_idx, th.tensor(batch_obs), th.tensor(batch_next_obs)))
-                else:
-                    self.pipe.put((th.tensor(batch[0])))
+                    if self.n_workers <= 1:
+                        batch = [self._makeBatchElement(image_path) for image_path in images]
+                    else:
+                        batch = parallel(delayed(self._makeBatchElement)(image_path) for image_path in images)
 
-                # Free memory
-                del batch_obs
-                del batch_next_obs
-            self.pipe.put(None)
+                    batch = channelFirst(th.tensor(batch))
+                    if self.training:
+                        batch_obs, batch_next_obs = batch[:len(images) // 2], batch[len(images) // 2:]
+                        self.pipe.put((minibatch_idx, batch_obs, batch_next_obs))
+                    else:
+                        self.pipe.put(batch)
+
+                    # Free memory
+                    del batch_obs
+                    del batch_next_obs
+                self.pipe.put(None)
 
     @classmethod
-    def _makeBatchElement(cls, image_path_list):
-        images = []
-        for image_path in image_path_list:
-            # Remove trailing .jpg if present
-            image_path = image_path.split('.jpg')[0]
-            im = cv2.imread("data/{}.jpg".format(image_path))
-            if im is None:
-                raise ValueError("tried to load {}.jpg, but it was not found".format(image_path))
-            im = preprocessImage(im)
-            # Channel first
-            im = np.transpose(im, (2, 1, 0))
-            images.append(im)
-        return images
+    def _makeBatchElement(cls, image_path):
+        image_path = image_path.split('.jpg')[0]
+        im = cv2.imread("data/{}.jpg".format(image_path))
+        if im is None:
+            raise ValueError("tried to load {}.jpg, but it was not found".format(image_path))
+        im = preprocessImage(im)
+        return im
 
     def resetAndShuffle(self):
         pass
@@ -104,6 +109,10 @@ class DataLoader(object):
         return val
 
     next = __next__  # Python 2 compatibility
+
+    def __del__(self):
+        if self.p is not None:
+            self.p.terminate()
 
 
 def preprocessImage(image):
