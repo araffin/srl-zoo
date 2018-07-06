@@ -3,6 +3,7 @@ from __future__ import print_function, division, absolute_import
 import time
 import threading
 import multiprocessing as mp
+from multiprocessing import Queue, Process
 from collections import OrderedDict
 import glob
 import random
@@ -10,9 +11,99 @@ import random
 import cv2
 import numpy as np
 import torch as th
+from joblib import Parallel, delayed
 
 from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels
+
+
+class DataLoader(object):
+    def __init__(self, minibatchlist, images_path, n_workers=1, multi_view=False, use_triplets=False, infinite_loop=True, max_queue_len=3, cache_capacity=0):
+        super(DataLoader, self).__init__()
+        self.n_workers = n_workers
+        self.infinite_loop = infinite_loop
+        self.n_minibatches = len(minibatchlist)
+        self.minibatchlist = minibatchlist
+        self.images_path = images_path
+        self.training = True
+        self.pipe = Queue(max_queue_len)
+        self.p = None
+        self.startProcess()
+
+    def startProcess(self):
+        self.p = Process(target=self._run)
+        self.p.daemon = True
+        self.p.start()
+
+    def _run(self):
+        start = True
+        while start or self.infinite_loop:
+            start = False
+            if self.training:
+                indices = np.random.permutation(self.n_minibatches).astype(np.int64)
+            else:
+                indices = np.arange(len(self.minibatchlist), dtype=np.int64)
+
+            for minibatch_idx in indices:
+                if self.training:
+                    images = [(self.images_path[image_idx], self.images_path[image_idx + 1]) for image_idx in self.minibatchlist[minibatch_idx]]
+                else:
+                    images = [self.images_path[self.minibatchlist]]
+
+                if self.n_workers <= 1:
+                    batch = zip(*[self._makeBatchElement(image_path) for image_path in images])
+                else:
+                    batch = zip(*Parallel(n_jobs=self.n_workers, backend="threading")(
+                                            delayed(self._makeBatchElement)(image_path) for image_path in images))
+
+                if self.training:
+                    batch_obs, batch_next_obs = batch
+                    self.pipe.put((minibatch_idx, th.tensor(batch_obs), th.tensor(batch_next_obs)))
+                else:
+                    self.pipe.put((th.tensor(batch[0])))
+
+                # Free memory
+                del batch_obs
+                del batch_next_obs
+            self.pipe.put(None)
+
+    @classmethod
+    def _makeBatchElement(cls, image_path_list):
+        images = []
+        for image_path in image_path_list:
+            # Remove trailing .jpg if present
+            image_path = image_path.split('.jpg')[0]
+            im = cv2.imread("data/{}.jpg".format(image_path))
+            if im is None:
+                raise ValueError("tried to load {}.jpg, but it was not found".format(image_path))
+            im = preprocessImage(im)
+            # Channel first
+            im = np.transpose(im, (2, 1, 0))
+            images.append(im)
+        return images
+
+    def resetAndShuffle(self):
+        pass
+
+    def trainMode(self):
+        self.training = True
+
+    def testMode(self):
+        self.training = False
+
+    def __len__(self):
+        return self.n_minibatches
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        val = self.pipe.get()
+        if val is None:
+            raise StopIteration
+        return val
+
+    next = __next__  # Python 2 compatibility
 
 
 def preprocessImage(image):
