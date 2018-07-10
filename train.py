@@ -162,9 +162,12 @@ if __name__ == '__main__':
         rewards = rewards[:limit]
         episode_starts = episode_starts[:limit]
 
+    # Save configs in log folder
+    saveConfig(exp_config, print_config=True)
+
     loss_history, learned_states, pairs_name_weights = srl.learn(images_path, actions, rewards, episode_starts)
 
-    # Save configs in log folder & results as well
+    # Update config with weights for each losses
     exp_config['losses_weights'] = pairs_name_weights
     saveConfig(exp_config, print_config=True)
 
