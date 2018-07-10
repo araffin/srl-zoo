@@ -85,7 +85,6 @@ def main():
         # Load all the points and images, find bounds and train KNN model
         X = np.array(list(data.values())).astype(float)
         y = list(data.keys())
-        print(X[:, -state_dim_second_split:].shape)
         srl_model_knn.fit(X[:, -state_dim_second_split:], np.arange(X.shape[0]))
 
         min_X = np.min(X[:, -state_dim_second_split:], axis=0)

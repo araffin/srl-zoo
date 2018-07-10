@@ -15,7 +15,7 @@ from losses.losses import LossManager, autoEncoderLoss, roboticPriorsLoss, tripl
 from losses.utils import findPriorsPairs
 from pipeline import NAN_ERROR
 from plotting.representation_plot import plotRepresentation, plt, plotImage
-from preprocessing.data_loader import CustomDataLoader
+from preprocessing.data_loader import CustomDataLoader, DataLoader
 from preprocessing.utils import deNormalize
 from utils import printRed, detachToNumpy
 from .modules import SRLModules, SRLModulesSplit

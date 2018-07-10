@@ -27,7 +27,8 @@ def channelFirst(tensor):
     return tensor.permute(0, 3, 1, 2)
 
 class DataLoader(object):
-    def __init__(self, minibatchlist, images_path, n_workers=1, multi_view=False, use_triplets=False, infinite_loop=True, max_queue_len=3, cache_capacity=0):
+    def __init__(self, minibatchlist, images_path, n_workers=1, multi_view=False,
+                 use_triplets=False, infinite_loop=True, max_queue_len=3, cache_capacity=0):
         super(DataLoader, self).__init__()
         self.n_workers = n_workers
         self.infinite_loop = infinite_loop
@@ -117,7 +118,7 @@ class DataLoader(object):
 
 def preprocessImage(image):
     """
-    :param image: (numpy matrix)
+    :param image: (numpy matrix) BGR image
     :return: (numpy matrix)
     """
     # Resize

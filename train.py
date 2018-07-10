@@ -31,8 +31,10 @@ def buildConfig(args):
     """
     # Fix to use this function in srl_baselines/
     split_index = args.split_index if hasattr(args, "split_index") else -1
+    beta = args.beta if hasattr(args, "beta") else -1
     exp_config = {
         "batch-size": args.batch_size,
+        "beta": beta,
         "data-folder": args.data_folder,
         "epochs": args.epochs,
         "learning-rate": args.learning_rate,
