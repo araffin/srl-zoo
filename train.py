@@ -133,23 +133,21 @@ if __name__ == '__main__':
     except AttributeError:
         images_path = ground_truth['images_path']
 
-    # Create log folder
+    # Building the experiment config file
+    exp_config = buildConfig(args)
     if args.log_folder == "":
-        exp_config = buildConfig(args)
+        # Automatically create dated log folder for configs
         createFolder("logs/{}".format(exp_config['data-folder']), "Dataset log folder already exist")
-
         # Check that the dataset is already preprocessed
         log_folder, experiment_name = getLogFolderName(exp_config)
-        print('Log folder: {}'.format(log_folder))
-
-        exp_config['log-folder'] = log_folder
-        exp_config['experiment-name'] = experiment_name
-        exp_config['n_actions'] = n_actions
-        exp_config['multi-view'] = args.multi_view
-
-        # Save config in log folder & results as well
         args.log_folder = log_folder
-        saveConfig(exp_config, print_config=True)
+    else:
+        experiment_name = "{}_{}".format(args.model_type, losses)
+    exp_config['log-folder'] = args.log_folder
+    exp_config['experiment-name'] = experiment_name
+    exp_config['n_actions'] = n_actions
+    exp_config['multi-view'] = args.multi_view
+    print('Log folder: {}'.format(args.log_folder))
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
@@ -164,7 +162,11 @@ if __name__ == '__main__':
         rewards = rewards[:limit]
         episode_starts = episode_starts[:limit]
 
-    loss_history, learned_states = srl.learn(images_path, actions, rewards, episode_starts)
+    loss_history, learned_states, pairs_name_weights = srl.learn(images_path, actions, rewards, episode_starts)
+
+    # Save configs in log folder & results as well
+    exp_config['losses_weights'] = pairs_name_weights
+    saveConfig(exp_config, print_config=True)
 
     # Save plot
     plotLosses(loss_history, args.log_folder)

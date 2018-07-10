@@ -312,11 +312,11 @@ class SRL4robotics(BaseLearner):
 
                 # Predict states given observations as in Time Contrastive Network (Triplet Loss) [Sermanet et al.]
                 if self.use_triplets:
-                    states, positive_states, negative_states = self.model.forward_triplets(obs[:, :3:, :, :],
+                    states, positive_states, negative_states = self.model.forwardTriplets(obs[:, :3:, :, :],
                                                                                            obs[:, 3:6, :, :],
                                                                                            obs[:, 6:, :, :])
 
-                    next_states, next_positive_states, next_negative_states = self.model.forward_triplets(
+                    next_states, next_positive_states, next_negative_states = self.model.forwardTriplets(
                         next_obs[:, :3:, :, :],
                         next_obs[:, 3:6, :, :],
                         next_obs[:, 6:, :, :])
@@ -456,4 +456,5 @@ class SRL4robotics(BaseLearner):
         # return predicted states for training observations
         with th.no_grad():
             pred_states = self.predStatesWithDataLoader(data_loader, restore_train=False)
-        return loss_history, pred_states
+        pairs_loss_weight = [k for k in zip(loss_manager.names, loss_manager.weights)]
+        return loss_history, pred_states, pairs_loss_weight

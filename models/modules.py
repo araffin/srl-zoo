@@ -88,12 +88,12 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         else:
             raise NotImplementedError()
 
-    def forward_triplets(self, anchor, positive, negative):
+    def forwardTriplets(self, anchor, positive, negative):
         """
         Overriding the forward function in the case of Triplet loss
-        anchor : observation
-        positive : observation
-        negative : observation
+        anchor : anchor observations (th. Tensor)
+        positive : positive observations (th. Tensor)
+        negative : negative observations (th. Tensor)
         """
         return self.model(anchor), self.model(positive), self.model(negative)
 
