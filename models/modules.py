@@ -17,9 +17,12 @@ except ImportError:
 class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
     def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn", losses=None):
         """
-        :param state_dim:
-        :param action_dim:
-        :param cuda:
+        A model that can combine AE/VAE + Inverse + Forward + Reward models
+        :param state_dim: (int)
+        :param action_dim: (int)
+        :param cuda: (bool)
+        :param model_type: (str)
+        :param losses: ([str])
         """
         self.model_type = model_type
         self.losses = losses
@@ -97,13 +100,29 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
 class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
     def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn", losses=None, split_index=1):
+        """
+        A model that can split representation, combining
+        AE/VAE for the first split with Inverse + Forward in the second split
+        Reward model is learned for all the dimensions
+        :param state_dim: (int)
+        :param action_dim: (int)
+        :param cuda: (bool)
+        :param model_type: (str)
+        :param losses: ([str])
+        :param split_index: (int) Number of dimensions for the first split
+        """
+
+        assert split_index < state_dim, "The second split must be of dim >= 1, consider increasing the state_dim or decreasing the split_index"
+        assert "autoencoder" in losses or "vae" in losses, "You must use autoencoder/vae when splitting the representation"
+
         self.model_type = model_type
         self.losses = losses
+
         BaseForwardModel.__init__(self)
         BaseInverseModel.__init__(self)
         BaseRewardModel.__init__(self)
 
-        # self.cuda = cuda
+        self.cuda = cuda
         self.state_dim = state_dim
 
         # TODO: try with .detach() to give all the state to the decoder
@@ -123,11 +142,26 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
                 self.model = CNNAutoEncoder(state_dim)
             elif "vae" in losses:
                 self.model = CNNVAE(state_dim)
-            else:
-                raise ValueError("You must use autoencoder/vae when splitting the representation")
 
             self.model.decoder_fc = nn.Linear(self.dim_first_method, 6 * 6 * 64)
 
+        elif model_type == "mlp":
+            if "autoencoder" in losses:
+                self.model = DenseAutoEncoder(input_dim=getInputDim(), state_dim=state_dim)
+            elif "vae" in losses:
+                self.model = DenseVAE(input_dim=getInputDim(), state_dim=state_dim)
+
+        elif model_type == "linear":
+            if "autoencoder" in losses:
+                self.model = LinearAutoEncoder(input_dim=getInputDim(), state_dim=state_dim)
+            else:
+                raise ValueError("You must use autoencoder with linear model")
+
+        elif model_type == "resnet":
+            raise ValueError("Resnet not supported for autoencoders")
+
+        if "triplet" in losses:
+            raise ValueError("triplet not supported when splitting representation")
 
     def getStates(self, observations):
         """
@@ -138,11 +172,11 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
     def forward(self, x):
         if "autoencoder" in self.losses:
-            return self.forwardSplitAE(x)
+            return self.forwardAutoencoder(x)
         elif "vae" in self.losses:
-            return self.forwardSplitVAE(x)
+            return self.forwardVAE(x)
 
-    def forwardSplitVAE(self, x):
+    def forwardVAE(self, x):
         """
         :param x: (th.Tensor)
         :return: (th.Tensor)
@@ -153,7 +187,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         decoded = self.model.decode(z).view(input_shape)
         return decoded, mu[self.first_split_indices], logvar[self.first_split_indices]
 
-    def forwardSplitAE(self, x):
+    def forwardAutoencoder(self, x):
         """
         :param x: (th.Tensor)
         :return: (th.Tensor)
