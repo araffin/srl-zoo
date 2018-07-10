@@ -456,4 +456,5 @@ class SRL4robotics(BaseLearner):
         # return predicted states for training observations
         with th.no_grad():
             pred_states = self.predStatesWithDataLoader(data_loader, restore_train=False)
-        return loss_history, pred_states
+        pairs_loss_weight = [k for k in zip(loss_manager.names, loss_manager.weights)]
+        return loss_history, pred_states, pairs_loss_weight
