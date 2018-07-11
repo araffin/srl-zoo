@@ -241,9 +241,9 @@ def mutualInformationLoss(states, rewards_st, weight, loss_manager):
                                           (th.std(th.cat([X, Y], dim=1), dim=0) + eps), 2), 2) / 2) + eps
             I += p_xy * th.log(p_xy / (p_x[x] * p_y[y]))
 
-    reward_prior_loss = th.exp(-I)
-    loss_manager.addToLosses('reward_prior', weight, reward_prior_loss)
-    return weight * reward_prior_loss
+    mutual_info_loss = th.exp(-I)
+    loss_manager.addToLosses('mutual_info', weight, mutual_info_loss)
+    return weight * mutual_info_loss
 
 
 def rewardPriorLoss(states, rewards_st, weight, loss_manager):
