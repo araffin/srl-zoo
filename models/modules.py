@@ -113,7 +113,6 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
 
         assert split_index < state_dim, "The second split must be of dim >= 1, consider increasing the state_dim or decreasing the split_index"
-        assert "autoencoder" in losses or "vae" in losses, "You must use autoencoder/vae when splitting the representation"
 
         self.model_type = model_type
         self.losses = losses
@@ -125,8 +124,6 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         self.cuda = cuda
         self.state_dim = state_dim
 
-        # TODO: try with .detach() to give all the state to the decoder
-        # but backpropagate only on part of it
         self.dim_first_method = split_index
         self.dim_second_method = state_dim - split_index
         self.first_split_indices = (slice(None, None), slice(None, split_index))  # [:, :split_index]
@@ -142,20 +139,23 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
                 self.model = CNNAutoEncoder(state_dim)
             elif "vae" in losses:
                 self.model = CNNVAE(state_dim)
-
-            self.model.decoder_fc = nn.Linear(self.dim_first_method, 6 * 6 * 64)
+            else:
+                self.model = CustomCNN(state_dim)
 
         elif model_type == "mlp":
             if "autoencoder" in losses:
                 self.model = DenseAutoEncoder(input_dim=getInputDim(), state_dim=state_dim)
             elif "vae" in losses:
                 self.model = DenseVAE(input_dim=getInputDim(), state_dim=state_dim)
+            else:
+                self.model = SRLDenseNetwork(getInputDim(), state_dim, cuda=cuda)
+
 
         elif model_type == "linear":
             if "autoencoder" in losses:
                 self.model = LinearAutoEncoder(input_dim=getInputDim(), state_dim=state_dim)
             else:
-                raise ValueError("You must use autoencoder with linear model")
+                self.model = SRLLinear(input_dim=getInputDim(), state_dim=state_dim, cuda=cuda)
 
         elif model_type == "resnet":
             raise ValueError("Resnet not supported for autoencoders")
@@ -175,6 +175,18 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
             return self.forwardAutoencoder(x)
         elif "vae" in self.losses:
             return self.forwardVAE(x)
+        else:
+            return self.model.forward(x)
+
+    def detachSecondSplit(self, tensor):
+        """
+        Detach second split from the graph,
+        so no gradients are backpropagated
+        for the second half of the states
+        :param tensor: (th.Tensor)
+        :return: (th.Tensor)
+        """
+        return th.cat([tensor[self.first_split_indices], tensor[self.second_split_indices].detach()], dim=1)
 
     def forwardVAE(self, x):
         """
@@ -183,9 +195,9 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         input_shape = x.size()
         mu, logvar = self.model.encode(x)
-        z = self.model.reparameterize(mu[self.first_split_indices], logvar[self.first_split_indices])
+        z = self.model.reparameterize(self.detachSecondSplit(mu), self.detachSecondSplit(logvar))
         decoded = self.model.decode(z).view(input_shape)
-        return decoded, mu[self.first_split_indices], logvar[self.first_split_indices]
+        return decoded, self.detachSecondSplit(mu), self.detachSecondSplit(logvar)
 
     def forwardAutoencoder(self, x):
         """
@@ -194,7 +206,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         input_shape = x.size()
         encoded = self.model.encode(x)
-        decoded = self.model.decode(encoded[self.first_split_indices]).view(input_shape)
+        decoded = self.model.decode(self.detachSecondSplit(encoded)).view(input_shape)
         return encoded, decoded
 
     def inverseModel(self, state, next_state):
@@ -224,4 +236,4 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param action: (th Tensor)
         :return: (th.Tensor)
         """
-        return self.reward_net(th.cat((state, next_state), dim=1))
+        return self.reward_net(th.cat((self.detachSecondSplit(state), self.detachSecondSplit(next_state)), dim=1))

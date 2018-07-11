@@ -349,7 +349,7 @@ class SRL4robotics(BaseLearner):
 
                 if self.use_inverse_loss:
                     actions_pred = self.model.inverseModel(states, next_states)
-                    inverseModelLoss(actions_pred, actions_st, weight=4, loss_manager=loss_manager)
+                    inverseModelLoss(actions_pred, actions_st, weight=2, loss_manager=loss_manager)
 
                 if self.use_reward_loss:
                     rewards_st = rewards[minibatchlist[minibatch_idx]].copy()
@@ -357,7 +357,7 @@ class SRL4robotics(BaseLearner):
                     rewards_st[rewards_st == -1] = 0
                     rewards_st = th.from_numpy(rewards_st).to(self.device)
                     rewards_pred = self.model.rewardModel(states, next_states)
-                    rewardModelLoss(rewards_pred, rewards_st.long(), weight=4, loss_manager=loss_manager)
+                    rewardModelLoss(rewards_pred, rewards_st.long(), weight=1, loss_manager=loss_manager)
 
                 if self.use_autoencoder:
                     autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_manager=loss_manager)

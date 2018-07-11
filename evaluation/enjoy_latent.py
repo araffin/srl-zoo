@@ -74,8 +74,7 @@ def main():
 
     if is_auto_encoder:
         ae_type = 'autoencoder' if 'autoencoder' in losses else 'vae'
-        state_dim_first_split = exp_config['split-index'] if exp_config['split-index'] > 0 else state_dim
-        createFigureAndSlider(ae_type, state_dim_first_split)
+        createFigureAndSlider(ae_type, state_dim)
 
     if not is_auto_encoder or len(losses) > 1:
         state_dim_second_split = state_dim - exp_config['split-index'] if exp_config['split-index'] > 0 else state_dim
@@ -103,7 +102,7 @@ def main():
         # make the image
         if is_auto_encoder:
             mu_ae = []
-            for i in range(state_dim_first_split):
+            for i in range(state_dim):
                 mu_ae.append(cv2.getTrackbarPos(str(i), 'slider for ' + ae_type))
             mu_ae = (np.array(mu_ae) - 50) / 10
             img_ae = getImage(srl_model.model, mu_ae, device)
