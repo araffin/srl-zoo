@@ -115,7 +115,7 @@ class CustomDataLoader(object):
     """
 
     def __init__(self, minibatchlist, images_path, test_batch_size=512, cache_capacity=5000,
-                 n_workers=5, auto_cleanup=True, multi_view=False, use_triplets=False):
+                 n_workers=5, auto_cleanup=True, multi_view=False, use_triplets=False, use_occlusion=False):
         super(CustomDataLoader, self).__init__()
 
         self.n_minibatches = len(minibatchlist)
@@ -176,6 +176,8 @@ class CustomDataLoader(object):
         self.shutdown = False
         self.multi_view = multi_view
         self.use_triplets = use_triplets
+        # apply occlusion for training a DAE
+        self.use_occlusion = use_occlusion
 
         if self.n_workers <= 0:
             raise ValueError("n_workers <= 0 in the data loader")
@@ -356,6 +358,8 @@ class CustomDataLoader(object):
         for indices, key in zip(indices_list, obs_dict.keys()):
 
             obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels()), dtype=np.float32)
+            if self.use_occlusion:
+                noisy_obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels()), dtype=np.float32)
             # Reset queues and received count
             self.resetQueues()
 
@@ -370,6 +374,8 @@ class CustomDataLoader(object):
                 if idx in known_images:
                     self.cached_indices[j] = True
                     obs[j, :, :, :] = self.cache[idx]
+                    if self.use_occlusion:
+                        noisy_obs[j, :, :, :] = self.cache[idx]
 
             # Fill the workers queues
             self._putImages(indices)
@@ -378,12 +384,24 @@ class CustomDataLoader(object):
             while self.n_received < self.n_sent:
                 j, im = self.output_queue.get(timeout=3)  # 3s timeout
                 obs[j, :, :, :] = im
+                if self.use_occlusion:
+                    h_1, h_2 = np.random.randint(IMAGE_HEIGHT, size=2)
+                    w_1, w_2 = np.random.randint(IMAGE_WIDTH, size=2)
+                    noisy_img = im
+                    noisy_img[h_1:h_2, w_1:w_2, :] = 0.
+                    noisy_obs[j, :, :, :] = noisy_img
                 # Cache the preprocessed image
                 self.cache[minibatch_idx_to_idx[j]] = im
                 self.n_received += 1
+
             # Channel first
             obs = np.transpose(obs, (0, 3, 2, 1))
-            obs_dict[key] = th.from_numpy(obs)
+            if self.use_occlusion:
+                noisy_obs = np.transpose(noisy_obs, (0, 3, 2, 1))
+                obs_dict[key] = (th.from_numpy(obs), th.from_numpy(noisy_obs))
+            else:
+                obs_dict[key] = th.from_numpy(obs)
+
             # Free memory
             del obs
 

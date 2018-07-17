@@ -75,7 +75,7 @@ if __name__ == '__main__':
                         help='Force balanced sampling for episode independent prior instead of uniform')
     parser.add_argument('--losses', type=str, nargs='+', default=["priors"], help='losses(s)',
                         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-                                 "autoencoder", "vae"], )
+                                 "autoencoder", "vae", "perceptual"], )
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
 

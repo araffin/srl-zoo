@@ -38,6 +38,8 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
             if "autoencoder" in losses:
                 self.model = CNNAutoEncoder(state_dim)
             elif "vae" in losses:
+                if "perceptual" in losses:
+                    self.denoizer = CNNAutoEncoder(state_dim)
                 self.model = CNNVAE(state_dim)
             else:
                 # for losses not depending on specific architecture (supervised, inv, fwd..)

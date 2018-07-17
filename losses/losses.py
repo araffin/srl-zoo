@@ -183,7 +183,8 @@ def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_m
 
 
 def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logvar,
-            weight, loss_manager, beta=1):
+            weight, loss_manager, beta=1, perceptual_similarity_loss=False, encoded_real=None, encoded_prediction=None,
+            next_encoded_real = None, next_encoded_prediction = None):
     """
     Reconstruction + KL divergence losses summed over all elements and batch
     :param decoded: reconstructed Observation (th.Tensor)
@@ -200,18 +201,24 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
     :return: (th.Tensor)
     """
 
-    generation_loss = F.mse_loss(decoded, obs, size_average=False)
-    generation_loss += F.mse_loss(next_decoded, next_obs, size_average=False)
-
     # see Appendix B from VAE paper:
     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
     # https://arxiv.org/abs/1312.6114
     kl_divergence = -0.5 * th.sum(1 + logvar - mu.pow(2) - logvar.exp())
     kl_divergence += -0.5 * th.sum(1 + next_logvar - next_mu.pow(2) - next_logvar.exp())
 
-    vae_loss = generation_loss + beta * kl_divergence
+    if perceptual_similarity_loss: # and not (encoded_real is None or encoded_prediction is None):
+        denoizer_encoding_loss = F.mse_loss(encoded_real,  encoded_prediction, size_average=False)
+        denoizer_encoding_loss += F.mse_loss(next_encoded_real, next_encoded_prediction, size_average=False)
+        vae_loss = denoizer_encoding_loss + beta * kl_divergence
+        loss_name = 'perceptual_similarity_loss'
+    else:
+        generation_loss = F.mse_loss(decoded, obs, size_average=False)
+        generation_loss += F.mse_loss(next_decoded, next_obs, size_average=False)
+        vae_loss = generation_loss + beta * kl_divergence
+        loss_name = 'kl_loss'
 
-    loss_manager.addToLosses('kl_loss', weight, vae_loss)
+    loss_manager.addToLosses(loss_name, weight, vae_loss)
     return weight * vae_loss
 
 

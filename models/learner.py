@@ -35,7 +35,6 @@ VALIDATION_SIZE = 0.2  # 20% of training data for validation
 BALANCED_SAMPLING = False  # Whether to do Uniform (default) or balanced sampling
 
 
-
 def observationsGenerator(observations, device, batch_size=64):
     """
     Python generator to avoid out of memory issues
@@ -198,6 +197,7 @@ class SRL4robotics(BaseLearner):
             self.use_autoencoder = "autoencoder" in losses
             self.use_vae = "vae" in losses
             self.use_triplets = "triplet" in self.losses
+            self.perceptual_similarity_loss = "perceptual" in self.losses
             self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
                                     cuda=cuda, losses=losses)
         else:
@@ -220,6 +220,25 @@ class SRL4robotics(BaseLearner):
         self.l1_reg = l1_reg
         self.log_folder = log_folder
         self.model_type = model_type
+
+    def predStatesWithDataLoader(self, data_loader, restore_train=False):
+        """
+        Predict states using minibatches to avoid memory issues
+        :param data_loader: (Baxter Data Loader object)
+        :param restore_train: (bool) restore train mode (model + dataLoader) after predicting states
+        :return: (numpy tensor)
+        """
+        # Switch to test mode and reset the iterator
+        data_loader.testMode()
+        predictions = []
+        for obs_var in data_loader:
+            obs_var = obs_var[0].to(self.device) \
+                if self.perceptual_similarity_loss and self.use_vae else obs_var.to(self.device)
+            predictions.append(self._predFn(obs_var, restore_train))
+        # Switch back to train mode
+        if restore_train:
+            data_loader.trainMode()
+        return np.concatenate(predictions, axis=0)
 
     def learn(self, images_path, actions, rewards, episode_starts):
         """
@@ -285,7 +304,7 @@ class SRL4robotics(BaseLearner):
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
                                        cache_capacity=100, multi_view=self.multi_view, n_workers=N_WORKERS,
-                                       use_triplets=self.use_triplets)
+                                       use_triplets=self.use_triplets, use_occlusion=self.perceptual_similarity_loss)
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
@@ -304,11 +323,21 @@ class SRL4robotics(BaseLearner):
             data_loader.resetAndShuffle()
 
             for minibatch_num, (minibatch_idx, obs, next_obs) in enumerate(data_loader):
-                obs, next_obs = obs.to(self.device), next_obs.to(self.device)
+
+                if self.use_vae and self.perceptual_similarity_loss:
+                    obs, noisy_obs = obs[0].to(self.device), obs[1].to(self.device)
+                    next_obs, next_noisy_obs = next_obs[0].to(self.device), next_obs[1].to(self.device)
+                else:
+                    obs, next_obs = obs.to(self.device), next_obs.to(self.device)
+
                 self.optimizer.zero_grad()
                 loss_manager.resetLosses()
 
                 decoded_obs, decoded_next_obs = None, None
+                states_denoizer = None
+                states_denoizer_predicted = None
+                next_states_denoizer = None
+                next_states_denoizer_predicted = None
 
                 # Predict states given observations as in Time Contrastive Network (Triplet Loss) [Sermanet et al.]
                 if self.use_triplets:
@@ -326,6 +355,14 @@ class SRL4robotics(BaseLearner):
                     (decoded_obs, mu, logvar), (next_decoded_obs, next_mu, next_logvar) = self.model(obs), \
                                                                                           self.model(next_obs)
                     states, next_states = self.model.getStates(obs), self.model.getStates(next_obs)
+
+                    if self.perceptual_similarity_loss:
+                        (states_denoizer, decoded_obs_denoizer), (next_states_denoizer, decoded_next_obs_denoizer) = \
+                            self.model.denoizer(noisy_obs), self.model.denoizer(next_noisy_obs)
+
+                        (states_denoizer_predicted, decoded_obs_denoizer_predicted) = self.model.denoizer(decoded_obs)
+                        (next_states_denoizer_predicted,
+                         decoded_next_obs_denoizer_predicted) = self.model.denoizer(next_decoded_obs)
                 else:
                     states, next_states = self.model(obs), self.model(next_obs)
 
@@ -360,9 +397,20 @@ class SRL4robotics(BaseLearner):
 
                 if self.use_autoencoder:
                     autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_manager=loss_manager)
+
                 if self.use_vae:
+
+                    if self.perceptual_similarity_loss:
+                        autoEncoderLoss(obs, decoded_obs_denoizer, next_obs, decoded_next_obs_denoizer, weight=1e-3,
+                                        loss_manager=loss_manager)
+
                     vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=0.5,
-                            loss_manager=loss_manager, beta=self.beta)
+                            loss_manager=loss_manager, beta=self.beta,
+                            perceptual_similarity_loss=self.perceptual_similarity_loss,
+                            encoded_real=states_denoizer, encoded_prediction=states_denoizer_predicted,
+                            next_encoded_real=next_states_denoizer,
+                            next_encoded_prediction=next_states_denoizer_predicted)
+
                 if self.reward_prior:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
                     rewards_st = th.from_numpy(rewards_st).float().view(-1, 1).to(self.device)
@@ -372,7 +420,8 @@ class SRL4robotics(BaseLearner):
                     episodePriorLoss(minibatch_idx, minibatch_episodes, states, self.discriminator,
                                      BALANCED_SAMPLING, weight=1, loss_manager=loss_manager)
                 if self.use_triplets:
-                    tripletLoss(states, positive_states, negative_states, weight=1.0, loss_manager=loss_manager, alpha=0.2)
+                    tripletLoss(states, positive_states, negative_states, weight=1.0, loss_manager=loss_manager,
+                                alpha=0.2)
                 # Compute weighted average of losses
                 loss_manager.updateLossHistory()
                 loss = loss_manager.computeTotalLoss()
