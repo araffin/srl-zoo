@@ -401,15 +401,16 @@ class SRL4robotics(BaseLearner):
                 if self.use_vae:
 
                     if self.perceptual_similarity_loss:
-                        autoEncoderLoss(obs, decoded_obs_denoizer, next_obs, decoded_next_obs_denoizer, weight=1e-3,
+                        autoEncoderLoss(obs, decoded_obs_denoizer, next_obs, decoded_next_obs_denoizer, weight=1,
                                         loss_manager=loss_manager)
 
-                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=0.5,
+                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=1e-10,
                             loss_manager=loss_manager, beta=self.beta,
                             perceptual_similarity_loss=self.perceptual_similarity_loss,
                             encoded_real=states_denoizer, encoded_prediction=states_denoizer_predicted,
                             next_encoded_real=next_states_denoizer,
-                            next_encoded_prediction=next_states_denoizer_predicted)
+                            next_encoded_prediction=next_states_denoizer_predicted,
+                            weight_perceptual=10)
 
                 if self.reward_prior:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
@@ -479,12 +480,18 @@ class SRL4robotics(BaseLearner):
                             # Plot Reconstructed Image
                             if obs[0].shape[0] == 3:  # RGB
                                 plotImage(deNormalize(detachToNumpy(obs[0])), "Input Image (Train)")
+                                if self.use_vae and self.perceptual_similarity_loss:
+                                    plotImage(deNormalize(detachToNumpy(noisy_obs[0])), "Noisy Input Image (Train)")
                                 plotImage(deNormalize(detachToNumpy(decoded_obs[0])), "Reconstructed Image")
 
                             elif obs[0].shape[0] % 3 == 0:  # Multi-RGB
                                 for k in range(obs[0].shape[0] // 3):
                                     plotImage(deNormalize(detachToNumpy(obs[0][k * 3:(k + 1) * 3, :, :])),
                                               "Input Image {} (Train)".format(k + 1))
+                                    if self.use_vae and self.perceptual_similarity_loss:
+                                        plotImage(deNormalize(detachToNumpy(noisy_obs[0][k * 3:(k + 1) * 3, :, :])),
+                                                  "Noisy Input Image (Train)".format(k + 1))
+
                                     plotImage(deNormalize(detachToNumpy(decoded_obs[0][k * 3:(k + 1) * 3, :, :])),
                                               "Reconstructed Image {}".format(k + 1))
 
