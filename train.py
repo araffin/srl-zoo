@@ -75,9 +75,11 @@ if __name__ == '__main__':
                         help='Force balanced sampling for episode independent prior instead of uniform')
     parser.add_argument('--losses', type=str, nargs='+', default=["priors"], help='losses(s)',
                         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-                                 "autoencoder", "vae", "perceptual"], )
+                                 "autoencoder", "vae", "perceptual","dae"], )
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
+    parser.add_argument('--path-denoizer', type=str, default="",
+                        help='Path till a pre-trained denoizing model when using the perceptual loss with VAE')
 
     input = getInputBuiltin()
     args = parser.parse_args()
@@ -108,6 +110,10 @@ if __name__ == '__main__':
     assert not ("vae" in losses and args.model_type == "linear"), "Model cannot be VAE using Linear Architecture !"
     assert not (args.multi_view and args.model_type == "resnet"), \
         "Default ResNet input layer is not suitable for stacked images!"
+    assert not (args.path_denoizer == "" and "vae" in losses and "perceptual" in losses),\
+        "To use the perceptual loss with a VAE, please specify a path to a pre-trained DAE model"
+    assert not ("dae" in losses and "perceptual" in losses), \
+        "Please learn the DAE before learning a VAE with the perceptual loss "
 
     print('Loading data ... ')
     training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
@@ -145,7 +151,7 @@ if __name__ == '__main__':
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       losses=losses, n_actions=n_actions, beta=args.beta)
+                       losses=losses, n_actions=n_actions, beta=args.beta, path_denoizer=args.path_denoizer)
 
     if args.training_set_size > 0:
         limit = args.training_set_size
