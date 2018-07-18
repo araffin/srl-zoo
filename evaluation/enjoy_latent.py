@@ -72,18 +72,24 @@ def main():
     # model param and info
     is_auto_encoder = 'autoencoder' in losses or 'vae' in losses
 
+    # Load all the states and images
+    data = json.load(open(args.log_dir + 'image_to_state.json'))
+    X = np.array(list(data.values())).astype(float)
+    y = list(data.keys())
+
     if is_auto_encoder:
         ae_type = 'autoencoder' if 'autoencoder' in losses else 'vae'
         createFigureAndSlider(ae_type, state_dim)
+        # Boundaries for the AE slider
+        min_x_ae = np.min(X, axis=0)
+        max_x_ae = np.max(X, axis=0)
 
     if not is_auto_encoder or len(losses) > 1:
         state_dim_second_split = state_dim - exp_config['split-index'] if exp_config['split-index'] > 0 else state_dim
-        data = json.load(open(args.log_dir + 'image_to_state.json'))
+
         srl_model_knn = KNeighborsClassifier()
 
-        # Load all the points and images, find bounds and train KNN model
-        X = np.array(list(data.values())).astype(float)
-        y = list(data.keys())
+        # Find bounds and train KNN model
         srl_model_knn.fit(X[:, -state_dim_second_split:], np.arange(X.shape[0]))
 
         min_X = np.min(X[:, -state_dim_second_split:], axis=0)
@@ -104,7 +110,8 @@ def main():
             mu_ae = []
             for i in range(state_dim):
                 mu_ae.append(cv2.getTrackbarPos(str(i), 'slider for ' + ae_type))
-            mu_ae = (np.array(mu_ae) - 50) / 10
+            # Rescale the values to fit the bounds of the representation
+            mu_ae = (np.array(mu_ae) / 100) * (max_x_ae - min_x_ae) + min_x_ae]
             img_ae = getImage(srl_model.model, mu_ae, device)
 
             # stop if user closed a window
