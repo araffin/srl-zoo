@@ -234,7 +234,7 @@ class SRL4robotics(BaseLearner):
         data_loader.testMode()
         predictions = []
         for obs_var in data_loader:
-            obs_var = obs_var[0].to(self.device) if self.use_dae else obs_var.to(self.device)
+            obs_var = obs_var[1].to(self.device) if self.use_dae else obs_var.to(self.device)
             predictions.append(self._predFn(obs_var, restore_train))
         # Switch back to train mode
         if restore_train:
@@ -300,7 +300,7 @@ class SRL4robotics(BaseLearner):
 
         if self.use_vae and self.perceptual_similarity_loss and self.path_denoizer is not None:
 
-            self.denoizer = SRLModules(state_dim=50, action_dim=self.dim_action, model_type=self.model_type,
+            self.denoizer = SRLModules(state_dim=50, action_dim=self.dim_action, model_type="custom_cnn",
                        cuda=self.cuda, losses=["dae"])
             self.denoizer.eval()
             self.device = th.device("cuda" if th.cuda.is_available() and self.cuda else "cpu")
@@ -417,14 +417,13 @@ class SRL4robotics(BaseLearner):
                     autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_manager=loss_manager)
 
                 if self.use_vae:
-
-                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=10,
+                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=1.,
                             loss_manager=loss_manager, beta=self.beta,
                             perceptual_similarity_loss=self.perceptual_similarity_loss,
                             encoded_real=states_denoizer, encoded_prediction=states_denoizer_predicted,
                             next_encoded_real=next_states_denoizer,
                             next_encoded_prediction=next_states_denoizer_predicted,
-                            weight_perceptual=0.01)
+                            weight_perceptual=0.1)
 
                 if self.reward_prior:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
