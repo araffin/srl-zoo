@@ -271,7 +271,7 @@ def plotCorrelation(states_rewards, ground_truth):
             key = 'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'
             X = ground_truth[key][:len(rewards)]
         else:
-            X = button_pos_[:len(rewards)]
+            X = target_pos_[:len(rewards)]
 
         # adding epsilon in case of little variance in samples of X & Ys
         eps = 1e-12
@@ -367,16 +367,16 @@ if __name__ == '__main__':
             with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
                 relative_pos = json.load(f).get('relative_pos', False)
 
-            button_pos_ = []
-            # True state is the relative position to the button
+            target_pos_ = []
+            # True state is the relative position to the target
             if relative_pos:
-                button_idx = -1
+                target_idx = -1
                 for i in range(len(episode_starts)):
                     if episode_starts[i] == 1:
-                        button_idx += 1
-                    true_states[i] -= target_positions[button_idx]
-                    button_pos_.append(target_positions[button_idx])
-            button_pos_ = np.array(button_pos_[:len(rewards)])
+                        target_idx += 1
+                    true_states[i] -= target_positions[target_idx]
+                    target_pos_.append(target_positions[target_idx])
+            target_pos_ = np.array(target_pos_[:len(rewards)])
 
             if args.color_episode:
                 rewards = colorPerEpisode(episode_starts)
@@ -397,13 +397,13 @@ if __name__ == '__main__':
         with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
             relative_pos = json.load(f).get('relative_pos', False)
 
-        # True state is the relative position to the button
+        # True state is the relative position to the target
         if relative_pos:
-            button_idx = -1
+            target_idx = -1
             for i in range(len(episode_starts)):
                 if episode_starts[i] == 1:
-                    button_idx += 1
-                true_states[i] -= target_positions[button_idx]
+                    target_idx += 1
+                true_states[i] -= target_positions[target_idx]
 
         if args.color_episode:
             rewards = colorPerEpisode(episode_starts)
