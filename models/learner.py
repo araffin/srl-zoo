@@ -370,7 +370,7 @@ class SRL4robotics(BaseLearner):
                 if self.reward_prior:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
                     rewards_st = th.from_numpy(rewards_st).float().view(-1, 1).to(self.device)
-                    rewardPriorLoss(states, rewards_st, weight=10., loss_manager=loss_manager)
+                    rewardPriorLoss(states, rewards_st, weight=1., loss_manager=loss_manager)
 
                 if self.episode_prior:
                     episodePriorLoss(minibatch_idx, minibatch_episodes, states, self.discriminator,

@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from models.priors import ReverseLayerF
+from .utils import correlationMatrix
 
 try:
     from functools import reduce
@@ -248,17 +249,17 @@ def mutualInformationLoss(states, rewards_st, weight, loss_manager):
 
 def rewardPriorLoss(states, rewards_st, weight, loss_manager):
     """
-    Loss expressing Correlation between predicted states and reward
+    Loss expressing correlation between predicted states and reward
     :param states: (th.Tensor)
     :param rewards_st: rewards at timestep t (th.Tensor)
-    :param weight: coefficient to weight the los s
+    :param weight: coefficient to weight the loss
     :param loss_manager: loss criterion needed to log the loss value
     :return:
     """
+    corr_matrix = correlationMatrix(th.cat([states, rewards_st], dim=1).t())
+    # Maximise correlation between states and rewards (last rows)
+    reward_prior_loss = 1 - th.mean(th.abs(corr_matrix[-rewards_st.shape[1]:, :]))
 
-    reward_loss = th.mean(
-        th.mm((states - th.mean(states, dim=0)).t(), (rewards_st - th.mean(rewards_st, dim=0))))
-    reward_prior_loss = th.exp(-th.abs(reward_loss))
     loss_manager.addToLosses('reward_prior', weight, reward_prior_loss)
     return weight * reward_prior_loss
 

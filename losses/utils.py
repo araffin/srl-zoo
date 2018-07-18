@@ -1,6 +1,7 @@
 from pipeline import NO_PAIRS_ERROR
 from utils import printRed
 
+import torch as th
 import numpy as np
 
 def overSampling(batch_size, m_list, pairs, function_on_pairs, actions, rewards):
@@ -113,3 +114,21 @@ def findPriorsPairs(batch_size, minibatchlist, actions, rewards, n_actions, n_pa
             printRed(msg)
             sys.exit(NO_PAIRS_ERROR)
     return dissimilar_pairs, same_actions_pairs
+
+
+# From https://github.com/pytorch/pytorch/pull/4411
+def correlationMatrix(mat, eps=1e-8):
+    """
+    Returns Correlation matrix for mat. It is the equivalent of numpy np.corrcoef
+
+    :param mat: (th.Tensor) Shape: (N, D)
+    :param esp: (float) Small value to avoid division by zero.
+    :return: (th.Tensor) The correlation matrix Shape: (N, N)
+    """
+    assert mat.dim() == 2, "Input must be a 2D matrix."
+    mat_bar = mat - mat.mean(1).repeat(mat.size(1)).view(mat.size(1), -1).t()
+    cov_matrix = mat_bar.mm(mat_bar.t()).div(mat_bar.size(1) - 1)
+    inv_stddev = th.rsqrt(th.diag(cov_matrix) + eps)
+    cor_matrix = cov_matrix.mul(inv_stddev.expand_as(cov_matrix))
+    cor_matrix.mul_(inv_stddev.expand_as(cov_matrix).t())
+    return cor_matrix.clamp(-1.0, 1.0)

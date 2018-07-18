@@ -275,7 +275,7 @@ def plotCorrelation(states_rewards, ground_truth):
 
         # adding epsilon in case of little variance in samples of X & Ys
         eps = 1e-12
-        corr = np.corrcoef(x=X + eps, y=states_rewards['states'] + eps, rowvar=False)
+        corr = np.corrcoef(x=X + eps, y=states_rewards['states'] + eps, rowvar=0)
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
         labels = [r'$\tilde{s}_' + str(i_) + '$' for i_ in range(X.shape[1])]
