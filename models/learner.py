@@ -234,8 +234,7 @@ class SRL4robotics(BaseLearner):
         data_loader.testMode()
         predictions = []
         for obs_var in data_loader:
-            obs_var = obs_var[0].to(self.device) \
-                if self.perceptual_similarity_loss and self.use_vae or self.use_dae else obs_var.to(self.device)
+            obs_var = obs_var[0].to(self.device) if self.use_dae else obs_var.to(self.device)
             predictions.append(self._predFn(obs_var, restore_train))
         # Switch back to train mode
         if restore_train:
@@ -307,6 +306,8 @@ class SRL4robotics(BaseLearner):
             self.device = th.device("cuda" if th.cuda.is_available() and self.cuda else "cpu")
             self.denoizer = self.denoizer.to(self.device)
             self.denoizer.load_state_dict(th.load(self.path_denoizer))
+            for param in self.denoizer.parameters():
+                param.requires_grad = False
 
             
 
@@ -316,7 +317,7 @@ class SRL4robotics(BaseLearner):
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
                                        cache_capacity=100, multi_view=self.multi_view, n_workers=N_WORKERS,
-                                       use_triplets=self.use_triplets, use_occlusion=self.perceptual_similarity_loss or self.use_dae)
+                                       use_triplets=self.use_triplets, use_occlusion=self.use_dae)
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
@@ -336,7 +337,7 @@ class SRL4robotics(BaseLearner):
 
             for minibatch_num, (minibatch_idx, obs, next_obs) in enumerate(data_loader):
 
-                if self.use_vae and self.perceptual_similarity_loss or self.use_dae:
+                if self.use_dae:
                     obs, noisy_obs = obs[0].to(self.device), obs[1].to(self.device)
                     next_obs, next_noisy_obs = next_obs[0].to(self.device), next_obs[1].to(self.device)
                 else:
@@ -365,7 +366,7 @@ class SRL4robotics(BaseLearner):
                     (states, decoded_obs), (next_states, decoded_next_obs) = self.model(obs), self.model(next_obs)
 
                 elif self.use_dae:
-                    (states_denoizer, decoded_obs), (next_states_denoizer, decoded_next_obs) = \
+                    (states, decoded_obs), (next_states, decoded_next_obs) = \
                         self.model(noisy_obs), self.model(next_noisy_obs)
 
                 elif self.use_vae:
@@ -417,13 +418,13 @@ class SRL4robotics(BaseLearner):
 
                 if self.use_vae:
 
-                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=1e-5,
+                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=10,
                             loss_manager=loss_manager, beta=self.beta,
                             perceptual_similarity_loss=self.perceptual_similarity_loss,
                             encoded_real=states_denoizer, encoded_prediction=states_denoizer_predicted,
                             next_encoded_real=next_states_denoizer,
                             next_encoded_prediction=next_states_denoizer_predicted,
-                            weight_perceptual=1)
+                            weight_perceptual=0.01)
 
                 if self.reward_prior:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
@@ -493,15 +494,18 @@ class SRL4robotics(BaseLearner):
                             # Plot Reconstructed Image
                             if obs[0].shape[0] == 3:  # RGB
                                 plotImage(deNormalize(detachToNumpy(obs[0])), "Input Image (Train)")
-                                if self.use_vae and self.perceptual_similarity_loss or self.use_dae:
+                                if self.use_dae:
                                     plotImage(deNormalize(detachToNumpy(noisy_obs[0])), "Noisy Input Image (Train)")
+                                if self.perceptual_similarity_loss:
+                                    plotImage(deNormalize(detachToNumpy(decoded_obs_denoizer[0])), "Reconstructed Image DAE")
+                                    plotImage(deNormalize(detachToNumpy(decoded_obs_denoizer_predicted[0])), "Reconstructed Image predicted DAE")
                                 plotImage(deNormalize(detachToNumpy(decoded_obs[0])), "Reconstructed Image")
 
                             elif obs[0].shape[0] % 3 == 0:  # Multi-RGB
                                 for k in range(obs[0].shape[0] // 3):
                                     plotImage(deNormalize(detachToNumpy(obs[0][k * 3:(k + 1) * 3, :, :])),
                                               "Input Image {} (Train)".format(k + 1))
-                                    if self.use_vae and self.perceptual_similarity_loss or self.use_dae:
+                                    if self.use_dae:
                                         plotImage(deNormalize(detachToNumpy(noisy_obs[0][k * 3:(k + 1) * 3, :, :])),
                                                   "Noisy Input Image (Train)".format(k + 1))
 
