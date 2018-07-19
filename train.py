@@ -21,7 +21,7 @@ from models.learner import SRL4robotics
 from pipeline import getLogFolderName, saveConfig
 from plotting.losses_plot import plotLosses
 from plotting.representation_plot import plotRepresentation
-from utils import parseDataFolder, createFolder, getInputBuiltin
+from utils import parseDataFolder, createFolder, getInputBuiltin, loadData
 
 
 def buildConfig(args):
@@ -120,12 +120,10 @@ if __name__ == '__main__':
         "Default ResNet input layer is not suitable for stacked images!"
 
     print('Loading data ... ')
-    training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
+    training_data, ground_truth, _, _ = loadData(args.data_folder)
+    rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
     actions = training_data['actions']
     n_actions = int(np.max(actions) + 1)
-
-    rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
-    ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
 
     # Try to convert old python 2 format
     try:

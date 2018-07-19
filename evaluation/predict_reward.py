@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import TensorDataset, DataLoader
 
 from models.forward_inverse import BaseRewardModel
-from utils import parseDataFolder, detachToNumpy
+from utils import parseDataFolder, detachToNumpy, loadData
 
 parser = argparse.ArgumentParser(description='Predict Reward from Ground Truth')
 parser.add_argument('--epochs', type=int, default=10,
@@ -23,6 +23,8 @@ parser.add_argument('--training-set-size', type=int, default=-1,
 parser.add_argument('-lr', '--learning-rate', type=float, default=0.005, help='learning rate (default: 0.005)')
 parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
 parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
+parser.add_argument('-i', '--input-file', type=str, default="",
+                    help='Path to a npz file containing states and rewards')
 
 args = parser.parse_args()
 args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -31,56 +33,43 @@ args.data_folder = parseDataFolder(args.data_folder)
 
 
 print('Loading data ... ')
-training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
-
-rewards = training_data['rewards']
-episode_starts = training_data['episode_starts']
+training_data, ground_truth, true_states, target_positions = loadData(args.data_folder)
+rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
 
 # Predict only positive or null rewards
 rewards[rewards < 0] = 0
 
-ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
-states, target_positions = ground_truth['ground_truth_states'], ground_truth['target_positions']
+if args.input_file != "":
+    print("Loading {}...".format(args.input_file))
+    states = np.load(args.input_file)['states']
+else:
+    print("Using ground truth")
+    states = true_states
+
 state_dim = states.shape[1]
 
 if args.training_set_size > 0:
-    limit = args.training_set_size
+    limit = min(args.training_set_size, len(states))
     rewards = rewards[:limit]
     states = states[:limit]
     target_positions = target_positions[:limit]
     episode_starts = episode_starts[:limit]
 
-with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
-    relative_pos = json.load(f).get('relative_pos', False)
-
-target_pos_ = []
-# True state is the relative position to the target
-if relative_pos:
-    target_idx = -1
-    for i in range(len(episode_starts)):
-        if episode_starts[i] == 1:
-            target_idx += 1
-        states[i] -= target_positions[target_idx]
-        target_pos_.append(target_positions[target_idx])
-target_pos_ = np.array(target_pos_[:len(rewards)])
-
-
-
 num_samples = rewards.shape[0] - 1  # number of samples
+print("{} samples".format(num_samples))
 
 # indices for all time steps where the episode continues
 indices = np.array([i for i in range(num_samples) if not episode_starts[i + 1]], dtype='int64')
 
-
 model = BaseRewardModel()
-model.initRewardNet(state_dim, n_rewards=2, n_hidden=16)
+#  + target_pos_.shape[1]
+model.initRewardNet(state_dim, n_rewards=2, n_hidden=4)
 model = model.to(device)
 
 criterion = nn.CrossEntropyLoss()
 
 optimizer = th.optim.Adam(model.parameters(), lr=args.learning_rate)
 num_epochs = args.epochs
-
 
 # Seed the random generator
 np.random.seed(args.seed)
@@ -124,6 +113,9 @@ for epoch in range(num_epochs):
             inputs = th.Tensor(states[idx, :]).float().to(device)
             next_inputs = th.Tensor(states[idx + 1, :]).float().to(device)
 
+            # inputs_target = th.Tensor(target_pos_[idx, :]).float().to(device)
+            # next_inputs_target = th.Tensor(target_pos_[idx + 1, :]).float().to(device)
+
             if len(next_inputs) < args.batch_size:
                 continue
 
@@ -138,6 +130,9 @@ for epoch in range(num_epochs):
             # forward
             # track history if only in train
             with th.set_grad_enabled(phase == 'train'):
+                # inputs = th.cat([inputs, inputs_target], dim=1)
+                # next_inputs = th.cat([next_inputs, next_inputs_target], dim=1)
+
                 outputs = model.rewardModel(inputs, next_inputs)
                 _, preds = th.max(outputs, dim=1)
                 loss = criterion(outputs, labels)

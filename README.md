@@ -249,6 +249,17 @@ python -m evaluation.predict_dataset --log-dir logs/path/to/log_folder/
 ```
 use  `-n 1000` to predict on the first 1000 samples only.
 
+If you want to predict the reward (train a classifier for positive or null reward) using ground truth states or learned states, you can use `evaluation/predict_reward.py` script.
+Ground Truth:
+```
+python -m evaluation.predict_reward --data-folder data/dataset_name/ --training-set-size 50000
+```
+
+On Learned States:
+```
+python -m evaluation.predict_reward --data-folder data/dataset_name/ -i log/path/to/states_rewards.npz
+```
+
 
 ## Multiple Cameras
 
@@ -313,12 +324,12 @@ optional arguments:
 ```
 You can plot a learned representation with:
 ```
-python plotting/representation_plot.py -i path/to/states_rewards.npz
+python -m plotting.representation_plot -i path/to/states_rewards.npz
 ```
 
 You can also plot ground truth states with:
 ```
-python plotting/representation_plot.py --data-folder path/to/datasetFolder/
+python -m plotting.representation_plot --data-folder path/to/datasetFolder/
 ```
 
 To have a different color per episode, you have to pass `--data-folder` argument along with `--color-episode`.
@@ -327,7 +338,7 @@ To have a different color per episode, you have to pass `--data-folder` argument
 
 You can have an interactive plot of a learned representation using:
 ```
-python plotting/interactive_plot.py --data-folder path/to/datasetFolder/ -i path/to/states_rewards.npz
+python -m plotting.interactive_plot --data-folder path/to/datasetFolder/ -i path/to/states_rewards.npz
 ```
 When you click on a state in the representation plot (left click for 2D, **right click for 3D plots**!), it shows the corresponding image along with the reward and the coordinates in the space.
 
@@ -335,7 +346,7 @@ Pass `--multi-view` as argument to visualize in case of multiple cameras.
 
 You can also plot ground truth states when you don't specify a npz file:
 ```
-python plotting/interactive_plot.py --data-folder path/to/datasetFolder/
+python -m plotting.interactive_plot --data-folder path/to/datasetFolder/
 ```
 
 ### Create a KNN Plot and Compute KNN-MSE
