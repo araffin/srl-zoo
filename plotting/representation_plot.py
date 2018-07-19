@@ -257,7 +257,7 @@ def plotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='co
 
 def plotCorrelation(states_rewards, ground_truth, target_positions):
     """
-    Correlation matrix: Target pos/GT vs. States predicted
+    Correlation matrix: Target pos/ground truth states vs. States predicted
     :param states_rewards: (numpy dict)
     :param ground_truth: (numpy dict)
     :param target_positions: (numpy array)

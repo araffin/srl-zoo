@@ -32,6 +32,8 @@ def buildConfig(args):
     # Fix to use this function in srl_baselines/
     split_index = args.split_index if hasattr(args, "split_index") else -1
     beta = args.beta if hasattr(args, "beta") else -1
+    l1_reg = args.l1_reg if hasattr(args, "l1_reg") else 0
+    l2_reg = args.l2_reg if hasattr(args, "l2_reg") else 0
     exp_config = {
         "batch-size": args.batch_size,
         "beta": beta,
@@ -45,7 +47,8 @@ def buildConfig(args):
         "state-dim": args.state_dim,
         "knn-samples": 200,
         "knn-seed": 1,
-        "l1-reg": 0,
+        "l1-reg": l1_reg,
+        "l2-reg": l2_reg,
         "losses": args.losses,
         "n-neighbors": 5,
         "n-to-plot": 5,
@@ -67,6 +70,7 @@ if __name__ == '__main__':
                         help='Limit size (number of samples) of the training set (default: -1)')
     parser.add_argument('-lr', '--learning-rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1-reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
+    parser.add_argument('--l2-reg', type=float, default=0.0, help='L2 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-display-plots', action='store_true', default=False,
                         help='disables live plots of the representation learned')
@@ -150,7 +154,7 @@ if __name__ == '__main__':
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
-                       l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
+                       l1_reg=args.l1_reg, l2_reg=args.l2_reg, cuda=args.cuda, multi_view=args.multi_view,
                        losses=losses, n_actions=n_actions, beta=args.beta, split_index=args.split_index)
 
     if args.training_set_size > 0:

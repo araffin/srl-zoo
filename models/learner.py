@@ -11,7 +11,7 @@ import torch as th
 from tqdm import tqdm
 
 from losses.losses import LossManager, autoEncoderLoss, roboticPriorsLoss, tripletLoss, rewardModelLoss, \
-    rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss, vaeLoss, l1Loss
+    rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss, vaeLoss, l1Loss, l2Loss
 from losses.utils import findPriorsPairs
 from pipeline import NAN_ERROR
 from plotting.representation_plot import plotRepresentation, plt, plotImage
@@ -130,6 +130,7 @@ class SRL4robotics(BaseLearner):
     :param seed: (int)
     :param learning_rate: (float)
     :param l1_reg: (float)
+    :param l2_reg: (float)
     :param cuda: (bool)
     :param multi_view: (bool)
     :param losses: ([str])
@@ -138,7 +139,7 @@ class SRL4robotics(BaseLearner):
     """
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
-                 seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False,
+                 seed=1, learning_rate=0.001, l1_reg=0.0, l2_reg=0.0, cuda=False,
                  multi_view=False, losses=None, n_actions=6, beta=1, split_index=-1):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
@@ -188,6 +189,7 @@ class SRL4robotics(BaseLearner):
 
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.l1_reg = l1_reg
+        self.l2_reg = l2_reg
         self.log_folder = log_folder
         self.model_type = model_type
 
@@ -289,7 +291,7 @@ class SRL4robotics(BaseLearner):
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
-        loss_manager = LossManager(self.model, self.l1_reg, loss_history)
+        loss_manager = LossManager(self.model, loss_history)
 
         best_error = np.inf
         best_model_path = "{}/srl_model.pth".format(self.log_folder)
@@ -334,8 +336,11 @@ class SRL4robotics(BaseLearner):
                 actions_st = th.from_numpy(actions_st).view(-1, 1).requires_grad_(False).to(self.device)
 
                 # L1 regularization
-                if loss_manager.l1_coeff > 0:
-                    l1Loss(loss_manager.reg_params, loss_manager.l1_coeff, loss_manager)
+                if self.l1_reg > 0:
+                    l1Loss(loss_manager.reg_params, self.l1_reg, loss_manager)
+
+                if self.l2_reg > 0:
+                    l2Loss(loss_manager.reg_params, self.l2_reg, loss_manager)
 
                 if not self.no_priors:
                     roboticPriorsLoss(states, next_states, minibatch_idx=minibatch_idx,

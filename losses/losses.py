@@ -21,17 +21,14 @@ class LossManager:
     Class in charge of Computing and Saving history of Losses
     """
 
-    def __init__(self, model, l1_reg=0.0, loss_history=None):
+    def __init__(self, model, loss_history=None):
         """
         :param model: (PyTorch model)
-        :param l1_reg: (float) l1 regularization coeff
         :param loss_history: (dict)
         """
         # Retrieve only trainable and regularizable parameters (we should exclude biases)
         self.reg_params = [param for name, param in model.named_parameters() if
                            ".bias" not in name and param.requires_grad]
-        n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
-        self.l1_coeff = (l1_reg / n_params)
         self.loss_history = loss_history
         self.names, self.weights, self.losses = [], [], []
 
@@ -141,6 +138,19 @@ def l1Loss(params, weight, loss_manager):
     l1_loss = sum([th.sum(th.abs(param)) for param in params])
     loss_manager.addToLosses('l1_loss', weight, l1_loss)
     return weight * l1_loss
+
+
+def l2Loss(params, weight, loss_manager):
+    """
+    L2 regularization loss
+    :param params: NN's weights to regularize
+    :param weight: coefficient to weight the loss (float)
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
+    :return:
+    """
+    l2_loss = sum([param.norm(2) for param in params]) / len(params)
+    loss_manager.addToLosses('l2_loss', weight, l2_loss)
+    return weight * l2_loss
 
 
 def rewardModelLoss(rewards_pred, rewards_st, weight, loss_manager):
