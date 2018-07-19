@@ -1,6 +1,5 @@
 from __future__ import print_function, division
 
-import json
 import argparse
 from textwrap import fill
 
@@ -352,7 +351,7 @@ if __name__ == '__main__':
         name = "Ground Truth States - {}".format(args.data_folder)
 
         if args.color_episode:
-            rewards = colorPerEpisode(episode_starts)
+            rewards = colorPerEpisode(training_data['episode_starts'])
 
         if args.plot_against:
             plotAgainst(true_states, rewards, cmap=cmap)

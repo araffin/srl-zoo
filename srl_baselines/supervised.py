@@ -18,7 +18,7 @@ from plotting.representation_plot import plotRepresentation, plt
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import getInputDim
 from train import buildConfig
-from utils import parseDataFolder, createFolder, getInputBuiltin
+from utils import parseDataFolder, createFolder, getInputBuiltin, loadData
 
 DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
@@ -27,16 +27,17 @@ TEST_BATCH_SIZE = 512
 
 
 class SupervisedLearning(BaseLearner):
-    """
-    :param state_dim: (int)
-    :param model_type: (str) one of "resnet" or "mlp"
-    :param seed: (int)
-    :param learning_rate: (float)
-    :param cuda: (bool)
-    """
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, cuda=False):
+        """
+        :param state_dim: (int)
+        :param model_type: (str) one of "resnet", "custom_cnn" or "mlp"
+        :param log_folder: (str
+        :param seed: (int)
+        :param learning_rate: (float)
+        :param cuda: (bool)
+        """
 
         super(SupervisedLearning, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -180,7 +181,6 @@ if __name__ == '__main__':
                         help='Use relative position as ground_truth')
     parser.add_argument('--log-folder', type=str, default='', help='Override the default log-folder')
 
-    input = getInputBuiltin()
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     DISPLAY_PLOTS = not args.no_display_plots
@@ -189,9 +189,11 @@ if __name__ == '__main__':
     BATCH_SIZE = args.batch_size
     args.data_folder = parseDataFolder(args.data_folder)
     log_folder = args.log_folder
+
     if log_folder == '':
         name = getModelName(args)
         log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
+
     createFolder(log_folder, "supervised folder already exist")
 
     folder_path = '{}/NearestNeighbors/'.format(log_folder)
@@ -200,23 +202,8 @@ if __name__ == '__main__':
     print('Log folder: {}'.format(log_folder))
 
     print('Loading data ... ')
-    training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
+    training_data, ground_truth, true_states, _ = loadData(args.data_folder)
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
-
-    # TODO: normalize true states
-    ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
-    # Backward compatibility with previous names
-    true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
-    target_positions = ground_truth[
-        'target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
-
-    if args.relative_pos:
-        print("Using relative position")
-        button_idx = -1
-        for i in range(len(episode_starts)):
-            if episode_starts[i] == 1:
-                button_idx += 1
-            true_states[i] -= target_positions[button_idx]
 
     images_path = ground_truth['images_path']
     state_dim = true_states.shape[1]
@@ -246,4 +233,4 @@ if __name__ == '__main__':
     plotRepresentation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     if DISPLAY_PLOTS:
-        input('\nPress any key to exit.')
+        getInputBuiltin()('\nPress any key to exit.')

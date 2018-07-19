@@ -200,7 +200,7 @@ if __name__ == '__main__':
         plotRepresentation(states_rewards['states'], states_rewards['rewards'], images_path,
                            multi_view=args.multi_view)
 
-        input('\nPress any key to exit.')
+        getInputBuiltin()('\nPress any key to exit.')
 
     else:
 
@@ -211,4 +211,4 @@ if __name__ == '__main__':
         name = "Ground Truth States - {}".format(args.data_folder)
 
         plotRepresentation(true_states, rewards, images_path, name, fit_pca=False, multi_view=args.multi_view)
-        input('\nPress any key to exit.')
+        getInputBuiltin()('\nPress any key to exit.')

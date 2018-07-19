@@ -31,7 +31,6 @@ args.cuda = not args.no_cuda and th.cuda.is_available()
 device = th.device('cuda') if args.cuda else th.device('cpu')
 args.data_folder = parseDataFolder(args.data_folder)
 
-
 print('Loading data ... ')
 training_data, ground_truth, true_states, target_positions = loadData(args.data_folder)
 rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
@@ -98,7 +97,7 @@ for epoch in range(num_epochs):
         if phase == 'train':
             model.train()  # Set model to training mode
         else:
-            model.eval()   # Set model to evaluate mode
+            model.eval()  # Set model to evaluate mode
 
         running_loss = 0.0
         running_corrects = 0
@@ -154,7 +153,6 @@ for epoch in range(num_epochs):
         for class_idx in range(2):
             corrects[class_idx] = detachToNumpy(corrects[class_idx])
             corrects[class_idx] = corrects[class_idx] / (n_per_class[class_idx])
-
 
         print('{} Loss: {:.4f} Acc: {:.4f}'.format(
             phase, epoch_loss, epoch_acc))
