@@ -111,7 +111,7 @@ def main():
             for i in range(state_dim):
                 mu_ae.append(cv2.getTrackbarPos(str(i), 'slider for ' + ae_type))
             # Rescale the values to fit the bounds of the representation
-            mu_ae = (np.array(mu_ae) / 100) * (max_x_ae - min_x_ae) + min_x_ae]
+            mu_ae = (np.array(mu_ae) / 100) * (max_x_ae - min_x_ae) + min_x_ae
             img_ae = getImage(srl_model.model, mu_ae, device)
 
             # stop if user closed a window
