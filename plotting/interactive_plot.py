@@ -120,8 +120,7 @@ def plotRepresentation(states, rewards, images_path, name="Learned State Represe
 class ImageFinder(object):
     """
     Callback for matplotlib to display an annotation when points are
-    clicked on.  The point which is closest to the click and within
-    xtol and ytol is identified.
+    clicked on.  The point which is closest to the click.
     """
 
     def __init__(self, states, rewards, image_plot, ax, images_path, view=0):
@@ -134,6 +133,17 @@ class ImageFinder(object):
         self.states = states
         self.rewards = rewards
         self.view = view
+
+        # Highlight the selected state
+        self.kwargs = dict(s=130, color='green', alpha=0.7)
+        coords = self.getCoords(0)
+        if states.shape[1] > 2:
+            self.dot = ax.scatter([coords[0]], [coords[1]], [coords[2]], **self.kwargs)
+        else:
+            self.dot = ax.scatter([coords[0]], [coords[1]], **self.kwargs)
+
+    def getCoords(self, state_idx):
+        return self.states[state_idx].tolist()
 
     def __call__(self, event):
         if event.inaxes:
@@ -162,6 +172,12 @@ class ImageFinder(object):
             path = self.images_path[state_idx]
             # Load the image that corresponds to the clicked point in the space
             self.image_plot.set_data(loadImage(path, self.view))
+            coords = self.getCoords(state_idx)
+            self.dot.set_offsets(coords[:2])
+            if self.states.shape[1] > 2:
+                # Recreate the highlighted dot each time because set_offsets does not work in 3d
+                self.dot.remove()
+                self.dot = self.ax.scatter([coords[0]], [coords[1]], [coords[2]], **self.kwargs)
 
 
 if __name__ == '__main__':
