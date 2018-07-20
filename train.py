@@ -60,7 +60,8 @@ if __name__ == '__main__':
     parser.add_argument('-lr', '--learning-rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1-reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
-    parser.add_argument('--no-display-plots', action='store_true', default=False, help='disables live plots of the representation learned')
+    parser.add_argument('--no-display-plots', action='store_true', default=False,
+                        help='disables live plots of the representation learned')
     parser.add_argument('--model-type', type=str, default="custom_cnn",
                         choices=['custom_cnn', 'resnet', 'mlp', 'linear'],
                         help='Model architecture (default: "custom_cnn")')
@@ -77,9 +78,10 @@ if __name__ == '__main__':
                         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
                                  "autoencoder", "vae", "perceptual","dae"], )
     parser.add_argument('--beta', type=float, default=1.0,
-                        help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
+                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
     parser.add_argument('--path-denoizer', type=str, default="",
                         help='Path till a pre-trained denoizing model when using the perceptual loss with VAE')
+    parser.add_argument('--losses-weights', type=float, nargs='+', default=[], help="losses's weights")
 
     input = getInputBuiltin()
     args = parser.parse_args()
@@ -94,6 +96,11 @@ if __name__ == '__main__':
 
     # Dealing with losses to use
     losses = list(set(args.losses))
+    losses_weights = list(args.losses_weights)
+    if len(losses_weights) == 0:
+        losses_weights_dict = None
+    else:
+        losses_weights_dict = {loss_key: weight_value for loss_key, weight_value in zip(args.losses, losses_weights)}
 
     if args.multi_view is True:
         # Setting variables involved data-loading from multiple cameras,
@@ -104,6 +111,8 @@ if __name__ == '__main__':
         else:
             preprocessing.preprocess.N_CHANNELS = 6
 
+    assert len(losses_weights) == 0 or len(losses_weights) == len(losses), \
+        "Please when doing so, specify as many weights as the number of losses you want to apply !"
     assert not ("autoencoder" in losses and "vae" in losses), "Model cannot be both an Autoencoder and a VAE (come on!)"
     assert not (("autoencoder" in losses or "vae" in losses)
                 and args.model_type == "resnet"), "Model cannot be an Autoencoder or VAE using ResNet Architecture !"
@@ -151,7 +160,7 @@ if __name__ == '__main__':
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       losses=losses, n_actions=n_actions, beta=args.beta, path_denoizer=args.path_denoizer)
+                       losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta, path_denoizer=args.path_denoizer)
 
     if args.training_set_size > 0:
         limit = args.training_set_size

@@ -210,15 +210,16 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
     if perceptual_similarity_loss:
         denoizer_encoding_loss = F.mse_loss(encoded_real,  encoded_prediction, size_average=False)
         denoizer_encoding_loss += F.mse_loss(next_encoded_real, next_encoded_prediction, size_average=False)
+        loss_manager.addToLosses("denoising perceptual similarity", weight_perceptual, denoizer_encoding_loss)
+
         vae_loss = weight_perceptual * denoizer_encoding_loss + beta * kl_divergence
-        loss_name = 'perceptual_similarity_loss'
+        loss_manager.addToLosses('kl_loss', beta, kl_divergence)
     else:
         generation_loss = F.mse_loss(decoded, obs, size_average=False)
         generation_loss += F.mse_loss(next_decoded, next_obs, size_average=False)
         vae_loss = generation_loss + beta * kl_divergence
         loss_name = 'kl_loss'
-
-    loss_manager.addToLosses(loss_name, weight, vae_loss)
+        loss_manager.addToLosses(loss_name, weight, vae_loss)
     return weight * vae_loss
 
 

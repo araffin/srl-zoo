@@ -178,7 +178,7 @@ class SRL4robotics(BaseLearner):
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False,
-                 multi_view=False, losses=None, n_actions=6, beta=1, path_denoizer=None):
+                 multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1, path_denoizer=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -186,6 +186,7 @@ class SRL4robotics(BaseLearner):
         self.losses = losses
         self.dim_action = n_actions
         self.beta = beta
+
         if model_type in ["linear", "mlp", "resnet", "custom_cnn"] \
                 or "autoencoder" in losses or "vae" in losses:
             self.use_forward_loss = "forward" in losses
@@ -222,6 +223,14 @@ class SRL4robotics(BaseLearner):
         self.l1_reg = l1_reg
         self.log_folder = log_folder
         self.model_type = model_type
+
+        self.losses_weights_dict = {"forward": 1.0, "inverse": 1.0, "reward": 1.0, "priors": 1.0,
+                                   "episode-prior": 1.0, "reward-prior": 10, "triplet": 1.0,
+                                   "autoencoder": 1.0, "vae": 1.0, "perceptual": 1e-6, "dae": 1.0}
+
+        if losses_weights_dict is not None:
+            self.losses_weights_dict.update(losses_weights_dict)
+        print("\nYour are using the following weights for uour lossses: ", self.losses_weights_dict,'\n')
 
     def predStatesWithDataLoader(self, data_loader, restore_train=False):
         """
@@ -322,6 +331,7 @@ class SRL4robotics(BaseLearner):
         loss_history = defaultdict(list)
 
         loss_manager = LossManager(self.model, self.l1_reg, loss_history)
+        self.losses_weights_dict["l1_loss"] = loss_manager.l1_coeff
 
         best_error = np.inf
         best_model_path = "{}/srl_model.pth".format(self.log_folder)
@@ -395,15 +405,17 @@ class SRL4robotics(BaseLearner):
                 if not self.no_priors:
                     roboticPriorsLoss(states, next_states, minibatch_idx=minibatch_idx,
                                         dissimilar_pairs=dissimilar_pairs, same_actions_pairs=same_actions_pairs,
-                                        weight=1., loss_manager=loss_manager)
+                                        weight=self.losses_weights_dict['priors'], loss_manager=loss_manager)
 
                 if self.use_forward_loss:
                     next_states_pred = self.model.forwardModel(states, actions_st)
-                    forwardModelLoss(next_states_pred, next_states, weight=1., loss_manager=loss_manager)
+                    forwardModelLoss(next_states_pred, next_states, weight=self.losses_weights_dict['forward'],
+                                     loss_manager=loss_manager)
 
                 if self.use_inverse_loss:
                     actions_pred = self.model.inverseModel(states, next_states)
-                    inverseModelLoss(actions_pred, actions_st, weight=1, loss_manager=loss_manager)
+                    inverseModelLoss(actions_pred, actions_st, weight=self.losses_weights_dict['inverse'],
+                                     loss_manager=loss_manager)
 
                 if self.use_reward_loss:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
@@ -411,31 +423,37 @@ class SRL4robotics(BaseLearner):
                     rewards_st[rewards_st == -1] = 0
                     rewards_st = th.from_numpy(rewards_st).view(-1, 1).to(self.device)
                     rewards_pred = self.model.rewardModel(states)
-                    rewardModelLoss(rewards_pred, rewards_st.long(), weight=2.5, loss_manager=loss_manager)
+                    rewardModelLoss(rewards_pred, rewards_st.long(), weight=self.losses_weights_dict['reward'],
+                                    loss_manager=loss_manager)
 
                 if self.use_autoencoder or self.use_dae:
-                    autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1, loss_manager=loss_manager)
+                    loss_type = "dae" if self.use_dae else "autoencoder"
+                    autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight=1,
+                                    loss_manager=self.losses_weights_dict[loss_type])
 
                 if self.use_vae:
-                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar, weight=1.,
+                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar,
+                            weight=self.losses_weights_dict['vae'],
                             loss_manager=loss_manager, beta=self.beta,
                             perceptual_similarity_loss=self.perceptual_similarity_loss,
                             encoded_real=states_denoizer, encoded_prediction=states_denoizer_predicted,
                             next_encoded_real=next_states_denoizer,
                             next_encoded_prediction=next_states_denoizer_predicted,
-                            weight_perceptual=0.1)
+                            weight_perceptual=self.losses_weights_dict['perceptual'])
 
                 if self.reward_prior:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]
                     rewards_st = th.from_numpy(rewards_st).float().view(-1, 1).to(self.device)
-                    rewardPriorLoss(states, rewards_st, weight=10., loss_manager=loss_manager)
+                    rewardPriorLoss(states, rewards_st, weight=self.losses_weights_dict['reward-prior'],
+                                    loss_manager=loss_manager)
 
                 if self.episode_prior:
                     episodePriorLoss(minibatch_idx, minibatch_episodes, states, self.discriminator,
-                                     BALANCED_SAMPLING, weight=1, loss_manager=loss_manager)
+                                     BALANCED_SAMPLING, weight=self.losses_weights_dict['episode-prior'],
+                                     loss_manager=loss_manager)
                 if self.use_triplets:
-                    tripletLoss(states, positive_states, negative_states, weight=1.0, loss_manager=loss_manager,
-                                alpha=0.2)
+                    tripletLoss(states, positive_states, negative_states, weight=self.losses_weights_dict['triplet'],
+                                loss_manager=loss_manager, alpha=0.2)
                 # Compute weighted average of losses
                 loss_manager.updateLossHistory()
                 loss = loss_manager.computeTotalLoss()
