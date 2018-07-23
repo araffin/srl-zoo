@@ -82,6 +82,8 @@ if __name__ == '__main__':
     parser.add_argument('--path-denoizer', type=str, default="",
                         help='Path till a pre-trained denoizing model when using the perceptual loss with VAE')
     parser.add_argument('--losses-weights', type=float, nargs='+', default=[], help="losses's weights")
+    parser.add_argument('--max-surface-occlusion', type=float, default=0.5,
+                         help='Max occlusion surface for masks when using DAE')
 
     input = getInputBuiltin()
     args = parser.parse_args()
@@ -160,7 +162,8 @@ if __name__ == '__main__':
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta, path_denoizer=args.path_denoizer)
+                       losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta,
+                       path_denoizer=args.path_denoizer, max_surface_occlusion=args.max_surface_occlusion)
 
     if args.training_set_size > 0:
         limit = args.training_set_size

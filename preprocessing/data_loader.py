@@ -88,7 +88,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, use_tri
             im = np.dstack(images)
 
         else:
-            im = cv2.imread(image_path + ".jpg")
+            im = cv2.imread(image_path + ".jpg"f
             if im is None:
                 raise ValueError("tried to load {}.jpg, but it was not found".format(image_path))
             im = preprocessImage(im)
@@ -115,7 +115,8 @@ class CustomDataLoader(object):
     """
 
     def __init__(self, minibatchlist, images_path, test_batch_size=512, cache_capacity=5000,
-                 n_workers=5, auto_cleanup=True, multi_view=False, use_triplets=False, use_occlusion=False):
+                 n_workers=5, auto_cleanup=True, multi_view=False, use_triplets=False, use_occlusion=False,
+                 max_surface_occlusion=0.5):
         super(CustomDataLoader, self).__init__()
 
         self.n_minibatches = len(minibatchlist)
@@ -178,6 +179,7 @@ class CustomDataLoader(object):
         self.use_triplets = use_triplets
         # apply occlusion for training a DAE
         self.use_occlusion = use_occlusion
+        self.max_surface_occlusion = max_surface_occlusion
 
         if self.n_workers <= 0:
             raise ValueError("n_workers <= 0 in the data loader")
@@ -349,6 +351,12 @@ class CustomDataLoader(object):
                     continue
             self._processNextMinibatch()
 
+    def sample_coordinates(self, coord_1, size_limit, occlusion_surface):
+        min_coord_2 = max(0, coord_1 - size_limit * occlusion_surface)
+        max_coord_2 = min(coord_1 + size_limit * occlusion_surface, size_limit)
+        coord_2 = np.random.randint(low=min_coord_2, high=max_coord_2)
+        return min(coord_1, coord_2), max(coord_1, coord_2)
+
     def _sendToWorkers(self, batch_size, indices_list, obs_dict):
         """
         Fill workers queues and concatenate result
@@ -385,8 +393,10 @@ class CustomDataLoader(object):
                 j, im = self.output_queue.get(timeout=3)  # 3s timeout
                 obs[j, :, :, :] = im
                 if self.use_occlusion:
-                    h_1, h_2 = np.random.randint(IMAGE_HEIGHT, size=2)
-                    w_1, w_2 = np.random.randint(IMAGE_WIDTH, size=2)
+                    h_1 = np.random.randint(IMAGE_HEIGHT)
+                    h_1, h_2 = self.sample_coordinates(h_1, IMAGE_HEIGHT, occlusion_surface=self.max_surface_occlusion )
+                    w_1 = np.random.randint(IMAGE_WIDTH)
+                    w_1, w_2 = self.sample_coordinates(w_1, IMAGE_WIDTH, occlusion_surface=self.max_surface_occlusion)
                     noisy_img = im
                     noisy_img[h_1:h_2, w_1:w_2, :] = 0.
                     noisy_obs[j, :, :, :] = noisy_img
