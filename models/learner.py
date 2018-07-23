@@ -54,6 +54,8 @@ class BaseLearner(object):
         np.random.seed(seed)
         th.manual_seed(seed)
         if cuda:
+            # Make CuDNN Determinist
+            th.backends.cudnn.deterministic = True
             th.cuda.manual_seed(seed)
 
         self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
