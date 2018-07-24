@@ -153,6 +153,8 @@ if __name__ == '__main__':
         exp_config['experiment-name'] = experiment_name
         exp_config['n_actions'] = n_actions
         exp_config['multi-view'] = args.multi_view
+        if "dae" in losses:
+            exp_config['max-surface-occlusion'] = args.max_surface_occlusion
 
         # Save config in log folder & results as well
         args.log_folder = log_folder

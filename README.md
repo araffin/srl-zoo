@@ -234,8 +234,7 @@ optional arguments:
                         If disabled, automatic logs will be generated with experiment config file & KNN-MSE computation.
   --multi-view          Enable use of multiple camera (for all losses, except on ResNet Architecture).
   --balanced-sampling   Force balanced sampling for episode independent prior instead of uniform
-  --losses {forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae,perceptual,dae} 
-  [{forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae,perceptual,dae} ...]
+  --losses              Combininable losses(s) to be applied for SRL
                         losses(s)
   --beta BETA           (For beta-VAE only) Factor on the KL divergence,
                         higher value means more disentangling.
