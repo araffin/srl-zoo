@@ -83,7 +83,7 @@ if __name__ == '__main__':
                         help='Path till a pre-trained denoizing model when using the perceptual loss with VAE')
     parser.add_argument('--losses-weights', type=float, nargs='+', default=[], help="losses's weights")
     parser.add_argument('--max-surface-occlusion', type=float, default=0.5,
-                         help='Max occlusion surface for masks when using DAE')
+                         help='Max percentage of input occlusion for masks when using DAE')
 
     input = getInputBuiltin()
     args = parser.parse_args()

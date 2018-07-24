@@ -296,11 +296,10 @@ def plotCorrelation(states_rewards, ground_truth, only_print=False):
         for iter_gt in range(ground_truth_dim):
             corr_copy[iter_gt, iter_gt] = 0.0
             correlation_max_vector = np.append(correlation_max_vector,max(abs(corr_copy[iter_gt])))
-    correlation_l2 = sum([k**2 for k in correlation_max_vector])
-
+    correlation_scalar = sum(correlation_max_vector)
     print("Correlation value of the model with GT:\n Max correlation vector: {}"
           "\n Sum of max correlation: {:.2f}\n Normalized sum: {:.2f}"
-          .format(correlation_max_vector, correlation_l2, correlation_l2/len(correlation_max_vector)))
+          .format(correlation_max_vector, correlation_scalar, correlation_scalar/len(correlation_max_vector)))
     if not only_print:
         pauseOrClose(fig)
 

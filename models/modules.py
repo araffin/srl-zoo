@@ -44,7 +44,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
                 self.model = CustomCNN(state_dim)
 
         elif model_type == "mlp":
-            if "autoencoder" in losses:
+            if "autoencoder" in losses or "dae" in losses:
                 self.model = DenseAutoEncoder(input_dim=getInputDim(), state_dim=state_dim)
             elif "vae" in losses:
                 self.model = DenseVAE(input_dim=getInputDim(),
@@ -54,7 +54,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
                 self.model = SRLDenseNetwork(getInputDim(), state_dim, cuda=cuda)
 
         elif model_type == "linear":
-            if "autoencoder" in losses:
+            if "autoencoder" in losses or "dae" in losses:
                 self.model = LinearAutoEncoder(input_dim=getInputDim(), state_dim=state_dim)
             else:
                 # for losses not depending on specific architecture (supervised, inv, fwd..)

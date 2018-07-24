@@ -11,7 +11,7 @@ Available methods:
 - Supervised Learning
 - Forward, Inverse Models
 - Triplet Network (for stereovision only)
-- [experimental] Reward losses
+- [experimental] Reward loss, Reward prior, Perceptual loss, Mutual Information loss 
 
 Related papers:
 - "State Representation Learning for Control: An Overview" (Lesort et al., 2018), link: [https://arxiv.org/pdf/1802.04181.pdf](https://arxiv.org/pdf/1802.04181.pdf)
@@ -199,8 +199,12 @@ usage: train.py [-h] [--epochs N] [--seed S] [--state-dim STATE_DIM]
                 [--model-type {custom_cnn,resnet,mlp,linear}] --data-folder
                 DATA_FOLDER [--log-folder LOG_FOLDER] [--multi-view]
                 [--balanced-sampling]
-                [--losses {forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae}
+                [--losses {forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae,
+                           dae,perceptual}
                 [--beta BETA]
+                [--path-denoizer PATH_DENOIZER]
+                [--losses-weights LOSSES_WEIGHTS]
+                [--max-surface-occlusion MAX_SURFACE_OCCLUSION]
 
 State Representation Learning with PyTorch
 
@@ -230,9 +234,18 @@ optional arguments:
                         If disabled, automatic logs will be generated with experiment config file & KNN-MSE computation.
   --multi-view          Enable use of multiple camera (for all losses, except on ResNet Architecture).
   --balanced-sampling   Force balanced sampling for episode independent prior instead of uniform
-  --losses              Combininable losses(s) to be applied for SRL
-  --beta BETA           The Beta factor on the KL divergence,
-                        higher value means more disentangling (for VAE only).
+  --losses {forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae,perceptual,dae} 
+  [{forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae,perceptual,dae} ...]
+                        losses(s)
+  --beta BETA           (For beta-VAE only) Factor on the KL divergence,
+                        higher value means more disentangling.
+  --path-denoizer PATH_DENOIZER
+                        Path till a pre-trained denoizing model when using the
+                        perceptual loss with VAE
+  --losses-weights LOSSES_WEIGHTS [LOSSES_WEIGHTS ...]
+                        losses's weights - as many as there are losses
+  --max-surface-occlusion MAX_SURFACE_OCCLUSION
+                        Max percentage of input occlusion for masks when using DAE.
 
 
 ```
@@ -302,6 +315,7 @@ optional arguments:
   --plot-against        Plot against each dimension
   --correlation         Plot the Pearson Matrix of correlation between the Ground truth and learned states.
   --projection          Plot 1D projection of predicted state on ground truth
+  --scalar              Only print correlation measurements
 
 ```
 You can plot a learned representation with:
