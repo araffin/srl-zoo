@@ -288,9 +288,11 @@ def plotCorrelation(states_rewards, ground_truth):
         plt.title(r'Correlation Matrix: S = Predicted states | $\tilde{S}$ = ' + ground_truth_name)
         fig.colorbar(cax, label='correlation coefficient')
 
+        ground_truth_dim = X.shape[1]
         corr_copy = corr
-        corr_copy[index, index] = 0.0
-        correlation_scalar += max(abs(corr_copy[index])) ** 2
+        for iter_gt in range(ground_truth_dim):
+            corr_copy[iter_gt, iter_gt] = 0.0
+            correlation_scalar += max(abs(corr_copy[iter_gt])) ** 2
     correlation_scalar = np.sqrt(correlation_scalar)
     print("Correlation value of the model with GT: ",correlation_scalar)
     pauseOrClose(fig)
