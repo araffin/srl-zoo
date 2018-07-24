@@ -259,14 +259,16 @@ def plotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='co
     plt.show()
 
 
-def plotCorrelation(states_rewards, ground_truth):
+def plotCorrelation(states_rewards, ground_truth, only_print=False):
     """
     Correlation matrix: Target pos/GT vs. States predicted
     :param states_rewards:
     :param ground_truth:
-    :return:
+    :param only_print: (bool) only print the correlation mesurements (max of correlation for each GT dimension)
     """
-    correlation_scalar = 0
+    np.set_printoptions(precision=2)
+    correlation_max_vector = np.array([])
+
     for index, ground_truth_name in enumerate([" Agent's position ", "Target Position"]):
         if ground_truth_name == " Agent's position ":
             key = 'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'
@@ -288,14 +290,19 @@ def plotCorrelation(states_rewards, ground_truth):
         plt.title(r'Correlation Matrix: S = Predicted states | $\tilde{S}$ = ' + ground_truth_name)
         fig.colorbar(cax, label='correlation coefficient')
 
+        # Building the vector of max correlation ( a scalar for each GT dimension)
         ground_truth_dim = X.shape[1]
         corr_copy = corr
         for iter_gt in range(ground_truth_dim):
             corr_copy[iter_gt, iter_gt] = 0.0
-            correlation_scalar += max(abs(corr_copy[iter_gt])) ** 2
-    correlation_scalar = np.sqrt(correlation_scalar)
-    print("Correlation value of the model with GT: ",correlation_scalar)
-    pauseOrClose(fig)
+            correlation_max_vector = np.append(correlation_max_vector,max(abs(corr_copy[iter_gt])))
+    correlation_l2 = sum([k**2 for k in correlation_max_vector])
+
+    print("Correlation value of the model with GT:\n Max correlation vector: {}"
+          "\n Sum of max correlation: {:.2f}\n Normalized sum: {:.2f}"
+          .format(correlation_max_vector, correlation_l2, correlation_l2/len(correlation_max_vector)))
+    if not only_print:
+        pauseOrClose(fig)
 
 
 def loadData(data_folder):
@@ -337,6 +344,8 @@ if __name__ == '__main__':
                         help='Plot correlation coeff against each dimension')
     parser.add_argument('--projection', action='store_true', default=False,
                         help='Plot 1D projection of predicted state on ground truth')
+    parser.add_argument('--scalar', action='store_true', default=False,
+                        help='Only print correlation measurements')
 
     args = parser.parse_args()
 
@@ -390,10 +399,11 @@ if __name__ == '__main__':
             if args.color_episode:
                 rewards = colorPerEpisode(episode_starts)
 
-            plotCorrelation(states_rewards, ground_truth)
+            plotCorrelation(states_rewards, ground_truth, only_print=args.scalar)
         else:
             plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
-        input('\nPress any key to exit.')
+        if not args.scalar:
+            input('\nPress any key to exit.')
 
     elif args.data_folder != "":
 
