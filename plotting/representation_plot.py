@@ -266,7 +266,8 @@ def plotCorrelation(states_rewards, ground_truth):
     :param ground_truth:
     :return:
     """
-    for ground_truth_name in [" Agent's position ", "Target Position"]:
+    correlation_scalar = 0
+    for index, ground_truth_name in enumerate([" Agent's position ", "Target Position"]):
         if ground_truth_name == " Agent's position ":
             key = 'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'
             X = ground_truth[key][:len(rewards)]
@@ -286,6 +287,12 @@ def plotCorrelation(states_rewards, ground_truth):
         ax.grid(False)
         plt.title(r'Correlation Matrix: S = Predicted states | $\tilde{S}$ = ' + ground_truth_name)
         fig.colorbar(cax, label='correlation coefficient')
+
+        corr_copy = corr
+        corr_copy[index, index] = 0.0
+        correlation_scalar += max(abs(corr_copy[index])) ** 2
+    correlation_scalar = np.sqrt(correlation_scalar)
+    print("Correlation value of the model with GT: ",correlation_scalar)
     pauseOrClose(fig)
 
 

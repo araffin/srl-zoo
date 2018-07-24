@@ -88,7 +88,7 @@ def imageWorker(image_queue, output_queue, exit_event, multi_view=False, use_tri
             im = np.dstack(images)
 
         else:
-            im = cv2.imread(image_path + ".jpg"f
+            im = cv2.imread(image_path + ".jpg")
             if im is None:
                 raise ValueError("tried to load {}.jpg, but it was not found".format(image_path))
             im = preprocessImage(im)
