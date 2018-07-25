@@ -99,7 +99,8 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
 
 class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
-    def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn", losses=None, split_index=1):
+    def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn",
+                losses=None, split_index=1, n_hidden_reward=16):
         """
         A model that can split representation, combining
         AE/VAE for the first split with Inverse + Forward in the second split
@@ -110,6 +111,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param model_type: (str)
         :param losses: ([str])
         :param split_index: (int) Number of dimensions for the first split
+        :param n_hidden_reward: (int) Number of hidden units for the reward model
         """
 
         assert split_index < state_dim, "The second split must be of dim >= 1, consider increasing the state_dim or decreasing the split_index"
@@ -131,7 +133,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         self.initForwardNet(self.dim_second_method, action_dim)
         self.initInverseNet(self.dim_second_method, action_dim)
-        self.initRewardNet(self.state_dim)
+        self.initRewardNet(self.state_dim, n_hidden=n_hidden_reward)
 
         # Architecture
         if model_type == "custom_cnn":
