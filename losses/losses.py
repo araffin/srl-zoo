@@ -198,6 +198,12 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
     :param weight: coefficient to weight the loss (float)
     :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :param beta: (float) used to weight the KL divergence for disentangling
+    :param perceptual_similarity_loss: shall the model compute the perceptual similarity loss (bool)
+    :param encoded_real: states encoding the real observation by the DAE (th.Tensor)
+    :param encoded_prediction: states encoding the vae's predicted observation by the DAE  (th.Tensor)
+    :param next_encoded_real: states encoding the next real observation by the DAE (th.Tensor)
+    :param next_encoded_prediction: states encoding the vae's predicted next observation by the DAE (th.Tensor)
+    :param weight_perceptual: loss for the DAE's embedding l2 distance (float)
     :return: (th.Tensor)
     """
 

@@ -82,7 +82,7 @@ if __name__ == '__main__':
     parser.add_argument('--path-denoiser', type=str, default="",
                         help='Path till a pre-trained denoising model when using the perceptual loss with VAE')
     parser.add_argument('--losses-weights', type=float, nargs='+', default=[], help="losses's weights")
-    parser.add_argument('--max-surface-occlusion', type=float, default=0.5,
+    parser.add_argument('--occlusion-percentage', type=float, default=0.5,
                          help='Max percentage of input occlusion for masks when using DAE')
 
     input = getInputBuiltin()
@@ -154,7 +154,7 @@ if __name__ == '__main__':
         exp_config['n_actions'] = n_actions
         exp_config['multi-view'] = args.multi_view
         if "dae" in losses:
-            exp_config['max-surface-occlusion'] = args.max_surface_occlusion
+            exp_config['occlusion-percentage'] = args.occlusion_percentage
 
         # Save config in log folder & results as well
         args.log_folder = log_folder
@@ -165,7 +165,7 @@ if __name__ == '__main__':
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
                        losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta,
-                       path_denoiser=args.path_denoiser, max_surface_occlusion=args.max_surface_occlusion)
+                       path_denoiser=args.path_denoiser, occlusion_percentage=args.occlusion_percentage)
 
     if args.training_set_size > 0:
         limit = args.training_set_size

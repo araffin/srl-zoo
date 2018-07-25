@@ -110,13 +110,17 @@ class CustomDataLoader(object):
     :param use_triplets: (bool) enables loading of negative observation
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
+    :param use_occlusion: is the use of occlusion enabled - when using DAE (bool)
+    :param occlusion percentage: max percentage of occlusion when using DAE (float)
+
     [WARNING] Set to False, you MUST clean up the loader manually (by calling cleanUp() method)
     It may also produce deadlocks
     """
 
     def __init__(self, minibatchlist, images_path, test_batch_size=512, cache_capacity=5000,
                  n_workers=5, auto_cleanup=True, multi_view=False, use_triplets=False, use_occlusion=False,
-                 max_surface_occlusion=0.5):
+                 occlusion_percentage=0.5):
+
         super(CustomDataLoader, self).__init__()
 
         self.n_minibatches = len(minibatchlist)
@@ -179,7 +183,7 @@ class CustomDataLoader(object):
         self.use_triplets = use_triplets
         # apply occlusion for training a DAE
         self.use_occlusion = use_occlusion
-        self.max_surface_occlusion = max_surface_occlusion
+        self.occlusion_percentage = occlusion_percentage
 
         if self.n_workers <= 0:
             raise ValueError("n_workers <= 0 in the data loader")
@@ -351,9 +355,17 @@ class CustomDataLoader(object):
                     continue
             self._processNextMinibatch()
 
-    def sample_coordinates(self, coord_1, size_limit, occlusion_surface):
-        min_coord_2 = max(0, coord_1 - size_limit * occlusion_surface)
-        max_coord_2 = min(coord_1 + size_limit * occlusion_surface, size_limit)
+    def sample_coordinates(self, coord_1, max_distance, percentage):
+        """
+        Sampling from a coordinate A, a second one B within a maximum distance [max_distance X percentage]
+
+        :param coord_1: sample first coordinate (int)
+        :param max_distance: max value of coordinate in the axis (int)
+        :param percentage: maximum occlusion as a percentage (float)
+        :return: (tuple of int)
+        """
+        min_coord_2 = max(0, coord_1 - max_distance * percentage)
+        max_coord_2 = min(coord_1 + max_distance * percentage, max_distance)
         coord_2 = np.random.randint(low=min_coord_2, high=max_coord_2)
         return min(coord_1, coord_2), max(coord_1, coord_2)
 
@@ -396,9 +408,9 @@ class CustomDataLoader(object):
                 # equal at most to coefficient of occlusion_surface X IMAGE_HEIGHT (resp.  IMAGE_WIDTH)
                 if self.use_occlusion:
                     h_1 = np.random.randint(IMAGE_HEIGHT)
-                    h_1, h_2 = self.sample_coordinates(h_1, IMAGE_HEIGHT, occlusion_surface=self.max_surface_occlusion )
+                    h_1, h_2 = self.sample_coordinates(h_1, IMAGE_HEIGHT, percentage=self.occlusion_percentage )
                     w_1 = np.random.randint(IMAGE_WIDTH)
-                    w_1, w_2 = self.sample_coordinates(w_1, IMAGE_WIDTH, occlusion_surface=self.max_surface_occlusion)
+                    w_1, w_2 = self.sample_coordinates(w_1, IMAGE_WIDTH, percentage=self.occlusion_percentage)
                     noisy_img = im
                     # This mask is set by applying zero values to corresponding pixels.
                     noisy_img[h_1:h_2, w_1:w_2, :] = 0.

@@ -174,12 +174,14 @@ class SRL4robotics(BaseLearner):
     :param losses: ([str])
     :param n_actions: (int)
     :param beta: (float)
+    :param path_denoiser: path to pre-trained DAE when using perceptual loss (str)
+    :param occlusion_percentage: max percentage of occlusion when using DAE (float)
     """
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False,
                  multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1, 
-                 path_denoiser=None, max_surface_occlusion=None):
+                 path_denoiser=None, occlusion_percentage=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -228,13 +230,13 @@ class SRL4robotics(BaseLearner):
         self.losses_weights_dict = {"forward": 1.0, "inverse": 1.0, "reward": 1.0, "priors": 1.0,
                                    "episode-prior": 1.0, "reward-prior": 10, "triplet": 1.0,
                                    "autoencoder": 1.0, "vae": 1.0, "perceptual": 1e-6, "dae": 1.0}
-        self.max_surface_occlusion = max_surface_occlusion
+        self.occlusion_percentage = occlusion_percentage
 
         if losses_weights_dict is not None:
             self.losses_weights_dict.update(losses_weights_dict)
         print("\nYour are using the following weights for uour lossses: ", self.losses_weights_dict,'\n')
-        if self.use_dae and self.max_surface_occlusion is not None:
-            print("Using a maximum occlusion surface of {}".format(str(self.max_surface_occlusion)))
+        if self.use_dae and self.occlusion_percentage is not None:
+            print("Using a maximum occlusion surface of {}".format(str(self.occlusion_percentage)))
 
 
     def predStatesWithDataLoader(self, data_loader, restore_train=False):
@@ -332,7 +334,7 @@ class SRL4robotics(BaseLearner):
         data_loader = CustomDataLoader(minibatchlist, images_path,
                                        cache_capacity=100, multi_view=self.multi_view, n_workers=N_WORKERS,
                                        use_triplets=self.use_triplets, use_occlusion=self.use_dae,
-                                       max_surface_occlusion=self.max_surface_occlusion)
+                                       occlusion_percentage=self.occlusion_percentage)
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 

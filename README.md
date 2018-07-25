@@ -11,7 +11,7 @@ Available methods:
 - Supervised Learning
 - Forward, Inverse Models
 - Triplet Network (for stereovision only)
-- [experimental] Reward loss, Reward prior, Perceptual loss, Mutual Information loss 
+- [experimental] Reward loss, Reward prior, Perceptual Similarity loss (DARLA), Mutual Information loss 
 
 Related papers:
 - "State Representation Learning for Control: An Overview" (Lesort et al., 2018), link: [https://arxiv.org/pdf/1802.04181.pdf](https://arxiv.org/pdf/1802.04181.pdf)
@@ -202,9 +202,9 @@ usage: train.py [-h] [--epochs N] [--seed S] [--state-dim STATE_DIM]
                 [--losses {forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae,
                            dae,perceptual}
                 [--beta BETA]
-                [--path-denoizer PATH_DENOIZER]
+                [--path-denoiser PATH_DENOISER]
                 [--losses-weights LOSSES_WEIGHTS]
-                [--max-surface-occlusion MAX_SURFACE_OCCLUSION]
+                [--occlusion-percentage OCCLUSION_PERCENTAGE]
 
 State Representation Learning with PyTorch
 
@@ -238,12 +238,12 @@ optional arguments:
                         losses(s)
   --beta BETA           (For beta-VAE only) Factor on the KL divergence,
                         higher value means more disentangling.
-  --path-denoizer PATH_DENOIZER
-                        Path till a pre-trained denoizing model when using the
+  --path-denoiser PATH_DENOISER
+                        Path till a pre-trained denoising model when using the
                         perceptual loss with VAE
   --losses-weights LOSSES_WEIGHTS [LOSSES_WEIGHTS ...]
                         losses's weights - as many as there are losses
-  --max-surface-occlusion MAX_SURFACE_OCCLUSION
+  --occlusion-percentage OCCLUSION_PERCENTAGE
                         Max percentage of input occlusion for masks when using DAE.
 
 
@@ -314,7 +314,7 @@ optional arguments:
   --plot-against        Plot against each dimension
   --correlation         Plot the Pearson Matrix of correlation between the Ground truth and learned states.
   --projection          Plot 1D projection of predicted state on ground truth
-  --scalar              Only print correlation measurements
+  --scalar              Only print correlation measurements values (together with --correlation option)
 
 ```
 You can plot a learned representation with:
