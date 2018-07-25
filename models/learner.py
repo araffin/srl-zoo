@@ -179,7 +179,7 @@ class SRL4robotics(BaseLearner):
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False,
                  multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1, 
-                 path_denoizer=None, max_surface_occlusion=None):
+                 path_denoiser=None, max_surface_occlusion=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -201,7 +201,7 @@ class SRL4robotics(BaseLearner):
             self.use_triplets = "triplet" in self.losses
             self.perceptual_similarity_loss = "perceptual" in self.losses
             self.use_dae = "dae" in self.losses
-            self.path_denoizer = path_denoizer
+            self.path_denoiser = path_denoiser
             self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
                                     cuda=cuda, losses=losses)
         else:
@@ -312,15 +312,15 @@ class SRL4robotics(BaseLearner):
             dissimilar_pairs, same_actions_pairs = findPriorsPairs(self.batch_size, minibatchlist, actions, rewards,
                                                                    n_actions, n_pairs_per_action)
 
-        if self.use_vae and self.perceptual_similarity_loss and self.path_denoizer is not None:
+        if self.use_vae and self.perceptual_similarity_loss and self.path_denoiser is not None:
 
-            self.denoizer = SRLModules(state_dim=200, action_dim=self.dim_action, model_type="custom_cnn",
+            self.denoiser = SRLModules(state_dim=200, action_dim=self.dim_action, model_type="custom_cnn",
                        cuda=self.cuda, losses=["dae"])
-            self.denoizer.eval()
+            self.denoiser.eval()
             self.device = th.device("cuda" if th.cuda.is_available() and self.cuda else "cpu")
-            self.denoizer = self.denoizer.to(self.device)
-            self.denoizer.load_state_dict(th.load(self.path_denoizer))
-            for param in self.denoizer.parameters():
+            self.denoiser = self.denoiser.to(self.device)
+            self.denoiser.load_state_dict(th.load(self.path_denoiser))
+            for param in self.denoiser.parameters():
                 param.requires_grad = False
 
             
@@ -363,10 +363,10 @@ class SRL4robotics(BaseLearner):
                 loss_manager.resetLosses()
 
                 decoded_obs, decoded_next_obs = None, None
-                states_denoizer = None
-                states_denoizer_predicted = None
-                next_states_denoizer = None
-                next_states_denoizer_predicted = None
+                states_denoiser = None
+                states_denoiser_predicted = None
+                next_states_denoiser = None
+                next_states_denoiser_predicted = None
 
                 # Predict states given observations as in Time Contrastive Network (Triplet Loss) [Sermanet et al.]
                 if self.use_triplets:
@@ -393,12 +393,12 @@ class SRL4robotics(BaseLearner):
                     if self.perceptual_similarity_loss:
                         # Predictions for the perceptual similarity loss as in DARLA
                         # https://arxiv.org/pdf/1707.08475.pdf
-                        (states_denoizer, decoded_obs_denoizer), (next_states_denoizer, decoded_next_obs_denoizer) = \
-                            self.denoizer(obs), self.denoizer(next_obs)
+                        (states_denoiser, decoded_obs_denoiser), (next_states_denoiser, decoded_next_obs_denoiser) = \
+                            self.denoiser(obs), self.denoiser(next_obs)
 
-                        (states_denoizer_predicted, decoded_obs_denoizer_predicted) = self.denoizer(decoded_obs)
-                        (next_states_denoizer_predicted,
-                         decoded_next_obs_denoizer_predicted) = self.denoizer(next_decoded_obs)
+                        (states_denoiser_predicted, decoded_obs_denoiser_predicted) = self.denoiser(decoded_obs)
+                        (next_states_denoiser_predicted,
+                         decoded_next_obs_denoiser_predicted) = self.denoiser(next_decoded_obs)
                 else:
                     states, next_states = self.model(obs), self.model(next_obs)
 
@@ -444,9 +444,9 @@ class SRL4robotics(BaseLearner):
                             weight=self.losses_weights_dict['vae'],
                             loss_manager=loss_manager, beta=self.beta,
                             perceptual_similarity_loss=self.perceptual_similarity_loss,
-                            encoded_real=states_denoizer, encoded_prediction=states_denoizer_predicted,
-                            next_encoded_real=next_states_denoizer,
-                            next_encoded_prediction=next_states_denoizer_predicted,
+                            encoded_real=states_denoiser, encoded_prediction=states_denoiser_predicted,
+                            next_encoded_real=next_states_denoiser,
+                            next_encoded_prediction=next_states_denoiser_predicted,
                             weight_perceptual=self.losses_weights_dict['perceptual'])
 
                 if self.reward_prior:
@@ -522,8 +522,8 @@ class SRL4robotics(BaseLearner):
                                 if self.use_dae:
                                     plotImage(deNormalize(detachToNumpy(noisy_obs[0])), "Noisy Input Image (Train)")
                                 if self.perceptual_similarity_loss:
-                                    plotImage(deNormalize(detachToNumpy(decoded_obs_denoizer[0])), "Reconstructed Image DAE")
-                                    plotImage(deNormalize(detachToNumpy(decoded_obs_denoizer_predicted[0])), "Reconstructed Image predicted DAE")
+                                    plotImage(deNormalize(detachToNumpy(decoded_obs_denoiser[0])), "Reconstructed Image DAE")
+                                    plotImage(deNormalize(detachToNumpy(decoded_obs_denoiser_predicted[0])), "Reconstructed Image predicted DAE")
                                 plotImage(deNormalize(detachToNumpy(decoded_obs[0])), "Reconstructed Image")
 
                             elif obs[0].shape[0] % 3 == 0:  # Multi-RGB
