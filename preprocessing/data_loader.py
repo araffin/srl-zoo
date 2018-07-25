@@ -392,12 +392,15 @@ class CustomDataLoader(object):
             while self.n_received < self.n_sent:
                 j, im = self.output_queue.get(timeout=3)  # 3s timeout
                 obs[j, :, :, :] = im
+                # If using occlusion, set a mask of random height (resp. width)
+                # equal at most to coefficient of occlusion_surface X IMAGE_HEIGHT (resp.  IMAGE_WIDTH)
                 if self.use_occlusion:
                     h_1 = np.random.randint(IMAGE_HEIGHT)
                     h_1, h_2 = self.sample_coordinates(h_1, IMAGE_HEIGHT, occlusion_surface=self.max_surface_occlusion )
                     w_1 = np.random.randint(IMAGE_WIDTH)
                     w_1, w_2 = self.sample_coordinates(w_1, IMAGE_WIDTH, occlusion_surface=self.max_surface_occlusion)
                     noisy_img = im
+                    # This mask is set by applying zero values to corresponding pixels.
                     noisy_img[h_1:h_2, w_1:w_2, :] = 0.
                     noisy_obs[j, :, :, :] = noisy_img
                 # Cache the preprocessed image
@@ -407,6 +410,7 @@ class CustomDataLoader(object):
             # Channel first
             obs = np.transpose(obs, (0, 3, 2, 1))
             if self.use_occlusion:
+                # The loader returns a tuple containing the original image and the noisy one (with mask applied)
                 noisy_obs = np.transpose(noisy_obs, (0, 3, 2, 1))
                 obs_dict[key] = (th.from_numpy(obs), th.from_numpy(noisy_obs))
             else:

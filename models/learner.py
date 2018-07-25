@@ -314,7 +314,7 @@ class SRL4robotics(BaseLearner):
 
         if self.use_vae and self.perceptual_similarity_loss and self.path_denoizer is not None:
 
-            self.denoizer = SRLModules(state_dim=50, action_dim=self.dim_action, model_type="custom_cnn",
+            self.denoizer = SRLModules(state_dim=200, action_dim=self.dim_action, model_type="custom_cnn",
                        cuda=self.cuda, losses=["dae"])
             self.denoizer.eval()
             self.device = th.device("cuda" if th.cuda.is_available() and self.cuda else "cpu")
@@ -391,6 +391,8 @@ class SRL4robotics(BaseLearner):
                     states, next_states = self.model.getStates(obs), self.model.getStates(next_obs)
 
                     if self.perceptual_similarity_loss:
+                        # Predictions for the perceptual similarity loss as in DARLA
+                        # https://arxiv.org/pdf/1707.08475.pdf
                         (states_denoizer, decoded_obs_denoizer), (next_states_denoizer, decoded_next_obs_denoizer) = \
                             self.denoizer(obs), self.denoizer(next_obs)
 
