@@ -88,11 +88,16 @@ if __name__ == '__main__':
                         help='Force balanced sampling for episode independent prior instead of uniform')
     parser.add_argument('--losses', type=str, nargs='+', default=["priors"], help='losses(s)',
                         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-                                 "autoencoder", "vae"], )
+                                 "autoencoder", "vae", "perceptual","dae"], )
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
     parser.add_argument('--split-index', type=int, default=-1,
                         help='Split representation models (default: -1, no split)')
+    parser.add_argument('--path-denoiser', type=str, default="",
+                        help='Path till a pre-trained denoising model when using the perceptual loss with VAE')
+    parser.add_argument('--losses-weights', type=float, nargs='+', default=[], help="losses's weights")
+    parser.add_argument('--occlusion-percentage', type=float, default=0.5,
+                         help='Max percentage of input occlusion for masks when using DAE')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -106,6 +111,11 @@ if __name__ == '__main__':
 
     # Dealing with losses to use
     losses = list(set(args.losses))
+    losses_weights = list(args.losses_weights)
+    if len(losses_weights) == 0:
+        losses_weights_dict = None
+    else:
+        losses_weights_dict = {loss_key: weight_value for loss_key, weight_value in zip(args.losses, losses_weights)}
 
     if args.multi_view is True:
         # Setting variables involved data-loading from multiple cameras,
@@ -116,12 +126,18 @@ if __name__ == '__main__':
         else:
             preprocessing.preprocess.N_CHANNELS = 6
 
+    assert len(losses_weights) == 0 or len(losses_weights) == len(losses), \
+        "Please when doing so, specify as many weights as the number of losses you want to apply !"
     assert not ("autoencoder" in losses and "vae" in losses), "Model cannot be both an Autoencoder and a VAE (come on!)"
     assert not (("autoencoder" in losses or "vae" in losses)
                 and args.model_type == "resnet"), "Model cannot be an Autoencoder or VAE using ResNet Architecture !"
     assert not ("vae" in losses and args.model_type == "linear"), "Model cannot be VAE using Linear Architecture !"
     assert not (args.multi_view and args.model_type == "resnet"), \
         "Default ResNet input layer is not suitable for stacked images!"
+    assert not (args.path_denoiser == "" and "vae" in losses and "perceptual" in losses),\
+        "To use the perceptual loss with a VAE, please specify a path to a pre-trained DAE model"
+    assert not ("dae" in losses and "perceptual" in losses), \
+        "Please learn the DAE before learning a VAE with the perceptual loss "
 
     print('Loading data ... ')
     training_data, ground_truth, _, _ = loadData(args.data_folder)
@@ -149,13 +165,17 @@ if __name__ == '__main__':
     exp_config['experiment-name'] = experiment_name
     exp_config['n_actions'] = n_actions
     exp_config['multi-view'] = args.multi_view
+    if "dae" in losses:
+        exp_config['occlusion-percentage'] = args.occlusion_percentage
     print('Log folder: {}'.format(args.log_folder))
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, l2_reg=args.l2_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       losses=losses, n_actions=n_actions, beta=args.beta, split_index=args.split_index)
+                       losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta, \
+                       split_index=args.split_index, path_denoiser=args.path_denoiser,
+                       occlusion_percentage=args.occlusion_percentage)
 
     if args.training_set_size > 0:
         limit = args.training_set_size

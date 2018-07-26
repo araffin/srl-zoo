@@ -211,12 +211,17 @@ class CustomDataLoader(object):
     :param use_triplets: (bool) enables loading of negative observation
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
+    :param use_occlusion: is the use of occlusion enabled - when using DAE (bool)
+    :param occlusion percentage: max percentage of occlusion when using DAE (float)
+
     [WARNING] Set to False, you MUST clean up the loader manually (by calling cleanUp() method)
     It may also produce deadlocks
     """
 
     def __init__(self, minibatchlist, images_path, test_batch_size=512, cache_capacity=5000,
-                 n_workers=5, auto_cleanup=True, multi_view=False, use_triplets=False):
+                 n_workers=5, auto_cleanup=True, multi_view=False, use_triplets=False, use_occlusion=False,
+                 occlusion_percentage=0.5):
+
         super(CustomDataLoader, self).__init__()
 
         self.n_minibatches = len(minibatchlist)
@@ -277,6 +282,9 @@ class CustomDataLoader(object):
         self.shutdown = False
         self.multi_view = multi_view
         self.use_triplets = use_triplets
+        # apply occlusion for training a DAE
+        self.use_occlusion = use_occlusion
+        self.occlusion_percentage = occlusion_percentage
 
         if self.n_workers <= 0:
             raise ValueError("n_workers <= 0 in the data loader")
@@ -448,6 +456,20 @@ class CustomDataLoader(object):
                     continue
             self._processNextMinibatch()
 
+    def sample_coordinates(self, coord_1, max_distance, percentage):
+        """
+        Sampling from a coordinate A, a second one B within a maximum distance [max_distance X percentage]
+
+        :param coord_1: sample first coordinate (int)
+        :param max_distance: max value of coordinate in the axis (int)
+        :param percentage: maximum occlusion as a percentage (float)
+        :return: (tuple of int)
+        """
+        min_coord_2 = max(0, coord_1 - max_distance * percentage)
+        max_coord_2 = min(coord_1 + max_distance * percentage, max_distance)
+        coord_2 = np.random.randint(low=min_coord_2, high=max_coord_2)
+        return min(coord_1, coord_2), max(coord_1, coord_2)
+
     def _sendToWorkers(self, batch_size, indices_list, obs_dict):
         """
         Fill workers queues and concatenate result
@@ -457,6 +479,8 @@ class CustomDataLoader(object):
         for indices, key in zip(indices_list, obs_dict.keys()):
 
             obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels()), dtype=np.float32)
+            if self.use_occlusion:
+                noisy_obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels()), dtype=np.float32)
             # Reset queues and received count
             self.resetQueues()
 
@@ -471,6 +495,8 @@ class CustomDataLoader(object):
                 if idx in known_images:
                     self.cached_indices[j] = True
                     obs[j, :, :, :] = self.cache[idx]
+                    if self.use_occlusion:
+                        noisy_obs[j, :, :, :] = self.cache[idx]
 
             # Fill the workers queues
             self._putImages(indices)
@@ -479,12 +505,30 @@ class CustomDataLoader(object):
             while self.n_received < self.n_sent:
                 j, im = self.output_queue.get(timeout=3)  # 3s timeout
                 obs[j, :, :, :] = im
+                # If using occlusion, set a mask of random height (resp. width)
+                # equal at most to coefficient of occlusion_surface X IMAGE_HEIGHT (resp.  IMAGE_WIDTH)
+                if self.use_occlusion:
+                    h_1 = np.random.randint(IMAGE_HEIGHT)
+                    h_1, h_2 = self.sample_coordinates(h_1, IMAGE_HEIGHT, percentage=self.occlusion_percentage )
+                    w_1 = np.random.randint(IMAGE_WIDTH)
+                    w_1, w_2 = self.sample_coordinates(w_1, IMAGE_WIDTH, percentage=self.occlusion_percentage)
+                    noisy_img = im
+                    # This mask is set by applying zero values to corresponding pixels.
+                    noisy_img[h_1:h_2, w_1:w_2, :] = 0.
+                    noisy_obs[j, :, :, :] = noisy_img
                 # Cache the preprocessed image
                 self.cache[minibatch_idx_to_idx[j]] = im
                 self.n_received += 1
+
             # Channel first
             obs = np.transpose(obs, (0, 3, 2, 1))
-            obs_dict[key] = th.from_numpy(obs)
+            if self.use_occlusion:
+                # The loader returns a tuple containing the original image and the noisy one (with mask applied)
+                noisy_obs = np.transpose(noisy_obs, (0, 3, 2, 1))
+                obs_dict[key] = (th.from_numpy(obs), th.from_numpy(noisy_obs))
+            else:
+                obs_dict[key] = th.from_numpy(obs)
+
             # Free memory
             del obs
 

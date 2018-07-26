@@ -195,7 +195,8 @@ def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_m
 
 
 def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logvar,
-            weight, loss_manager, beta=1):
+            weight, loss_manager, beta=1, perceptual_similarity_loss=False, encoded_real=None, encoded_prediction=None,
+            next_encoded_real = None, next_encoded_prediction = None, weight_perceptual=0.):
     """
     Reconstruction + KL divergence losses summed over all elements and batch
     :param decoded: reconstructed Observation (th.Tensor)
@@ -209,11 +210,14 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
     :param weight: coefficient to weight the loss (float)
     :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :param beta: (float) used to weight the KL divergence for disentangling
+    :param perceptual_similarity_loss: shall the model compute the perceptual similarity loss (bool)
+    :param encoded_real: states encoding the real observation by the DAE (th.Tensor)
+    :param encoded_prediction: states encoding the vae's predicted observation by the DAE  (th.Tensor)
+    :param next_encoded_real: states encoding the next real observation by the DAE (th.Tensor)
+    :param next_encoded_prediction: states encoding the vae's predicted next observation by the DAE (th.Tensor)
+    :param weight_perceptual: loss for the DAE's embedding l2 distance (float)
     :return: (th.Tensor)
     """
-
-    generation_loss = F.mse_loss(decoded, obs, size_average=False)
-    generation_loss += F.mse_loss(next_decoded, next_obs, size_average=False)
 
     # see Appendix B from VAE paper:
     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
@@ -221,9 +225,19 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
     kl_divergence = -0.5 * th.sum(1 + logvar - mu.pow(2) - logvar.exp())
     kl_divergence += -0.5 * th.sum(1 + next_logvar - next_mu.pow(2) - next_logvar.exp())
 
-    vae_loss = generation_loss + beta * kl_divergence
+    if perceptual_similarity_loss:
+        denoiser_encoding_loss = F.mse_loss(encoded_real,  encoded_prediction, size_average=False)
+        denoiser_encoding_loss += F.mse_loss(next_encoded_real, next_encoded_prediction, size_average=False)
+        loss_manager.addToLosses("denoising perceptual similarity", weight_perceptual, denoiser_encoding_loss)
 
-    loss_manager.addToLosses('kl_loss', weight, vae_loss)
+        vae_loss = weight_perceptual * denoiser_encoding_loss + beta * kl_divergence
+        loss_manager.addToLosses('kl_loss', beta, kl_divergence)
+    else:
+        generation_loss = F.mse_loss(decoded, obs, size_average=False)
+        generation_loss += F.mse_loss(next_decoded, next_obs, size_average=False)
+        vae_loss = generation_loss + beta * kl_divergence
+        loss_name = 'kl_loss'
+        loss_manager.addToLosses(loss_name, weight, vae_loss)
     return weight * vae_loss
 
 
