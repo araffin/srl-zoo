@@ -3,7 +3,6 @@ from __future__ import print_function, division, absolute_import
 import time
 import threading
 import multiprocessing as mp
-from multiprocessing import Queue, Process
 from collections import OrderedDict
 import glob
 import random
@@ -12,6 +11,7 @@ import cv2
 import numpy as np
 import torch as th
 from joblib import Parallel, delayed
+from torch.multiprocessing import Queue, Process
 
 from .utils import preprocessInput
 from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels
@@ -25,18 +25,6 @@ def channelFirst(tensor):
     :return: (th.Tensor)
     """
     return tensor.permute(0, 3, 1, 2)
-
-
-class Timer:
-    def __init__(self, msg):
-        self.msg = msg
-        self.t = None
-
-    def __enter__(self):
-        self.t = time.time()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        print(self.msg, ":", time.time() - self.t, "s")
 
 
 class DataLoader(object):
@@ -80,7 +68,7 @@ class DataLoader(object):
                     else:
                         batch = parallel(delayed(self._makeBatchElement)(image_path) for image_path in images)
 
-                    batch = th.cat(batch, 0)
+                    batch = th.cat(batch, dim=0)
 
                     if self.training:
                         batch_obs, batch_next_obs = batch[:len(images) // 2], batch[len(images) // 2:]
@@ -100,6 +88,7 @@ class DataLoader(object):
         if im is None:
             raise ValueError("tried to load {}.jpg, but it was not found".format(image_path))
         im = preprocessImage(im)
+        # channel first + 1 dim for the batch
         im = th.tensor(im.reshape((1,) + im.shape).transpose(0, 3, 1, 2))
         return im
 
@@ -119,7 +108,13 @@ class DataLoader(object):
         return self
 
     def __next__(self):
-        val = self.pipe.get()
+        while True:
+            try:
+                val = self.pipe.get_nowait()
+                break
+            except:
+                time.sleep(0.001)
+                continue
         if val is None:
             raise StopIteration
         return val
