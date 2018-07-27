@@ -174,14 +174,14 @@ class SRL4robotics(BaseLearner):
     :param losses: ([str])
     :param n_actions: (int)
     :param beta: (float)
-    :param path_denoiser: path to pre-trained DAE when using perceptual loss (str)
+    :param path_to_dae: path to pre-trained DAE when using perceptual loss (str)
     :param occlusion_percentage: max percentage of occlusion when using DAE (float)
     """
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, cuda=False,
                  multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1, 
-                 path_denoiser=None, occlusion_percentage=None):
+                 path_to_dae=None, occlusion_percentage=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -203,7 +203,7 @@ class SRL4robotics(BaseLearner):
             self.use_triplets = "triplet" in self.losses
             self.perceptual_similarity_loss = "perceptual" in self.losses
             self.use_dae = "dae" in self.losses
-            self.path_denoiser = path_denoiser
+            self.path_to_dae = path_to_dae
             self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
                                     cuda=cuda, losses=losses)
         else:
@@ -314,14 +314,14 @@ class SRL4robotics(BaseLearner):
             dissimilar_pairs, same_actions_pairs = findPriorsPairs(self.batch_size, minibatchlist, actions, rewards,
                                                                    n_actions, n_pairs_per_action)
 
-        if self.use_vae and self.perceptual_similarity_loss and self.path_denoiser is not None:
+        if self.use_vae and self.perceptual_similarity_loss and self.path_to_dae is not None:
 
             self.denoiser = SRLModules(state_dim=200, action_dim=self.dim_action, model_type="custom_cnn",
                        cuda=self.cuda, losses=["dae"])
             self.denoiser.eval()
             self.device = th.device("cuda" if th.cuda.is_available() and self.cuda else "cpu")
             self.denoiser = self.denoiser.to(self.device)
-            self.denoiser.load_state_dict(th.load(self.path_denoiser))
+            self.denoiser.load_state_dict(th.load(self.path_to_dae))
             for param in self.denoiser.parameters():
                 param.requires_grad = False
 
@@ -333,7 +333,7 @@ class SRL4robotics(BaseLearner):
 
         data_loader = CustomDataLoader(minibatchlist, images_path,
                                        cache_capacity=100, multi_view=self.multi_view, n_workers=N_WORKERS,
-                                       use_triplets=self.use_triplets, use_occlusion=self.use_dae,
+                                       use_triplets=self.use_triplets, apply_occlusion=self.use_dae,
                                        occlusion_percentage=self.occlusion_percentage)
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)

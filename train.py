@@ -79,8 +79,8 @@ if __name__ == '__main__':
                                  "autoencoder", "vae", "perceptual","dae"], )
     parser.add_argument('--beta', type=float, default=1.0,
                          help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
-    parser.add_argument('--path-denoiser', type=str, default="",
-                        help='Path till a pre-trained denoising model when using the perceptual loss with VAE')
+    parser.add_argument('--path-to-dae', type=str, default="",
+                        help='Path to a pre-trained denoising model when using the perceptual loss with VAE')
     parser.add_argument('--losses-weights', type=float, nargs='+', default=[], help="losses's weights")
     parser.add_argument('--occlusion-percentage', type=float, default=0.5,
                          help='Max percentage of input occlusion for masks when using DAE')
@@ -121,7 +121,7 @@ if __name__ == '__main__':
     assert not ("vae" in losses and args.model_type == "linear"), "Model cannot be VAE using Linear Architecture !"
     assert not (args.multi_view and args.model_type == "resnet"), \
         "Default ResNet input layer is not suitable for stacked images!"
-    assert not (args.path_denoiser == "" and "vae" in losses and "perceptual" in losses),\
+    assert not (args.path_to_dae == "" and "vae" in losses and "perceptual" in losses),\
         "To use the perceptual loss with a VAE, please specify a path to a pre-trained DAE model"
     assert not ("dae" in losses and "perceptual" in losses), \
         "Please learn the DAE before learning a VAE with the perceptual loss "
@@ -165,7 +165,7 @@ if __name__ == '__main__':
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
                        losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta,
-                       path_denoiser=args.path_denoiser, occlusion_percentage=args.occlusion_percentage)
+                       path_to_dae=args.path_to_dae, occlusion_percentage=args.occlusion_percentage)
 
     if args.training_set_size > 0:
         limit = args.training_set_size

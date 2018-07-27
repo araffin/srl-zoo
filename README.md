@@ -202,7 +202,7 @@ usage: train.py [-h] [--epochs N] [--seed S] [--state-dim STATE_DIM]
                 [--losses {forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae,
                            dae,perceptual}
                 [--beta BETA]
-                [--path-denoiser PATH_DENOISER]
+                [--path-to-dae PATH_TO_DAE]
                 [--losses-weights LOSSES_WEIGHTS]
                 [--occlusion-percentage OCCLUSION_PERCENTAGE]
 
@@ -234,12 +234,12 @@ optional arguments:
                         If disabled, automatic logs will be generated with experiment config file & KNN-MSE computation.
   --multi-view          Enable use of multiple camera (for all losses, except on ResNet Architecture).
   --balanced-sampling   Force balanced sampling for episode independent prior instead of uniform
-  --losses              Combininable losses(s) to be applied for SRL
+  --losses              Combinable losses(s) to be applied for SRL
                         losses(s)
   --beta BETA           (For beta-VAE only) Factor on the KL divergence,
                         higher value means more disentangling.
-  --path-denoiser PATH_DENOISER
-                        Path till a pre-trained denoising model when using the
+  --path-to-dae PATH_TO_DAE
+                        Path to a pre-trained dae model when using the
                         perceptual loss with VAE
   --losses-weights LOSSES_WEIGHTS [LOSSES_WEIGHTS ...]
                         losses's weights - as many as there are losses
@@ -314,7 +314,7 @@ optional arguments:
   --plot-against        Plot against each dimension
   --correlation         Plot the Pearson Matrix of correlation between the Ground truth and learned states.
   --projection          Plot 1D projection of predicted state on ground truth
-  --scalar              Only print correlation measurements values (together with --correlation option)
+  --print-corr          Only print correlation measurements values (together with --correlation option)
 
 ```
 You can plot a learned representation with:

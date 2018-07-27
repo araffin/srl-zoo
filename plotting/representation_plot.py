@@ -343,7 +343,7 @@ if __name__ == '__main__':
                         help='Plot correlation coeff against each dimension')
     parser.add_argument('--projection', action='store_true', default=False,
                         help='Plot 1D projection of predicted state on ground truth')
-    parser.add_argument('--scalar', action='store_true', default=False,
+    parser.add_argument('--print-corr', action='store_true', default=False,
                         help='Only print correlation measurements')
 
     args = parser.parse_args()

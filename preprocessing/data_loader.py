@@ -110,15 +110,16 @@ class CustomDataLoader(object):
     :param use_triplets: (bool) enables loading of negative observation
     :param n_workers: (int) number of processes used for preprocessing
     :param auto_cleanup: (bool) Whether to clean up preprocessing thread and cache after each epoch
-    :param use_occlusion: is the use of occlusion enabled - when using DAE (bool)
-    :param occlusion percentage: max percentage of occlusion when using DAE (float)
+    :param apply_occlusion: whether or not to load observations containing a random zero-pixel
+           square mask (when using DAE) (bool)
+    :param occlusion_percentage: max percentage of occlusion when using DAE (float)
 
     [WARNING] Set to False, you MUST clean up the loader manually (by calling cleanUp() method)
     It may also produce deadlocks
     """
 
     def __init__(self, minibatchlist, images_path, test_batch_size=512, cache_capacity=5000,
-                 n_workers=5, auto_cleanup=True, multi_view=False, use_triplets=False, use_occlusion=False,
+                 n_workers=5, auto_cleanup=True, multi_view=False, use_triplets=False, apply_occlusion=False,
                  occlusion_percentage=0.5):
 
         super(CustomDataLoader, self).__init__()
@@ -182,7 +183,7 @@ class CustomDataLoader(object):
         self.multi_view = multi_view
         self.use_triplets = use_triplets
         # apply occlusion for training a DAE
-        self.use_occlusion = use_occlusion
+        self.apply_occlusion = apply_occlusion
         self.occlusion_percentage = occlusion_percentage
 
         if self.n_workers <= 0:
@@ -378,7 +379,7 @@ class CustomDataLoader(object):
         for indices, key in zip(indices_list, obs_dict.keys()):
 
             obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels()), dtype=np.float32)
-            if self.use_occlusion:
+            if self.apply_occlusion:
                 noisy_obs = np.zeros((batch_size, IMAGE_WIDTH, IMAGE_HEIGHT, getNChannels()), dtype=np.float32)
             # Reset queues and received count
             self.resetQueues()
@@ -394,7 +395,7 @@ class CustomDataLoader(object):
                 if idx in known_images:
                     self.cached_indices[j] = True
                     obs[j, :, :, :] = self.cache[idx]
-                    if self.use_occlusion:
+                    if self.apply_occlusion:
                         noisy_obs[j, :, :, :] = self.cache[idx]
 
             # Fill the workers queues
@@ -406,7 +407,7 @@ class CustomDataLoader(object):
                 obs[j, :, :, :] = im
                 # If using occlusion, set a mask of random height (resp. width)
                 # equal at most to coefficient of occlusion_surface X IMAGE_HEIGHT (resp.  IMAGE_WIDTH)
-                if self.use_occlusion:
+                if self.apply_occlusion:
                     h_1 = np.random.randint(IMAGE_HEIGHT)
                     h_1, h_2 = self.sample_coordinates(h_1, IMAGE_HEIGHT, percentage=self.occlusion_percentage )
                     w_1 = np.random.randint(IMAGE_WIDTH)
@@ -421,7 +422,7 @@ class CustomDataLoader(object):
 
             # Channel first
             obs = np.transpose(obs, (0, 3, 2, 1))
-            if self.use_occlusion:
+            if self.apply_occlusion:
                 # The loader returns a tuple containing the original image and the noisy one (with mask applied)
                 noisy_obs = np.transpose(noisy_obs, (0, 3, 2, 1))
                 obs_dict[key] = (th.from_numpy(obs), th.from_numpy(noisy_obs))
