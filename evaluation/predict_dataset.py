@@ -6,7 +6,7 @@ import numpy as np
 import torch as th
 
 from models.learner import SRL4robotics, MAX_BATCH_SIZE_GPU
-from preprocessing.data_loader import CustomDataLoader
+from preprocessing.data_loader import DataLoader
 
 VALID_MODELS = ["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
                 "autoencoder", "vae"]
@@ -29,18 +29,15 @@ images_path = images_path[:limit]
 rewards = rewards[:limit]
 
 
-indices = np.arange(len(images_path), dtype='int64')
-minibatchlist = [np.array(sorted(indices[start_idx:start_idx + MAX_BATCH_SIZE_GPU]))
-                 for start_idx in range(0, len(indices) - MAX_BATCH_SIZE_GPU + 1, MAX_BATCH_SIZE_GPU)]
+minibatchlist = DataLoader.createTestMinibatchList(len(images_path), MAX_BATCH_SIZE_GPU)
 
-data_loader = CustomDataLoader(minibatchlist, images_path,
-                               cache_capacity=0, multi_view=exp_config.get('multi-view', False), n_workers=4,
-                               use_triplets='triplet' in exp_config['losses'])
+data_loader = DataLoader(minibatchlist, images_path, n_workers=4, multi_view=exp_config.get('multi-view', False),
+                         use_triplets='triplet' in exp_config['losses'], max_queue_len=1, is_training=False)
 
 
 print("Predicting states for {} observations...".format(len(images_path)))
 with th.no_grad():
-    learned_states = srl_model.predStatesWithDataLoader(data_loader, restore_train=False)
+    learned_states = srl_model.predStatesWithDataLoader(data_loader)
 
 srl_model.saveStates(learned_states, images_path, rewards, args.log_dir, name="_test")
 
