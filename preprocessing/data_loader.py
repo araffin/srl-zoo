@@ -26,9 +26,22 @@ def channelFirst(tensor):
     """
     return tensor.permute(0, 3, 1, 2)
 
+
+class Timer:
+    def __init__(self, msg):
+        self.msg = msg
+        self.t = None
+
+    def __enter__(self):
+        self.t = time.time()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        print(self.msg, ":", time.time() - self.t, "s")
+
+
 class DataLoader(object):
     def __init__(self, minibatchlist, images_path, n_workers=1, multi_view=False,
-                 use_triplets=False, infinite_loop=True, max_queue_len=3, cache_capacity=0):
+                 use_triplets=False, infinite_loop=True, max_queue_len=4, cache_capacity=0):
         super(DataLoader, self).__init__()
         self.n_workers = n_workers
         self.infinite_loop = infinite_loop
@@ -42,12 +55,12 @@ class DataLoader(object):
 
     def startProcess(self):
         self.p = Process(target=self._run)
-        self.p.daemon = False  # If set to True, joblib run with n_workers=1
+        self.p.daemon = True
         self.p.start()
 
     def _run(self):
         start = True
-        with Parallel(n_jobs=self.n_workers, batch_size="auto") as parallel:
+        with Parallel(n_jobs=self.n_workers, batch_size="auto", backend="threading") as parallel:
             while start or self.infinite_loop:
                 start = False
                 if self.training:
@@ -67,7 +80,8 @@ class DataLoader(object):
                     else:
                         batch = parallel(delayed(self._makeBatchElement)(image_path) for image_path in images)
 
-                    batch = channelFirst(th.tensor(batch))
+                    batch = th.cat(batch, 0)
+
                     if self.training:
                         batch_obs, batch_next_obs = batch[:len(images) // 2], batch[len(images) // 2:]
                         self.pipe.put((minibatch_idx, batch_obs, batch_next_obs))
@@ -86,6 +100,7 @@ class DataLoader(object):
         if im is None:
             raise ValueError("tried to load {}.jpg, but it was not found".format(image_path))
         im = preprocessImage(im)
+        im = th.tensor(im.reshape((1,) + im.shape).transpose(0, 3, 1, 2))
         return im
 
     def resetAndShuffle(self):
