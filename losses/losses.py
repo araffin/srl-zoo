@@ -108,7 +108,7 @@ def forwardModelLoss(next_states_pred, next_states, weight, loss_manager):
     :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return:
     """
-    forward_loss = F.mse_loss(next_states_pred, next_states, size_average=True)
+    forward_loss = F.mse_loss(next_states_pred, next_states, reduction='elementwise_mean')
     loss_manager.addToLosses('forward_loss', weight, forward_loss)
     return weight * forward_loss
 
@@ -176,7 +176,7 @@ def reconstructionLoss(input_image, target_image):
     :param target_image:  Reconstructed observation (th.Tensor)
     :return:
     """
-    return F.mse_loss(input_image, target_image, size_average=True)
+    return F.mse_loss(input_image, target_image, reduction='elementwise_mean')
 
 
 def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_manager):
@@ -212,8 +212,8 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
     :return: (th.Tensor)
     """
 
-    generation_loss = F.mse_loss(decoded, obs, size_average=False)
-    generation_loss += F.mse_loss(next_decoded, next_obs, size_average=False)
+    generation_loss = F.mse_loss(decoded, obs, reduction='sum')
+    generation_loss += F.mse_loss(next_decoded, next_obs, reduction='sum')
 
     # see Appendix B from VAE paper:
     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
@@ -299,7 +299,7 @@ def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, b
     # Reverse gradient
     reverse_states = ReverseLayerF.apply(states, lambda_)
 
-    criterion_episode = nn.BCELoss(size_average=False)
+    criterion_episode = nn.BCELoss(reduction='sum')
     # Get episodes indices for current minibatch
     episodes = np.array(minibatch_episodes[minibatch_idx])
 

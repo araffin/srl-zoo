@@ -22,11 +22,12 @@ Related papers:
 
 Table of Contents
 =================
-
 * [Installation](#installation)
-  * [Recommended Method: Anaconda Environment](#recommended-method-anaconda-environment)
+  * [Using Anaconda](#using-anaconda)
     * [Python 3](#python-3)
     * [Python 2](#python-2)
+  * [Using Docker](#using-docker)
+  * [Using Requirements.txt](#using-requirementstxt)
 * [Learning a State Representation](#learning-a-state-representation)
   * [Examples](#examples)
   * [Stacking/Splitting Models Instead of Combining Them](#stackingsplitting-models-instead-of-combining-them)
@@ -60,11 +61,12 @@ Table of Contents
 
 
 
+
 ## Installation
 
 Recommended configuration: Ubuntu 16.04 with python >=3.5 (or python 2.7)
 
-### Recommended Method: Anaconda Environment
+### Using Anaconda
 
 #### Python 3
 Please use `environment.yml` file from [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl)
@@ -86,6 +88,11 @@ Then activate it using:
 source activate srl
 ```
 
+### Using Docker
+
+We provide docker images to work with our repository, please read *Installation using docker** from [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl) for more information.
+
+### Using Requirements.txt
 Alternatively, you can use requirements.txt file:
 ```
 pip install -r requirements.txt
