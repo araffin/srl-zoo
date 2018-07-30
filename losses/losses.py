@@ -29,7 +29,6 @@ class LossManager:
         # Retrieve only trainable and regularizable parameters (we should exclude biases)
         self.reg_params = [param for name, param in model.named_parameters() if
                            ".bias" not in name and param.requires_grad]
-        # self.reg_params = [param for param in model.parameters()]
         self.loss_history = loss_history
         self.names, self.weights, self.losses = [], [], []
 

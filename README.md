@@ -118,12 +118,12 @@ All losses are defined in `losses/losses.py`. The available losses are:
 
 - autoencoder: reconstruction loss, using current and next observation
 - vae: (beta)-VAE loss (reconstruction + kullback leiber divergence loss)
-- inverse: predict the action given current and next observation
-- forward: predict the next state given current observation and taken action
-- reward: predict the reward (positive or not) given current and next observation
+- inverse: predict the action given current and next state
+- forward: predict the next state given current state and taken action
+- reward: predict the reward (positive or not) given current and next state
 - priors: robotic priors losses (see "Learning State Representations with Robotic Priors")
 - triplet: triplet loss for multi-cam setting (see *Multiple Cameras* section)
-- reward-prior [Experimentatal] Maximise correlation between states and reward (does not makes sense for sparse reward)
+- reward-prior [Experimental] Maximise correlation between states and reward (does not make sense for sparse reward)
 
 All possible arguments can be display using `python train.py --help`. You can limit the training set size (`--training-set-size` argument), change the minibatch size (`-bs`), number of epochs (`--epochs`), ...
 
@@ -147,13 +147,13 @@ python train.py --data-folder data/path/to/dataset --losses autoencoder inverse
 
 ### Stacking/Splitting Models Instead of Combining Them
 
-Because losses does not optimize the same objective and can be opposed, it can makes sense to stack representations learned with different objectives, instead of combining them. For instance, you can stack an autoencoder (with a state dimension of 20) with an inverse model (of dimension 2) using:
+Because losses do not optimize the same objective and can be opposed, it may make sense to stack representations learned with different objectives, instead of combining them. For instance, you can stack an autoencoder (with a state dimension of 20) with an inverse model (of dimension 2) using:
 
 ```
 python train.py --data-folder data/path/to/dataset --losses autoencoder inverse --state-dim 22 --split-index 20
 ```
 
-The details of how models are splitted can found inside the `SRLModulesSplit` class, defined in `models/modules.py`. All models share the same *encoder* or *features extractor*, that maps observation to states.
+The details of how models are splitted can be found inside the `SRLModulesSplit` class, defined in `models/modules.py`. All models share the same *encoder* or *features extractor*, that maps observations to states.
 
 
 ### Predicting States on the Whole Dataset
@@ -333,10 +333,10 @@ python -m baselines.pca --data-folder path/to/data/folder --state-dim 3
 ## Config Files
 
 ### Base Config
-Config common to all dataset can found in [configs/default.json](configs/default.json).
+Config common to all dataset can be found in [configs/default.json](configs/default.json).
 
 ### Dataset config
-All dataset must be placed in the `data/` folder.
+All datasets must be placed in the `data/` folder.
 Each dataset must contain a `dataset_config.json` file, an example can be found [here](configs/example_dataset_config.json).
 This config file describes specific variables to this dataset.
 
@@ -351,7 +351,7 @@ We recommend you downloading this example dataset to have a concrete and working
 
 NOTE: If you use data generated with the [RL Repo](https://github.com/araffin/robotics-rl-srl), the dataset will be already preprocessed, so you don't need to bother about this step.
 
-The dataset format is as followed:
+The dataset format is as follows:
 
 0. You must provide a dataset config file (see previous section) that contains at least if the ground truth is the relative position or not
 1. Images are grouped by episode in different folders (`record_{03d}/` folders)
