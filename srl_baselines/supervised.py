@@ -58,6 +58,19 @@ class SupervisedLearning(BaseLearner):
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
         self.log_folder = log_folder
 
+    def predStatesWithDataLoader(self, data_loader):
+        """
+        Predict states using minibatches to avoid memory issues
+        :param data_loader: (Baxter Data Loader object)
+        :return: (numpy tensor)
+        """
+        predictions = []
+        for obs_var in data_loader:
+            obs_var = obs_var.to(self.device)
+            predictions.append(self._predFn(obs_var))
+
+        return np.concatenate(predictions, axis=0)
+
     def learn(self, true_states, images_path, rewards):
         """
         Learn a state representation
