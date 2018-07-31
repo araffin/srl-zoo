@@ -61,7 +61,6 @@ print("{} samples".format(num_samples))
 indices = np.array([i for i in range(num_samples) if not episode_starts[i + 1]], dtype='int64')
 
 model = BaseRewardModel()
-#  + target_pos_.shape[1]
 model.initRewardNet(state_dim, n_rewards=2, n_hidden=4)
 model = model.to(device)
 
@@ -112,16 +111,8 @@ for epoch in range(num_epochs):
             inputs = th.Tensor(states[idx, :]).float().to(device)
             next_inputs = th.Tensor(states[idx + 1, :]).float().to(device)
 
-            # inputs_target = th.Tensor(target_pos_[idx, :]).float().to(device)
-            # next_inputs_target = th.Tensor(target_pos_[idx + 1, :]).float().to(device)
-
             if len(next_inputs) < args.batch_size:
                 continue
-
-            n_pos = 1 + th.sum(labels == 1).float()
-            n_null = 1 + th.sum(labels == 0).float()
-            weight = th.tensor([1 / n_null, 1 / n_pos]).to(device)
-            criterion.weight = weight
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -129,9 +120,6 @@ for epoch in range(num_epochs):
             # forward
             # track history if only in train
             with th.set_grad_enabled(phase == 'train'):
-                # inputs = th.cat([inputs, inputs_target], dim=1)
-                # next_inputs = th.cat([next_inputs, next_inputs_target], dim=1)
-
                 outputs = model.rewardModel(inputs, next_inputs)
                 _, preds = th.max(outputs, dim=1)
                 loss = criterion(outputs, labels)

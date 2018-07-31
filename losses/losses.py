@@ -29,7 +29,6 @@ class LossManager:
         # Retrieve only trainable and regularizable parameters (we should exclude biases)
         self.reg_params = [param for name, param in model.named_parameters() if
                            ".bias" not in name and param.requires_grad]
-        # self.reg_params = [param for param in model.parameters()]
         self.loss_history = loss_history
         self.names, self.weights, self.losses = [], [], []
 
@@ -108,7 +107,7 @@ def forwardModelLoss(next_states_pred, next_states, weight, loss_manager):
     :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return:
     """
-    forward_loss = F.mse_loss(next_states_pred, next_states, size_average=True)
+    forward_loss = F.mse_loss(next_states_pred, next_states, reduction='elementwise_mean')
     loss_manager.addToLosses('forward_loss', weight, forward_loss)
     return weight * forward_loss
 
@@ -176,7 +175,7 @@ def reconstructionLoss(input_image, target_image):
     :param target_image:  Reconstructed observation (th.Tensor)
     :return:
     """
-    return F.mse_loss(input_image, target_image, size_average=True)
+    return F.mse_loss(input_image, target_image, reduction='elementwise_mean')
 
 
 def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_manager):
@@ -313,7 +312,7 @@ def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, b
     # Reverse gradient
     reverse_states = ReverseLayerF.apply(states, lambda_)
 
-    criterion_episode = nn.BCELoss(size_average=False)
+    criterion_episode = nn.BCELoss(reduction='sum')
     # Get episodes indices for current minibatch
     episodes = np.array(minibatch_episodes[minibatch_idx])
 

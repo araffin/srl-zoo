@@ -15,13 +15,13 @@ from losses.losses import LossManager, autoEncoderLoss, roboticPriorsLoss, tripl
 from losses.utils import findPriorsPairs
 from pipeline import NAN_ERROR
 from plotting.representation_plot import plotRepresentation, plt, plotImage
-from preprocessing.data_loader import CustomDataLoader, DataLoader
+from preprocessing.data_loader import DataLoader
 from preprocessing.utils import deNormalize
 from utils import printRed, detachToNumpy
 from .modules import SRLModules, SRLModulesSplit
 from .priors import Discriminator
 
-MAX_BATCH_SIZE_GPU = 512  # For plotting, max batch_size before having memory issues
+MAX_BATCH_SIZE_GPU = 256  # For plotting, max batch_size before having memory issues
 EPOCH_FLAG = 1  # Plot every 1 epoch
 N_WORKERS = 4
 
@@ -51,6 +51,7 @@ class BaseLearner(object):
         self.batch_size = batch_size
         self.model = None
         self.seed = seed
+        self.use_dae = False
         # Seed the random generator
         np.random.seed(seed)
         th.manual_seed(seed)
@@ -61,38 +62,27 @@ class BaseLearner(object):
 
         self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
 
-    def _predFn(self, observations, restore_train=True):
+    def _predFn(self, observations):
         """
         Predict states in test mode given observations
         :param observations: (PyTorch Tensor)
-        :param restore_train: (bool) whether to restore training mode after prediction
         :return: (numpy tensor)
         """
-        # Switch to test mode
-        self.model.eval()
-        states = self.model.getStates(observations)
-        if restore_train:
-            # Restore training mode
-            self.model.train()
         # Move the tensor back to the cpu
-        return detachToNumpy(states)
+        return detachToNumpy(self.model.getStates(observations))
 
-    def predStatesWithDataLoader(self, data_loader, restore_train=False):
+    def predStatesWithDataLoader(self, data_loader):
         """
         Predict states using minibatches to avoid memory issues
         :param data_loader: (Baxter Data Loader object)
-        :param restore_train: (bool) restore train mode (model + dataLoader) after predicting states
         :return: (numpy tensor)
         """
-        # Switch to test mode and reset the iterator
-        data_loader.testMode()
         predictions = []
-        for obs_var in data_loader:
-            obs_var = obs_var.to(self.device)
-            predictions.append(self._predFn(obs_var, restore_train))
-        # Switch back to train mode
-        if restore_train:
-            data_loader.trainMode()
+        for (obs_var, obs_noisy_var) in data_loader:
+
+            obs_var = obs_noisy_var.to(self.device) if self.use_dae else obs_var.to(self.device)
+            predictions.append(self._predFn(obs_var))
+
         return np.concatenate(predictions, axis=0)
 
     def learn(self, *args, **kwargs):
@@ -249,26 +239,6 @@ class SRL4robotics(BaseLearner):
 
         return srl_model, exp_config
 
-
-    def predStatesWithDataLoader(self, data_loader, restore_train=False):
-        """
-        Predict states using minibatches to avoid memory issues
-        :param data_loader: (Baxter Data Loader object)
-        :param restore_train: (bool) restore train mode (model + dataLoader) after predicting states
-        :return: (numpy tensor)
-        """
-        # Switch to test mode and reset the iterator
-        data_loader.testMode()
-        predictions = []
-        for obs_var in data_loader:
-            obs_var = obs_var[1].to(self.device) if self.use_dae else obs_var.to(self.device)
-            predictions.append(self._predFn(obs_var, restore_train))
-        # Switch back to train mode
-        if restore_train:
-            data_loader.trainMode()
-        return np.concatenate(predictions, axis=0)
-
-
     def learn(self, images_path, actions, rewards, episode_starts):
         """
         Learn a state representation
@@ -294,6 +264,8 @@ class SRL4robotics(BaseLearner):
         # list is the id of the observation preserved through the training
         minibatchlist = [np.array(sorted(indices[start_idx:start_idx + self.batch_size]))
                          for start_idx in range(0, len(indices) - self.batch_size + 1, self.batch_size)]
+
+        test_minibatchlist = DataLoader.createTestMinibatchList(len(images_path), MAX_BATCH_SIZE_GPU)
 
         # Number of minibatches used for validation:
         n_val_batches = np.round(VALIDATION_SIZE * len(minibatchlist)).astype(np.int64)
@@ -339,10 +311,12 @@ class SRL4robotics(BaseLearner):
             idx_to_episode = {idx: episode_idx for idx, episode_idx in enumerate(np.cumsum(episode_starts))}
             minibatch_episodes = [[idx_to_episode[i] for i in minibatch] for minibatch in minibatchlist]
 
-        data_loader = CustomDataLoader(minibatchlist, images_path,
-                                       cache_capacity=100, multi_view=self.multi_view, n_workers=N_WORKERS,
-                                       use_triplets=self.use_triplets, use_occlusion=self.use_dae,
+        data_loader = DataLoader(minibatchlist, images_path, n_workers=N_WORKERS, multi_view=self.multi_view,
+                                 use_triplets=self.use_triplets, is_training=True, apply_occlusion=self.use_dae,
                                        occlusion_percentage=self.occlusion_percentage)
+        test_data_loader = DataLoader(test_minibatchlist, images_path, n_workers=N_WORKERS, multi_view=self.multi_view,
+                                      use_triplets=self.use_triplets, max_queue_len=1, is_training=False,
+                                      apply_occlusion=self.use_dae, occlusion_percentage=self.occlusion_percentage)
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
@@ -350,7 +324,6 @@ class SRL4robotics(BaseLearner):
 
         best_error = np.inf
         best_model_path = "{}/srl_model.pth".format(self.log_folder)
-        self.model.train()
         start_time = time.time()
 
         for epoch in range(N_EPOCHS):
@@ -358,15 +331,19 @@ class SRL4robotics(BaseLearner):
             epoch_loss, epoch_batches = 0, 0
             val_loss = 0
             pbar = tqdm(total=len(minibatchlist))
-            data_loader.resetAndShuffle()
 
-            for minibatch_num, (minibatch_idx, obs, next_obs) in enumerate(data_loader):
+            for minibatch_num, (minibatch_idx, obs, next_obs, noisy_obs, next_noisy_obs) in enumerate(data_loader):
+
+                validation_mode = minibatch_idx in val_indices
+                if validation_mode:
+                    self.model.eval()
+                else:
+                    self.model.train()
 
                 if self.use_dae:
-                    obs, noisy_obs = obs[0].to(self.device), obs[1].to(self.device)
-                    next_obs, next_noisy_obs = next_obs[0].to(self.device), next_obs[1].to(self.device)
-                else:
-                    obs, next_obs = obs.to(self.device), next_obs.to(self.device)
+                    noisy_obs = noisy_obs.to(self.device)
+                    next_noisy_obs = next_noisy_obs.to(self.device)
+                obs, next_obs = obs.to(self.device), next_obs.to(self.device)
 
                 self.optimizer.zero_grad()
                 loss_manager.resetLosses()
@@ -380,8 +357,8 @@ class SRL4robotics(BaseLearner):
                 # Predict states given observations as in Time Contrastive Network (Triplet Loss) [Sermanet et al.]
                 if self.use_triplets:
                     states, positive_states, negative_states = self.model.forwardTriplets(obs[:, :3:, :, :],
-                                                                                           obs[:, 3:6, :, :],
-                                                                                           obs[:, 6:, :, :])
+                                                                                          obs[:, 3:6, :, :],
+                                                                                          obs[:, 6:, :, :])
 
                     next_states, next_positive_states, next_negative_states = self.model.forwardTriplets(
                         next_obs[:, :3:, :, :],
@@ -482,7 +459,7 @@ class SRL4robotics(BaseLearner):
                 # We have to call backward in both train/val
                 # to avoid memory error
                 loss.backward()
-                if minibatch_idx in val_indices:
+                if validation_mode:
                     val_loss += loss.item()
                     # We do not optimize on validation data
                     # so optimizer.step() is not called
@@ -523,8 +500,9 @@ class SRL4robotics(BaseLearner):
                 print("{:.2f}s/epoch".format((time.time() - start_time) / (epoch + 1)))
                 if DISPLAY_PLOTS:
                     with th.no_grad():
+                        self.model.eval()
                         # Optionally plot the current state space
-                        plotRepresentation(self.predStatesWithDataLoader(data_loader, restore_train=True), rewards,
+                        plotRepresentation(self.predStatesWithDataLoader(test_data_loader), rewards,
                                            add_colorbar=epoch == 0,
                                            name="Learned State Representation (Training Data)")
 
@@ -558,7 +536,8 @@ class SRL4robotics(BaseLearner):
 
         print("Predicting states for all the observations...")
         # return predicted states for training observations
+        self.model.eval()
         with th.no_grad():
-            pred_states = self.predStatesWithDataLoader(data_loader, restore_train=False)
+            pred_states = self.predStatesWithDataLoader(test_data_loader)
         pairs_loss_weight = [k for k in zip(loss_manager.names, loss_manager.weights)]
         return loss_history, pred_states, pairs_loss_weight

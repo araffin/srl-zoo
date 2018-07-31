@@ -81,7 +81,7 @@ if __name__ == '__main__':
     parser.add_argument('--log-folder', type=str, default="",
                         help='Folder where the experiment model and plots will be saved. ' +
                              'By default, automatically computing KNN-MSE and saving logs at location ' +
-                             'logs/DatasetName/YY-MM-DD_HHhMM_SS_ModelType_ST_DIMN_LOSEES')
+                             'logs/DatasetName/YY-MM-DD_HHhMM_SS_ModelType_ST_DIMN_LOSSES')
     parser.add_argument('--multi-view', action='store_true', default=False,
                         help='Enable use of multiple camera')
     parser.add_argument('--balanced-sampling', action='store_true', default=False,

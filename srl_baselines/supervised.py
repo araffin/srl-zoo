@@ -23,7 +23,7 @@ from utils import parseDataFolder, createFolder, getInputBuiltin, loadData
 DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 32
-TEST_BATCH_SIZE = 512
+TEST_BATCH_SIZE = 256
 
 
 class SupervisedLearning(BaseLearner):
@@ -73,11 +73,13 @@ class SupervisedLearning(BaseLearner):
         x_train, x_val, y_train, y_val = train_test_split(x_indices, true_states,
                                                           test_size=0.33, random_state=self.seed)
 
-        train_loader = SupervisedDataLoader(x_train, y_train, images_path, batch_size=self.batch_size)
-        val_loader = SupervisedDataLoader(x_val, y_val, images_path, batch_size=TEST_BATCH_SIZE, is_training=False)
+        train_loader = SupervisedDataLoader(x_train, y_train, images_path, batch_size=BATCH_SIZE,
+                                            max_queue_len=4, is_training=True)
+        val_loader = SupervisedDataLoader(x_val, y_val, images_path, batch_size=TEST_BATCH_SIZE,
+                                          max_queue_len=1, is_training=False)
         # For plotting
         data_loader = SupervisedDataLoader(x_indices, true_states, images_path, batch_size=TEST_BATCH_SIZE,
-                                           no_targets=True, is_training=False)
+                                           max_queue_len=1, is_training=False)
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = nn.MSELoss()
@@ -85,16 +87,15 @@ class SupervisedLearning(BaseLearner):
         best_error = np.inf
         best_model_path = "{}/srl_supervised_model.pth".format(self.log_folder)
 
-        self.model.train()
         start_time = time.time()
         epoch_train_loss = [[] for _ in range(N_EPOCHS)]
         epoch_val_loss = [[] for _ in range(N_EPOCHS)]
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             train_loss, val_loss = 0, 0
-            train_loader.resetAndShuffle()
             pbar = tqdm(total=len(train_loader))
-            for batch_idx, (obs, target_states) in enumerate(train_loader):
+            self.model.train()  # Restore train mode
+            for obs, target_states in train_loader:
                 obs, target_states = obs.to(self.device), target_states.to(self.device)
 
                 pred_states = self.model(obs)
@@ -110,7 +111,6 @@ class SupervisedLearning(BaseLearner):
             train_loss /= len(train_loader)
 
             self.model.eval()
-            val_loader.resetIterator()
             with th.no_grad():
                 # Pass on the validation set
                 for obs, target_states in val_loader:
@@ -122,7 +122,6 @@ class SupervisedLearning(BaseLearner):
                     epoch_val_loss[epoch].append(loss.item())
 
                 val_loss /= len(val_loader)
-            self.model.train()  # Restore train mode
 
             # Save best model
             if val_loss < best_error:

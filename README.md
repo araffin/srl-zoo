@@ -11,6 +11,7 @@ Available methods:
 - Supervised Learning
 - Forward, Inverse Models
 - Triplet Network (for stereovision only)
+- Combination and stacking of methods
 - [experimental] Reward loss, Reward prior, Perceptual Similarity loss (DARLA), Mutual Information loss 
 
 Related papers:
@@ -21,47 +22,51 @@ Related papers:
 
 Table of Contents
 =================
-
-  * [Installation](#installation)
-    * [Recommended Method: Use saved conda environment](#recommended-method-use-saved-conda-environment)
+* [Installation](#installation)
+  * [Using Anaconda](#using-anaconda)
     * [Python 3](#python-3)
     * [Python 2](#python-2)
-    * [Dependencies details](#dependencies-details)
-  * [Config Files](#config-files)
-    * [Base Config](#base-config)
-    * [Dataset config](#dataset-config)
-    * [Experiment Config](#experiment-config)
-  * [Dataset Format](#dataset-format)
-  * [Launch script](#launch-script)
-  * [Pipeline Script](#pipeline-script)
-    * [Examples](#examples)
-  * [Learn a state representation](#learn-a-state-representation)
-  * [Multiple Cameras](#multiple-cameras)
-    * [Stacked Observations](#stacked-observations)
-    * [Triplets of Observations](#triplets-of-observations)
-  * [Evaluation and Plotting](#evaluation-and-plotting)
-  * [Learned Space Visualization](#learned-space-visualization)
-    * [Create a report](#create-a-report)
-    * [Plot a Learned Representation](#plot-a-learned-representation)
-    * [Interactive Plot](#interactive-plot)
-    * [Create a KNN Plot and Compute KNN-MSE](#create-a-knn-plot-and-compute-knn-mse)
-  * [Baselines](#baselines)
-    * [Supervised Learning](#supervised-learning)
-    * [Autoencoder](#autoencoder)
-    * [VAE](#vae)
-    * [Principal Components Analysis](#principal-components-analysis)
-  * [SRL Server for Reinforcement Learning](#srl-server-for-reinforcement-learning)
-  * [Running Tests](#running-tests)
-  * [Example Data](#example-data)
-  * [Troubleshooting](#troubleshooting)
-    * [CUDA out of memory error](#cuda-out-of-memory-error)
+  * [Using Docker](#using-docker)
+  * [Using Requirements.txt](#using-requirementstxt)
+* [Learning a State Representation](#learning-a-state-representation)
+  * [Examples](#examples)
+  * [Stacking/Splitting Models Instead of Combining Them](#stackingsplitting-models-instead-of-combining-them)
+  * [Predicting States on the Whole Dataset](#predicting-states-on-the-whole-dataset)
+  * [Predicting Reward Using a Trained Model](#predicting-reward-using-a-trained-model)
+* [Multiple Cameras](#multiple-cameras)
+  * [Stacked Observations](#stacked-observations)
+  * [Triplets of Observations](#triplets-of-observations)
+* [Evaluation and Plotting](#evaluation-and-plotting)
+* [Learned Space Visualization](#learned-space-visualization)
+  * [Create a report](#create-a-report)
+  * [Plot a Learned Representation](#plot-a-learned-representation)
+  * [Interactive Plot](#interactive-plot)
+  * [Create a KNN Plot and Compute KNN-MSE](#create-a-knn-plot-and-compute-knn-mse)
+* [Baselines](#baselines)
+  * [Supervised Learning](#supervised-learning)
+  * [Principal Components Analysis](#principal-components-analysis)
+* [Config Files](#config-files)
+  * [Base Config](#base-config)
+  * [Dataset config](#dataset-config)
+  * [Experiment Config](#experiment-config)
+* [Dataset Format](#dataset-format)
+* [Launch script](#launch-script)
+* [Pipeline Script](#pipeline-script)
+  * [Examples](#examples-1)
+* [SRL Server for Reinforcement Learning](#srl-server-for-reinforcement-learning)
+* [Running Tests](#running-tests)
+* [Example Data](#example-data)
+* [Troubleshooting](#troubleshooting)
+  * [CUDA out of memory error](#cuda-out-of-memory-error)
+
+
 
 
 ## Installation
 
 Recommended configuration: Ubuntu 16.04 with python >=3.5 (or python 2.7)
 
-### Recommended Method: Anaconda Environment
+### Using Anaconda
 
 #### Python 3
 Please use `environment.yml` file from [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl)
@@ -83,13 +88,16 @@ Then activate it using:
 source activate srl
 ```
 
+### Using Docker
+
+We provide docker images to work with our repository, please read *Installation using docker** from [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl) for more information.
+
+### Using Requirements.txt
 Alternatively, you can use requirements.txt file:
 ```
 pip install -r requirements.txt
 ```
 In that case, you will need to install OpenCV too (cf below).
-
-#### Dependencies Details
 
 - OpenCV (version >= 2.4)
 ```
@@ -100,166 +108,69 @@ or
 sudo apt-get install python-opencv (opencv 2.4 - python2)
 ```
 
-- PyTorch
-- PyTorchVision
-- Numpy
-- Scikit-learn
-- Pandas
 
-For plotting:
-- matplotlib
-- seaborn
-- Pillow
+## Learning a State Representation
 
-For display enhancement:
-- termcolor
-- tqdm
+To learn a state representation, you need to impose constrains on the representation using one or more losses. For example, to train an autoencoder, you need to use a reconstruction loss.
+Most losses are not exclusive, that means you can combine them.
 
+All losses are defined in `losses/losses.py`. The available losses are:
 
-## Config Files
+- autoencoder: reconstruction loss, using current and next observation
+- vae: (beta)-VAE loss (reconstruction + kullback leiber divergence loss)
+- inverse: predict the action given current and next state
+- forward: predict the next state given current state and taken action
+- reward: predict the reward (positive or not) given current and next state
+- priors: robotic priors losses (see "Learning State Representations with Robotic Priors")
+- triplet: triplet loss for multi-cam setting (see *Multiple Cameras* section)
+- reward-prior [Experimental] Maximise correlation between states and reward (does not make sense for sparse reward)
 
-### Base Config
-Config common to all dataset can found in [configs/default.json](configs/default.json).
+All possible arguments can be display using `python train.py --help`. You can limit the training set size (`--training-set-size` argument), change the minibatch size (`-bs`), number of epochs (`--epochs`), ...
 
-### Dataset config
-All dataset must be placed in the `data/` folder.
-Each dataset must contain a `dataset_config.json` file, an example can be found [here](configs/example_dataset_config.json).
-This config file describes specific variables to this dataset.
-
-
-### Experiment Config
-Experiment config file is generated by the `pipeline.py` script. An example can be found [here](configs/example_exp_config.json).
-
-## Dataset Format
-
-In order to use SRL methods on a dataset, this dataset must be preprocessed and formatted as in the [example dataset](https://drive.google.com/open?id=154qMJHgUnzk0J_Hxmr2jCnV1ipS7o1D5).
-We recommend you downloading this example dataset to have a concrete and working example of what a preprocessed dataset looks like.
-
-NOTE: If you use data generated with the [RL Repo](https://github.com/araffin/robotics-rl-srl), the dataset will be already preprocessed, so you don't need to bother about this step.
-
-The dataset format is as followed:
-
-0. You must provide a dataset config file (see previous section) that contains at least if the ground truth is the relative position or not
-1. Images are grouped by episode in different folders (`record_{03d}/` folders)
-2. At the root of the dataset folder, preprocessed_data.npz contains numpy arrays ('episode_starts', 'rewards', 'actions')
-3. At the root of the dataset folder, ground_truth.npz contains numpy arrays ('target_positions', 'ground_truth_states', 'images_path')
-
-The exact format for each numpy array can be found in the example dataset (or in the [RL Repo](https://github.com/araffin/robotics-rl-srl)).
-Note: the variables 'arm_states' and 'button_positions' were renamed 'ground_truth_states' and 'target_positions'
-
-
-## Launch script
-Located [here](launch.sh), it is a shell script that launches multiple grid searches, trains the baselines and calls the report script.
-You have to edit `$data_folder` and make sure of the parameters for knn evaluation before running it:
-```
-./launch.sh
-```
-
-## Pipeline Script
-It learns state representations and evaluates them using knn-mse.
-
-To generate data for Kuka and Mobile Robot environment, please see the RL repo: [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl).
-
-Baxter data used in the paper are not public yet. However you can generate new data using [Baxter Simulator](https://github.com/araffin/arm_scenario_simulator) and [Baxter Experiments](https://github.com/NataliaDiaz/arm_scenario_experiments)
-
-```
-python pipeline.py [-h] [-c EXP_CONFIG] [--data-folder DATA_FOLDER]
-                   [--base_config BASE_CONFIG]
--c EXP_CONFIG, --exp-config EXP_CONFIG
-                     Path to an experiment config file
---data-folder DATA_FOLDER
-                     Path to a dataset folder
---base_config BASE_CONFIG
-                     Path to overall config file, it contains variables
-                     independent from datasets (default:
-                     /configs/default.json)
-```
 
 ### Examples
 
-Grid search:
+Train an inverse model:
 ```
-python pipeline.py --data-folder data/staticButtonSimplest/
-```
-
-Reproducing an experiment:
-```
-python pipeline.py -c path/to/exp_config.json
+python train.py --data-folder data/path/to/dataset --losses inverse
 ```
 
-
-## Learn a State Representation
-
-Usage:
+Train an autoencoder:
 ```
-usage: train.py [-h] [--epochs N] [--seed S] [--state-dim STATE_DIM]
-                [-bs BATCH_SIZE] [--val-size VAL_SIZE]
-                [--training-set-size TRAINING_SET_SIZE] [-lr LEARNING_RATE]
-                [--l1-reg L1_REG] [--no-cuda] [--no-plots]
-                [--model-type {custom_cnn,resnet,mlp,linear}] --data-folder
-                DATA_FOLDER [--log-folder LOG_FOLDER] [--multi-view]
-                [--balanced-sampling]
-                [--losses {forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae,
-                           dae,perceptual}
-                [--beta BETA]
-                [--path-denoiser PATH_DENOISER]
-                [--losses-weights LOSSES_WEIGHTS]
-                [--occlusion-percentage OCCLUSION_PERCENTAGE]
+python train.py --data-folder data/path/to/dataset --losses autoencoder
+```
 
-State Representation Learning with PyTorch
+Combining an autoencoder with an inverse model is as easy as:
+```
+python train.py --data-folder data/path/to/dataset --losses autoencoder inverse
+```
 
-optional arguments:
-  -h, --help            show this help message and exit
-  --epochs N            number of epochs to train (default: 50)
-  --seed S              random seed (default: 1)
-  --state-dim STATE_DIM
-                        state dimension (default: 2)
-  -bs BATCH_SIZE, --batch-size BATCH_SIZE
-                        batch_size (default: 256)
-  --val-size VAL_SIZE   Validation set size in percentage (default: 0.2)
-  --training-set-size TRAINING_SET_SIZE
-                        Limit size (number of samples) of the training set
-                        (default: -1)
-  -lr LEARNING_RATE, --learning-rate LEARNING_RATE
-                        learning rate (default: 0.005)
-  --l1-reg L1_REG       L1 regularization coeff (default: 0.0)
-  --no-cuda             disables CUDA training
-  --no-plots            disables plots
-  --model-type {custom_cnn,resnet,mlp,linear}
-                        Model architecture (default: "custom_cnn")
-  --data-folder DATA_FOLDER
-                        Dataset folder
-  --log-folder LOG_FOLDER
-                        Folder within logs/ where the experiment model and plots will be saved.
-                        If disabled, automatic logs will be generated with experiment config file & KNN-MSE computation.
-  --multi-view          Enable use of multiple camera (for all losses, except on ResNet Architecture).
-  --balanced-sampling   Force balanced sampling for episode independent prior instead of uniform
-  --losses              Combininable losses(s) to be applied for SRL
-                        losses(s)
-  --beta BETA           (For beta-VAE only) Factor on the KL divergence,
-                        higher value means more disentangling.
-  --path-denoiser PATH_DENOISER
-                        Path till a pre-trained denoising model when using the
-                        perceptual loss with VAE
-  --losses-weights LOSSES_WEIGHTS [LOSSES_WEIGHTS ...]
-                        losses's weights - as many as there are losses
-  --occlusion-percentage OCCLUSION_PERCENTAGE
-                        Max percentage of input occlusion for masks when using DAE.
-
-
+Train a vae with the perseptual similarity loss:
+```
+python train.py --data-folder data/path/to/dataset --losses vae perceptual --path-denoiser logs/path/to/pretrained_dae/srl_model.pth
 ```
 
 
-Example:
+### Stacking/Splitting Models Instead of Combining Them
+
+Because losses do not optimize the same objective and can be opposed, it may make sense to stack representations learned with different objectives, instead of combining them. For instance, you can stack an autoencoder (with a state dimension of 20) with an inverse model (of dimension 2) using:
+
 ```
-python train.py --data-folder data/path/to/dataset
+python train.py --data-folder data/path/to/dataset --losses autoencoder inverse --state-dim 22 --split-index 20
 ```
+
+The details of how models are splitted can be found inside the `SRLModulesSplit` class, defined in `models/modules.py`. All models share the same *encoder* or *features extractor*, that maps observations to states.
+
+
+### Predicting States on the Whole Dataset
 
 If you trained your model on a subset of a dataset, you can predict states for the whole dataset (or on a subset) using:
 ```
 python -m evaluation.predict_dataset --log-dir logs/path/to/log_folder/
 ```
 use  `-n 1000` to predict on the first 1000 samples only.
+
+### Predicting Reward Using a Trained Model
 
 If you want to predict the reward (train a classifier for positive or null reward) using ground truth states or learned states, you can use `evaluation/predict_reward.py` script.
 Ground Truth:
@@ -301,7 +212,7 @@ Related papers:
 
 ## Learned Space Visualization
 
-To view the learned state and play with the latent space of a VAE, autoencoder or srl-priors, you may use:
+To view the learned state and play with the latent space of a trained model, you may use:
 ```bash
 python -m enjoy.enjoy_latent --log-dir logs/nameOfTheDataset/nameOfTheModel
 ```
@@ -346,6 +257,18 @@ python -m plotting.representation_plot --data-folder path/to/datasetFolder/
 ```
 
 To have a different color per episode, you have to pass `--data-folder` argument along with `--color-episode`.
+
+Correlation plot with ground truth states:
+
+```
+python -m plotting.representation_plot -i path/to/states_rewards.npz --data-folder path/to/datasetFolder/ --correlation
+```
+
+Plotting each dimension of the state representation against another:
+
+```
+python -m plotting.representation_plot -i path/to/states_rewards.npz --plot-against
+```
 
 ### Interactive Plot
 
@@ -412,6 +335,79 @@ PCA:
 ```
 python -m baselines.pca --data-folder path/to/data/folder --state-dim 3
 ```
+
+
+## Config Files
+
+### Base Config
+Config common to all dataset can be found in [configs/default.json](configs/default.json).
+
+### Dataset config
+All datasets must be placed in the `data/` folder.
+Each dataset must contain a `dataset_config.json` file, an example can be found [here](configs/example_dataset_config.json).
+This config file describes specific variables to this dataset.
+
+
+### Experiment Config
+Experiment config file is generated by the `pipeline.py` script. An example can be found [here](configs/example_exp_config.json).
+
+## Dataset Format
+
+In order to use SRL methods on a dataset, this dataset must be preprocessed and formatted as in the [example dataset](https://drive.google.com/open?id=154qMJHgUnzk0J_Hxmr2jCnV1ipS7o1D5).
+We recommend you downloading this example dataset to have a concrete and working example of what a preprocessed dataset looks like.
+
+NOTE: If you use data generated with the [RL Repo](https://github.com/araffin/robotics-rl-srl), the dataset will be already preprocessed, so you don't need to bother about this step.
+
+The dataset format is as follows:
+
+0. You must provide a dataset config file (see previous section) that contains at least if the ground truth is the relative position or not
+1. Images are grouped by episode in different folders (`record_{03d}/` folders)
+2. At the root of the dataset folder, preprocessed_data.npz contains numpy arrays ('episode_starts', 'rewards', 'actions')
+3. At the root of the dataset folder, ground_truth.npz contains numpy arrays ('target_positions', 'ground_truth_states', 'images_path')
+
+The exact format for each numpy array can be found in the example dataset (or in the [RL Repo](https://github.com/araffin/robotics-rl-srl)).
+Note: the variables 'arm_states' and 'button_positions' were renamed 'ground_truth_states' and 'target_positions'
+
+
+## Launch script
+Located [here](launch.sh), it is a shell script that launches multiple grid searches, trains the baselines and calls the report script.
+You have to edit `$data_folder` and make sure of the parameters for knn evaluation before running it:
+```
+./launch.sh
+```
+
+## Pipeline Script
+It learns state representations and evaluates them using knn-mse.
+
+To generate data for Kuka and Mobile Robot environment, please see the RL repo: [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl).
+
+Baxter data used in the paper are not public yet. However you can generate new data using [Baxter Simulator](https://github.com/araffin/arm_scenario_simulator) and [Baxter Experiments](https://github.com/NataliaDiaz/arm_scenario_experiments)
+
+```
+python pipeline.py [-h] [-c EXP_CONFIG] [--data-folder DATA_FOLDER]
+                   [--base_config BASE_CONFIG]
+-c EXP_CONFIG, --exp-config EXP_CONFIG
+                     Path to an experiment config file
+--data-folder DATA_FOLDER
+                     Path to a dataset folder
+--base_config BASE_CONFIG
+                     Path to overall config file, it contains variables
+                     independent from datasets (default:
+                     /configs/default.json)
+```
+
+### Examples
+
+Grid search:
+```
+python pipeline.py --data-folder data/staticButtonSimplest/
+```
+
+Reproducing an experiment:
+```
+python pipeline.py -c path/to/exp_config.json
+```
+
 
 ## SRL Server for Reinforcement Learning
 
