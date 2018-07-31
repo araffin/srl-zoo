@@ -204,7 +204,6 @@ class SRL4robotics(BaseLearner):
         if self.use_dae and self.occlusion_percentage is not None:
             print("Using a maximum occlusion surface of {}".format(str(self.occlusion_percentage)))
 
-
     @staticmethod
     def loadSavedModel(log_folder, valid_models, cuda=True):
         """
@@ -298,14 +297,12 @@ class SRL4robotics(BaseLearner):
         if self.use_vae and self.perceptual_similarity_loss and self.path_to_dae is not None:
 
             self.denoiser = SRLModules(state_dim=200, action_dim=self.dim_action, model_type="custom_cnn",
-                       cuda=self.cuda, losses=["dae"])
+                                       cuda=self.cuda, losses=["dae"])
             self.denoiser.load_state_dict(th.load(self.path_to_dae))
             self.denoiser.eval()
             self.denoiser = self.denoiser.to(self.device)
             for param in self.denoiser.parameters():
                 param.requires_grad = False
-
-            
 
         if self.episode_prior:
             idx_to_episode = {idx: episode_idx for idx, episode_idx in enumerate(np.cumsum(episode_starts))}

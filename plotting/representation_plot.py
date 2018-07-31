@@ -260,7 +260,8 @@ def plotCorrelation(states_rewards, ground_truth, target_positions, only_print=F
     :param states_rewards: (numpy dict)
     :param ground_truth: (numpy dict)
     :param target_positions: (numpy array)
-    :param only_print: (bool) only print the correlation mesurements (max of correlation for each GT dimension)
+    :param only_print: (bool) only print the correlation mesurements (max of correlation for each of
+    Ground Truth's dimension)
     """
     np.set_printoptions(precision=2)
     correlation_max_vector = np.array([])
@@ -268,16 +269,16 @@ def plotCorrelation(states_rewards, ground_truth, target_positions, only_print=F
     for index, ground_truth_name in enumerate([" Agent's position ", "Target Position"]):
         if ground_truth_name == " Agent's position ":
             key = 'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'
-            X = ground_truth[key][:len(rewards)]
+            x = ground_truth[key][:len(rewards)]
         else:
-            X = target_positions[:len(rewards)]
+            x = target_positions[:len(rewards)]
 
         # adding epsilon in case of little variance in samples of X & Ys
         eps = 1e-12
-        corr = np.corrcoef(x=X + eps, y=states_rewards['states'] + eps, rowvar=0)
+        corr = np.corrcoef(x=x + eps, y=states_rewards['states'] + eps, rowvar=0)
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
-        labels = [r'$\tilde{s}_' + str(i_) + '$' for i_ in range(X.shape[1])]
+        labels = [r'$\tilde{s}_' + str(i_) + '$' for i_ in range(x.shape[1])]
         labels += [r'$s_' + str(i_) + '$' for i_ in range(states_rewards['states'].shape[1])]
         cax = ax.matshow(corr, cmap=cmap, vmin=-1, vmax=1)
         ax.set_xticklabels([''] + labels)
@@ -286,14 +287,17 @@ def plotCorrelation(states_rewards, ground_truth, target_positions, only_print=F
         plt.title(r'Correlation Matrix: S = Predicted states | $\tilde{S}$ = ' + ground_truth_name)
         fig.colorbar(cax, label='correlation coefficient')
 
-        # Building the vector of max correlation ( a scalar for each GT dimension)
-        ground_truth_dim = X.shape[1]
+        # Building the vector of max correlation ( a scalar for each of the Ground Truth's dimension)
+        ground_truth_dim = x.shape[1]
         corr_copy = corr
-        for iter_gt in range(ground_truth_dim):
-            corr_copy[iter_gt, iter_gt] = 0.0
-            correlation_max_vector = np.append(correlation_max_vector,max(abs(corr_copy[iter_gt])))
+        for idx in range(ground_truth_dim):
+            corr_copy[idx, idx] = 0.0
+            correlation_max_vector = np.append(correlation_max_vector, max(abs(corr_copy[idx])))
+
+    # Printing the max correlation for each of Ground Truth's dimension with the predicted states
+    # as well as a normalized sum
     correlation_scalar = sum(correlation_max_vector)
-    print("Correlation value of the model with GT:\n Max correlation vector: {}"
+    print("\nCorrelation value of the model's prediction with the Ground Truth:\n Max correlation vector: {}"
           "\n Sum of max correlation: {:.2f}\n Normalized sum: {:.2f}"
           .format(correlation_max_vector, correlation_scalar, correlation_scalar/len(correlation_max_vector)))
     if not only_print:
@@ -355,10 +359,10 @@ if __name__ == '__main__':
             if args.color_episode:
                 rewards = colorPerEpisode(training_data['episode_starts'])
 
-            plotCorrelation(states_rewards, ground_truth, target_positions, only_print=args.scalar)
+            plotCorrelation(states_rewards, ground_truth, target_positions, only_print=args.print_corr)
         else:
             plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
-        if not args.scalar:
+        if not args.print_corr:
             getInputBuiltin()('\nPress any key to exit.')
 
     elif args.data_folder != "":

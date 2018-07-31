@@ -215,7 +215,6 @@ class DataLoader(object):
 
             im = preprocessImage(im, apply_occlusion=apply_occlusion, occlusion_percentage=occlusion_percentage)
 
-
         # channel first + 1 dim for the batch
         # th.tensor creates a copy
         im = th.tensor(im.reshape((1,) + im.shape).transpose(0, 3, 1, 2))
