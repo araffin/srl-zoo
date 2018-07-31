@@ -245,7 +245,7 @@ class DataLoader(object):
 
         # Channel first (for pytorch convolutions) + one dim for the batch
         # th.tensor creates a copy
-        im = th.tensor(im.reshape((1,) + im.shape).transpose(0, 3, 1, 2))
+        im = th.tensor(im.reshape((1,) + im.shape).transpose(0, 3, 2, 1))
         return im
 
     def __len__(self):
