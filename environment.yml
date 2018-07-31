@@ -79,8 +79,8 @@ dependencies:
 - xz=5.2.3=h55aa19d_2
 - zlib=1.2.11=ha838bed_2
 - opencv=2.4.11=nppy27_0
-- pytorch=0.4.0=py27_cuda9.0.176_cudnn7.1.2_1
-- torchvision=0.2.0=py27hfb27419_1
+- pytorch=0.4.1
+- torchvision=0.2.1
 - pip:
   - backports-abc==0.5
   - backports.functools-lru-cache==1.4

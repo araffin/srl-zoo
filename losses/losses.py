@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from models.priors import ReverseLayerF
+from .utils import correlationMatrix
 
 try:
     from functools import reduce
@@ -20,17 +21,14 @@ class LossManager:
     Class in charge of Computing and Saving history of Losses
     """
 
-    def __init__(self, model, l1_reg=0.0, loss_history=None):
+    def __init__(self, model, loss_history=None):
         """
         :param model: (PyTorch model)
-        :param l1_reg: (float) l1 regularization coeff
         :param loss_history: (dict)
         """
         # Retrieve only trainable and regularizable parameters (we should exclude biases)
         self.reg_params = [param for name, param in model.named_parameters() if
                            ".bias" not in name and param.requires_grad]
-        n_params = sum([reduce(lambda x, y: x * y, param.size()) for param in self.reg_params])
-        self.l1_coeff = (l1_reg / n_params)
         self.loss_history = loss_history
         self.names, self.weights, self.losses = [], [], []
 
@@ -109,7 +107,7 @@ def forwardModelLoss(next_states_pred, next_states, weight, loss_manager):
     :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return:
     """
-    forward_loss = F.mse_loss(next_states_pred, next_states, size_average=True)
+    forward_loss = F.mse_loss(next_states_pred, next_states, reduction='elementwise_mean')
     loss_manager.addToLosses('forward_loss', weight, forward_loss)
     return weight * forward_loss
 
@@ -142,6 +140,19 @@ def l1Loss(params, weight, loss_manager):
     return weight * l1_loss
 
 
+def l2Loss(params, weight, loss_manager):
+    """
+    L2 regularization loss
+    :param params: NN's weights to regularize
+    :param weight: coefficient to weight the loss (float)
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
+    :return:
+    """
+    l2_loss = sum([param.norm(2) for param in params]) / len(params)
+    loss_manager.addToLosses('l2_loss', weight, l2_loss)
+    return weight * l2_loss
+
+
 def rewardModelLoss(rewards_pred, rewards_st, weight, loss_manager):
     """
     Categorical Reward prediction Loss (Cross-entropy)
@@ -152,7 +163,7 @@ def rewardModelLoss(rewards_pred, rewards_st, weight, loss_manager):
     :return:
     """
     loss_fn = nn.CrossEntropyLoss()
-    reward_loss = loss_fn(rewards_pred, target=rewards_st.squeeze(1))
+    reward_loss = loss_fn(rewards_pred, target=rewards_st)
     loss_manager.addToLosses('reward_loss', weight, reward_loss)
     return weight * reward_loss
 
@@ -164,7 +175,7 @@ def reconstructionLoss(input_image, target_image):
     :param target_image:  Reconstructed observation (th.Tensor)
     :return:
     """
-    return F.mse_loss(input_image, target_image, size_average=True)
+    return F.mse_loss(input_image, target_image, reduction='elementwise_mean')
 
 
 def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_manager):
@@ -200,8 +211,8 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
     :return: (th.Tensor)
     """
 
-    generation_loss = F.mse_loss(decoded, obs, size_average=False)
-    generation_loss += F.mse_loss(next_decoded, next_obs, size_average=False)
+    generation_loss = F.mse_loss(decoded, obs, reduction='sum')
+    generation_loss += F.mse_loss(next_decoded, next_obs, reduction='sum')
 
     # see Appendix B from VAE paper:
     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
@@ -241,24 +252,24 @@ def mutualInformationLoss(states, rewards_st, weight, loss_manager):
                                           (th.std(th.cat([X, Y], dim=1), dim=0) + eps), 2), 2) / 2) + eps
             I += p_xy * th.log(p_xy / (p_x[x] * p_y[y]))
 
-    reward_prior_loss = th.exp(-I)
-    loss_manager.addToLosses('reward_prior', weight, reward_prior_loss)
-    return weight * reward_prior_loss
+    mutual_info_loss = th.exp(-I)
+    loss_manager.addToLosses('mutual_info', weight, mutual_info_loss)
+    return weight * mutual_info_loss
 
 
 def rewardPriorLoss(states, rewards_st, weight, loss_manager):
     """
-    Loss expressing Correlation between predicted states and reward
+    Loss expressing correlation between predicted states and reward
     :param states: (th.Tensor)
     :param rewards_st: rewards at timestep t (th.Tensor)
-    :param weight: coefficient to weight the los s
+    :param weight: coefficient to weight the loss
     :param loss_manager: loss criterion needed to log the loss value
     :return:
     """
+    corr_matrix = correlationMatrix(th.cat([states, rewards_st], dim=1).t())
+    # Maximise correlation between states and rewards (last rows)
+    reward_prior_loss = 1 - th.mean(th.abs(corr_matrix[-rewards_st.shape[1]:, :]))
 
-    reward_loss = th.mean(
-        th.mm((states - th.mean(states, dim=0)).t(), (rewards_st - th.mean(rewards_st, dim=0))))
-    reward_prior_loss = th.exp(-th.abs(reward_loss))
     loss_manager.addToLosses('reward_prior', weight, reward_prior_loss)
     return weight * reward_prior_loss
 
@@ -287,7 +298,7 @@ def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, b
     # Reverse gradient
     reverse_states = ReverseLayerF.apply(states, lambda_)
 
-    criterion_episode = nn.BCELoss(size_average=False)
+    criterion_episode = nn.BCELoss(reduction='sum')
     # Get episodes indices for current minibatch
     episodes = np.array(minibatch_episodes[minibatch_idx])
 

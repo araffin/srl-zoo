@@ -1,6 +1,5 @@
 from __future__ import print_function, division
 
-import json
 import argparse
 from textwrap import fill
 
@@ -11,11 +10,7 @@ import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
 
-# Python 2/3 compatibility
-try:
-    input = raw_input
-except NameError:
-    pass
+from utils import parseDataFolder, getInputBuiltin, loadData
 
 # Init seaborn
 sns.set()
@@ -259,23 +254,23 @@ def plotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='co
     plt.show()
 
 
-def plotCorrelation(states_rewards, ground_truth):
+def plotCorrelation(states_rewards, ground_truth, target_positions):
     """
-    Correlation matrix: Target pos/GT vs. States predicted
-    :param states_rewards:
-    :param ground_truth:
-    :return:
+    Correlation matrix: Target pos/ground truth states vs. States predicted
+    :param states_rewards: (numpy dict)
+    :param ground_truth: (numpy dict)
+    :param target_positions: (numpy array)
     """
     for ground_truth_name in [" Agent's position ", "Target Position"]:
         if ground_truth_name == " Agent's position ":
             key = 'ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states'
             X = ground_truth[key][:len(rewards)]
         else:
-            X = button_pos_[:len(rewards)]
+            X = target_positions[:len(rewards)]
 
         # adding epsilon in case of little variance in samples of X & Ys
         eps = 1e-12
-        corr = np.corrcoef(x=X + eps, y=states_rewards['states'] + eps, rowvar=False)
+        corr = np.corrcoef(x=X + eps, y=states_rewards['states'] + eps, rowvar=0)
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
         labels = [r'$\tilde{s}_' + str(i_) + '$' for i_ in range(X.shape[1])]
@@ -287,29 +282,6 @@ def plotCorrelation(states_rewards, ground_truth):
         plt.title(r'Correlation Matrix: S = Predicted states | $\tilde{S}$ = ' + ground_truth_name)
         fig.colorbar(cax, label='correlation coefficient')
     pauseOrClose(fig)
-
-
-def loadData(data_folder):
-    """
-    :param data_folder: path to the data_folder to be loaded (Str)
-    :return: training_data, ground_truth, true_states, target_positions (Numpy dictionary-like objects) X 3
-    """
-    training_data = np.load('data/{}/preprocessed_data.npz'.format(data_folder))
-    ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
-    # Backward compatibility with previous names
-    true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
-    target_positions = \
-        ground_truth['target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
-    return training_data, ground_truth, true_states, target_positions
-
-
-def loadOffsets(training_data, data_folder):
-    """
-    :param training_data:
-    :param data_folder:
-    :return: episode_starts, name
-    """
-    return training_data['episode_starts'], "Ground Truth States - {}".format(data_folder)
 
 
 if __name__ == '__main__':
@@ -337,9 +309,7 @@ if __name__ == '__main__':
     assert not (args.correlation and args.data_folder == ""), \
         "You must specify a datafolder when using the correlation plot"
 
-    # Remove `data/` from the path if needed
-    if args.data_folder.startswith('data/'):
-        args.data_folder = args.data_folder[5:]
+    args.data_folder = parseDataFolder(args.data_folder)
 
     if args.input_file != "":
         print("Loading {}...".format(args.input_file))
@@ -363,50 +333,25 @@ if __name__ == '__main__':
 
         elif args.correlation:
             training_data, ground_truth, true_states, target_positions = loadData(args.data_folder)
-            episode_starts = training_data['episode_starts']
-            with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
-                relative_pos = json.load(f).get('relative_pos', False)
-
-            button_pos_ = []
-            # True state is the relative position to the button
-            if relative_pos:
-                button_idx = -1
-                for i in range(len(episode_starts)):
-                    if episode_starts[i] == 1:
-                        button_idx += 1
-                    true_states[i] -= target_positions[button_idx]
-                    button_pos_.append(target_positions[button_idx])
-            button_pos_ = np.array(button_pos_[:len(rewards)])
 
             if args.color_episode:
-                rewards = colorPerEpisode(episode_starts)
+                rewards = colorPerEpisode(training_data['episode_starts'])
 
-            plotCorrelation(states_rewards, ground_truth)
+            plotCorrelation(states_rewards, ground_truth, target_positions)
         else:
             plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
-        input('\nPress any key to exit.')
+        getInputBuiltin()('\nPress any key to exit.')
 
     elif args.data_folder != "":
 
         print("Plotting ground truth...")
-        training_data, ground_truth, true_states, target_positions = loadData(args.data_folder)
-        episode_starts = training_data['episode_starts']
+        training_data, ground_truth, true_states, _ = loadData(args.data_folder)
+
         rewards = training_data['rewards']
         name = "Ground Truth States - {}".format(args.data_folder)
 
-        with open('data/{}/dataset_config.json'.format(args.data_folder), 'r') as f:
-            relative_pos = json.load(f).get('relative_pos', False)
-
-        # True state is the relative position to the button
-        if relative_pos:
-            button_idx = -1
-            for i in range(len(episode_starts)):
-                if episode_starts[i] == 1:
-                    button_idx += 1
-                true_states[i] -= target_positions[button_idx]
-
         if args.color_episode:
-            rewards = colorPerEpisode(episode_starts)
+            rewards = colorPerEpisode(training_data['episode_starts'])
 
         if args.plot_against:
             plotAgainst(true_states, rewards, cmap=cmap)
@@ -414,7 +359,7 @@ if __name__ == '__main__':
             prettyPlotAgainst(true_states, rewards, cmap=cmap)
         else:
             plotRepresentation(true_states, rewards, name, fit_pca=False, cmap=cmap)
-        input('\nPress any key to exit.')
+        getInputBuiltin()('\nPress any key to exit.')
 
     else:
         print("You must specify one of --input-file or --data-folder")

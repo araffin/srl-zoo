@@ -1,2 +1,2 @@
 from .data_loader import preprocessImage
-from .preprocess import getNChannels, getInputDim
+from .preprocess import getNChannels, getInputDim, N_CHANNELS

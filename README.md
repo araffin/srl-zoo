@@ -11,7 +11,8 @@ Available methods:
 - Supervised Learning
 - Forward, Inverse Models
 - Triplet Network (for stereovision only)
-- [experimental] Reward losses
+- Reward losses
+- Combination and stacking of methods
 
 Related papers:
 - "State Representation Learning for Control: An Overview" (Lesort et al., 2018), link: [https://arxiv.org/pdf/1802.04181.pdf](https://arxiv.org/pdf/1802.04181.pdf)
@@ -21,47 +22,51 @@ Related papers:
 
 Table of Contents
 =================
-
-  * [Installation](#installation)
-    * [Recommended Method: Use saved conda environment](#recommended-method-use-saved-conda-environment)
+* [Installation](#installation)
+  * [Using Anaconda](#using-anaconda)
     * [Python 3](#python-3)
     * [Python 2](#python-2)
-    * [Dependencies details](#dependencies-details)
-  * [Config Files](#config-files)
-    * [Base Config](#base-config)
-    * [Dataset config](#dataset-config)
-    * [Experiment Config](#experiment-config)
-  * [Dataset Format](#dataset-format)
-  * [Launch script](#launch-script)
-  * [Pipeline Script](#pipeline-script)
-    * [Examples](#examples)
-  * [Learn a state representation](#learn-a-state-representation)
-  * [Multiple Cameras](#multiple-cameras)
-    * [Stacked Observations](#stacked-observations)
-    * [Triplets of Observations](#triplets-of-observations)
-  * [Evaluation and Plotting](#evaluation-and-plotting)
-  * [Learned Space Visualization](#learned-space-visualization)
-    * [Create a report](#create-a-report)
-    * [Plot a Learned Representation](#plot-a-learned-representation)
-    * [Interactive Plot](#interactive-plot)
-    * [Create a KNN Plot and Compute KNN-MSE](#create-a-knn-plot-and-compute-knn-mse)
-  * [Baselines](#baselines)
-    * [Supervised Learning](#supervised-learning)
-    * [Autoencoder](#autoencoder)
-    * [VAE](#vae)
-    * [Principal Components Analysis](#principal-components-analysis)
-  * [SRL Server for Reinforcement Learning](#srl-server-for-reinforcement-learning)
-  * [Running Tests](#running-tests)
-  * [Example Data](#example-data)
-  * [Troubleshooting](#troubleshooting)
-    * [CUDA out of memory error](#cuda-out-of-memory-error)
+  * [Using Docker](#using-docker)
+  * [Using Requirements.txt](#using-requirementstxt)
+* [Learning a State Representation](#learning-a-state-representation)
+  * [Examples](#examples)
+  * [Stacking/Splitting Models Instead of Combining Them](#stackingsplitting-models-instead-of-combining-them)
+  * [Predicting States on the Whole Dataset](#predicting-states-on-the-whole-dataset)
+  * [Predicting Reward Using a Trained Model](#predicting-reward-using-a-trained-model)
+* [Multiple Cameras](#multiple-cameras)
+  * [Stacked Observations](#stacked-observations)
+  * [Triplets of Observations](#triplets-of-observations)
+* [Evaluation and Plotting](#evaluation-and-plotting)
+* [Learned Space Visualization](#learned-space-visualization)
+  * [Create a report](#create-a-report)
+  * [Plot a Learned Representation](#plot-a-learned-representation)
+  * [Interactive Plot](#interactive-plot)
+  * [Create a KNN Plot and Compute KNN-MSE](#create-a-knn-plot-and-compute-knn-mse)
+* [Baselines](#baselines)
+  * [Supervised Learning](#supervised-learning)
+  * [Principal Components Analysis](#principal-components-analysis)
+* [Config Files](#config-files)
+  * [Base Config](#base-config)
+  * [Dataset config](#dataset-config)
+  * [Experiment Config](#experiment-config)
+* [Dataset Format](#dataset-format)
+* [Launch script](#launch-script)
+* [Pipeline Script](#pipeline-script)
+  * [Examples](#examples-1)
+* [SRL Server for Reinforcement Learning](#srl-server-for-reinforcement-learning)
+* [Running Tests](#running-tests)
+* [Example Data](#example-data)
+* [Troubleshooting](#troubleshooting)
+  * [CUDA out of memory error](#cuda-out-of-memory-error)
+
+
 
 
 ## Installation
 
 Recommended configuration: Ubuntu 16.04 with python >=3.5 (or python 2.7)
 
-### Recommended Method: Anaconda Environment
+### Using Anaconda
 
 #### Python 3
 Please use `environment.yml` file from [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl)
@@ -83,13 +88,16 @@ Then activate it using:
 source activate srl
 ```
 
+### Using Docker
+
+We provide docker images to work with our repository, please read *Installation using docker** from [https://github.com/araffin/robotics-rl-srl](https://github.com/araffin/robotics-rl-srl) for more information.
+
+### Using Requirements.txt
 Alternatively, you can use requirements.txt file:
 ```
 pip install -r requirements.txt
 ```
 In that case, you will need to install OpenCV too (cf below).
-
-#### Dependencies Details
 
 - OpenCV (version >= 2.4)
 ```
@@ -100,29 +108,235 @@ or
 sudo apt-get install python-opencv (opencv 2.4 - python2)
 ```
 
-- PyTorch
-- PyTorchVision
-- Numpy
-- Scikit-learn
-- Pandas
 
-For plotting:
-- matplotlib
-- seaborn
-- Pillow
+## Learning a State Representation
 
-For display enhancement:
-- termcolor
-- tqdm
+To learn a state representation, you need to impose constrains on the representation using one or more losses. For example, to train an autoencoder, you need to use a reconstruction loss.
+Most losses are not exclusive, that means you can combine them.
+
+All losses are defined in `losses/losses.py`. The available losses are:
+
+- autoencoder: reconstruction loss, using current and next observation
+- vae: (beta)-VAE loss (reconstruction + kullback leiber divergence loss)
+- inverse: predict the action given current and next state
+- forward: predict the next state given current state and taken action
+- reward: predict the reward (positive or not) given current and next state
+- priors: robotic priors losses (see "Learning State Representations with Robotic Priors")
+- triplet: triplet loss for multi-cam setting (see *Multiple Cameras* section)
+- reward-prior [Experimental] Maximise correlation between states and reward (does not make sense for sparse reward)
+
+All possible arguments can be display using `python train.py --help`. You can limit the training set size (`--training-set-size` argument), change the minibatch size (`-bs`), number of epochs (`--epochs`), ...
+
+
+### Examples
+
+Train an inverse model:
+```
+python train.py --data-folder data/path/to/dataset --losses inverse
+```
+
+Train an autoencoder:
+```
+python train.py --data-folder data/path/to/dataset --losses autoencoder
+```
+
+Combining an autoencoder with an inverse model is as easy as:
+```
+python train.py --data-folder data/path/to/dataset --losses autoencoder inverse
+```
+
+### Stacking/Splitting Models Instead of Combining Them
+
+Because losses do not optimize the same objective and can be opposed, it may make sense to stack representations learned with different objectives, instead of combining them. For instance, you can stack an autoencoder (with a state dimension of 20) with an inverse model (of dimension 2) using:
+
+```
+python train.py --data-folder data/path/to/dataset --losses autoencoder inverse --state-dim 22 --split-index 20
+```
+
+The details of how models are splitted can be found inside the `SRLModulesSplit` class, defined in `models/modules.py`. All models share the same *encoder* or *features extractor*, that maps observations to states.
+
+
+### Predicting States on the Whole Dataset
+
+If you trained your model on a subset of a dataset, you can predict states for the whole dataset (or on a subset) using:
+```
+python -m evaluation.predict_dataset --log-dir logs/path/to/log_folder/
+```
+use  `-n 1000` to predict on the first 1000 samples only.
+
+### Predicting Reward Using a Trained Model
+
+If you want to predict the reward (train a classifier for positive or null reward) using ground truth states or learned states, you can use `evaluation/predict_reward.py` script.
+Ground Truth:
+```
+python -m evaluation.predict_reward --data-folder data/dataset_name/ --training-set-size 50000
+```
+
+On Learned States:
+```
+python -m evaluation.predict_reward --data-folder data/dataset_name/ -i log/path/to/states_rewards.npz
+```
+
+
+## Multiple Cameras
+
+### Stacked Observations
+
+Using the `custom_cnn` and `mlp` architecture, it is possible to pass pairs of images from different views stacked along the channels' dimension i.e of dim (224,224,6).
+
+To use this functionality to perform state representation learning, enable `--multi-view` (see usage of script train.py),
+and use a dataset generated for the purpose.
+
+
+### Triplets of Observations
+
+Similarly, it is possible to learn representation of states using a dataset of triplets, i.e tuples made of an anchor, a positive and a negative observation.
+
+The anchor and the positive observation are views of the scene at the same time step, but from different cameras.
+
+The negative example is an image from the same camera as the anchor but at a different time step selected randomly among images in the same record.
+
+In our case, enable `triplet` as a loss (`--losses`) to use the TCN-like architecture made of a pre-trained ResNet with an extra fully connected layer (embedding).
+
+To use this functionality also enable `--multi-view`, and use a dataset generated for the purpose.
+Related papers:
+- "Time-Contrastive Networks: Self-Supervised Learning from Video" (P. Sermanet et al., 2017), paper: [https://arxiv.org/abs/1704.06888](https://arxiv.org/abs/1704.06888)
+
+## Evaluation and Plotting
+
+## Learned Space Visualization
+
+To view the learned state and play with the latent space of a trained model, you may use:
+```bash
+python -m enjoy.enjoy_latent --log-dir logs/nameOfTheDataset/nameOfTheModel
+```
+
+### Create a report
+After a report you can create a csv report file using:
+```
+python evaluation/create_report.py -d logs/nameOfTheDataset/
+```
+
+### Plot a Learned Representation
+
+```
+usage: representation_plot.py [-h] [-i INPUT_FILE] [--data-folder DATA_FOLDER]
+                              [--color-episode] [--plot-against]
+                              [--correlation] [--projection]
+
+Plotting script for representation
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT_FILE, --input-file INPUT_FILE
+                        Path to a npz file containing states and rewards
+  --data-folder DATA_FOLDER
+                        Path to a dataset folder, it will plot ground truth
+                        states
+  --color-episode       Color states per episodes instead of reward
+  --plot-against        Plot against each dimension
+  --correlation         Plot the Pearson Matrix of correlation between the Ground truth and learned states.
+  --projection          Plot 1D projection of predicted state on ground truth
+
+```
+You can plot a learned representation with:
+```
+python -m plotting.representation_plot -i path/to/states_rewards.npz
+```
+
+You can also plot ground truth states with:
+```
+python -m plotting.representation_plot --data-folder path/to/datasetFolder/
+```
+
+To have a different color per episode, you have to pass `--data-folder` argument along with `--color-episode`.
+
+Correlation plot with ground truth states:
+
+```
+python -m plotting.representation_plot -i path/to/states_rewards.npz --data-folder path/to/datasetFolder/ --correlation
+```
+
+Plotting each dimension of the state representation against another:
+
+```
+python -m plotting.representation_plot -i path/to/states_rewards.npz --plot-against
+```
+
+### Interactive Plot
+
+You can have an interactive plot of a learned representation using:
+```
+python -m plotting.interactive_plot --data-folder path/to/datasetFolder/ -i path/to/states_rewards.npz
+```
+When you click on a state in the representation plot (left click for 2D, **right click for 3D plots**!), it shows the corresponding image along with the reward and the coordinates in the space.
+
+Pass `--multi-view` as argument to visualize in case of multiple cameras.
+
+You can also plot ground truth states when you don't specify a npz file:
+```
+python -m plotting.interactive_plot --data-folder path/to/datasetFolder/
+```
+
+### Create a KNN Plot and Compute KNN-MSE
+
+Usage:
+```
+python evaluation/knn_images.py [-h] --log-folder LOG_FOLDER [--seed SEED]
+                     [-k N_NEIGHBORS] [-n N_SAMPLES] [--n-to-plot N_TO_PLOT]
+                     [--relative-pos] [--ground-truth] [--multi-view]
+
+KNN plot and KNN MSE
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --log-folder LOG_FOLDER
+                        Path to a log folder
+  --seed SEED           random seed (default: 1)
+  -k N_NEIGHBORS, --n-neighbors N_NEIGHBORS
+                        Number of nearest neighbors (default: 5)
+  -n N_SAMPLES, --n-samples N_SAMPLES
+                        Number of test samples (default: 5)
+  --n-to-plot N_TO_PLOT
+                        Number of samples to plot (default: 5)
+  --relative-pos        Use relative position as ground_truth
+  --ground-truth        Compute KNN-MSE for ground truth
+  --multi-view          To deal with multi view data format
+
+
+```
+
+Example:
+```
+python plotting/knn_images.py --log-folder path/to/an/experiment/log/folder
+```
+
+## Baselines
+
+Baseline models are saved in `logs/nameOfTheDataset/baselines/` folder.
+
+### Supervised Learning
+
+Example:
+```
+python -m baselines.supervised --data-folder path/to/data/folder
+```
+
+### Principal Components Analysis
+
+PCA:
+```
+python -m baselines.pca --data-folder path/to/data/folder --state-dim 3
+```
 
 
 ## Config Files
 
 ### Base Config
-Config common to all dataset can found in [configs/default.json](configs/default.json).
+Config common to all dataset can be found in [configs/default.json](configs/default.json).
 
 ### Dataset config
-All dataset must be placed in the `data/` folder.
+All datasets must be placed in the `data/` folder.
 Each dataset must contain a `dataset_config.json` file, an example can be found [here](configs/example_dataset_config.json).
 This config file describes specific variables to this dataset.
 
@@ -137,7 +351,7 @@ We recommend you downloading this example dataset to have a concrete and working
 
 NOTE: If you use data generated with the [RL Repo](https://github.com/araffin/robotics-rl-srl), the dataset will be already preprocessed, so you don't need to bother about this step.
 
-The dataset format is as followed:
+The dataset format is as follows:
 
 0. You must provide a dataset config file (see previous section) that contains at least if the ground truth is the relative position or not
 1. Images are grouped by episode in different folders (`record_{03d}/` folders)
@@ -187,200 +401,6 @@ Reproducing an experiment:
 python pipeline.py -c path/to/exp_config.json
 ```
 
-
-## Learn a State Representation
-
-Usage:
-```
-usage: train.py [-h] [--epochs N] [--seed S] [--state-dim STATE_DIM]
-                [-bs BATCH_SIZE] [--val-size VAL_SIZE]
-                [--training-set-size TRAINING_SET_SIZE] [-lr LEARNING_RATE]
-                [--l1-reg L1_REG] [--no-cuda] [--no-plots]
-                [--model-type {custom_cnn,resnet,mlp,linear}] --data-folder
-                DATA_FOLDER [--log-folder LOG_FOLDER] [--multi-view]
-                [--balanced-sampling]
-                [--losses {forward,inverse,reward,priors,episode-prior,reward-prior,triplet,autoencoder,vae}
-                [--beta BETA]
-
-State Representation Learning with PyTorch
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --epochs N            number of epochs to train (default: 50)
-  --seed S              random seed (default: 1)
-  --state-dim STATE_DIM
-                        state dimension (default: 2)
-  -bs BATCH_SIZE, --batch-size BATCH_SIZE
-                        batch_size (default: 256)
-  --val-size VAL_SIZE   Validation set size in percentage (default: 0.2)
-  --training-set-size TRAINING_SET_SIZE
-                        Limit size (number of samples) of the training set
-                        (default: -1)
-  -lr LEARNING_RATE, --learning-rate LEARNING_RATE
-                        learning rate (default: 0.005)
-  --l1-reg L1_REG       L1 regularization coeff (default: 0.0)
-  --no-cuda             disables CUDA training
-  --no-plots            disables plots
-  --model-type {custom_cnn,resnet,mlp,linear}
-                        Model architecture (default: "custom_cnn")
-  --data-folder DATA_FOLDER
-                        Dataset folder
-  --log-folder LOG_FOLDER
-                        Folder within logs/ where the experiment model and plots will be saved.
-                        If disabled, automatic logs will be generated with experiment config file & KNN-MSE computation.
-  --multi-view          Enable use of multiple camera (for all losses, except on ResNet Architecture).
-  --balanced-sampling   Force balanced sampling for episode independent prior instead of uniform
-  --losses              Combininable losses(s) to be applied for SRL
-  --beta BETA           The Beta factor on the KL divergence,
-                        higher value means more disentangling (for VAE only).
-
-
-```
-
-
-Example:
-```
-python train.py --data-folder data/path/to/dataset
-```
-
-## Multiple Cameras
-
-### Stacked Observations
-
-Using the `custom_cnn` and `mlp` architecture, it is possible to pass pairs of images from different views stacked along the channels' dimension i.e of dim (224,224,6).
-
-To use this functionality to perform state representation learning, enable `--multi-view` (see usage of script train.py),
-and use a dataset generated for the purpose.
-
-
-### Triplets of Observations
-
-Similarly, it is possible to learn representation of states using a dataset of triplets, i.e tuples made of an anchor, a positive and a negative observation.
-
-The anchor and the positive observation are views of the scene at the same time step, but from different cameras.
-
-The negative example is an image from the same camera as the anchor but at a different time step selected randomly among images in the same record.
-
-In our case, enable `triplet` as a loss (`--losses`) to use the TCN-like architecture made of a pre-trained ResNet with an extra fully connected layer (embedding).
-
-To use this functionality also enable `--multi-view`, and use a dataset generated for the purpose.
-Related papers:
-- "Time-Contrastive Networks: Self-Supervised Learning from Video" (P. Sermanet et al., 2017), paper: [https://arxiv.org/abs/1704.06888](https://arxiv.org/abs/1704.06888)
-
-## Evaluation and Plotting
-
-## Learned Space Visualization
-
-To view the learned state and play with the latent space of a VAE, autoencoder or srl-priors, you may use:
-```bash
-python -m enjoy.enjoy_latent --log-dir logs/nameOfTheDataset/nameOfTheModel
-```
-
-### Create a report
-After a report you can create a csv report file using:
-```
-python evaluation/create_report.py -d logs/nameOfTheDataset/
-```
-
-### Plot a Learned Representation
-
-```
-usage: representation_plot.py [-h] [-i INPUT_FILE] [--data-folder DATA_FOLDER]
-                              [--color-episode] [--plot-against]
-                              [--correlation] [--projection]
-
-Plotting script for representation
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -i INPUT_FILE, --input-file INPUT_FILE
-                        Path to a npz file containing states and rewards
-  --data-folder DATA_FOLDER
-                        Path to a dataset folder, it will plot ground truth
-                        states
-  --color-episode       Color states per episodes instead of reward
-  --plot-against        Plot against each dimension
-  --correlation         Plot the Pearson Matrix of correlation between the Ground truth and learned states.
-  --projection          Plot 1D projection of predicted state on ground truth
-
-```
-You can plot a learned representation with:
-```
-python plotting/representation_plot.py -i path/to/states_rewards.npz
-```
-
-You can also plot ground truth states with:
-```
-python plotting/representation_plot.py --data-folder path/to/datasetFolder/
-```
-
-To have a different color per episode, you have to pass `--data-folder` argument along with `--color-episode`.
-
-### Interactive Plot
-
-You can have an interactive plot of a learned representation using:
-```
-python plotting/interactive_plot.py --data-folder path/to/datasetFolder/ -i path/to/states_rewards.npz
-```
-When you click on a state in the representation plot (left click for 2D, **right click for 3D plots**!), it shows the corresponding image along with the reward and the coordinates in the space.
-
-Pass `--multi-view` as argument to visualize in case of multiple cameras.
-
-You can also plot ground truth states when you don't specify a npz file:
-```
-python plotting/interactive_plot.py --data-folder path/to/datasetFolder/
-```
-
-### Create a KNN Plot and Compute KNN-MSE
-
-Usage:
-```
-python plotting/knn_images.py [-h] --log-folder LOG_FOLDER [--seed SEED]
-                     [-k N_NEIGHBORS] [-n N_SAMPLES] [--n-to-plot N_TO_PLOT]
-                     [--relative-pos] [--ground-truth] [--multi-view]
-
-KNN plot and KNN MSE
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --log-folder LOG_FOLDER
-                        Path to a log folder
-  --seed SEED           random seed (default: 1)
-  -k N_NEIGHBORS, --n-neighbors N_NEIGHBORS
-                        Number of nearest neighbors (default: 5)
-  -n N_SAMPLES, --n-samples N_SAMPLES
-                        Number of test samples (default: 5)
-  --n-to-plot N_TO_PLOT
-                        Number of samples to plot (default: 5)
-  --relative-pos        Use relative position as ground_truth
-  --ground-truth        Compute KNN-MSE for ground truth
-  --multi-view          To deal with multi view data format
-
-
-```
-
-Example:
-```
-python plotting/knn_images.py --log-folder path/to/an/experiment/log/folder
-```
-
-## Baselines
-
-Baseline models are saved in `logs/nameOfTheDataset/baselines/` folder.
-
-### Supervised Learning
-
-Example:
-```
-python -m baselines.supervised --data-folder path/to/data/folder
-```
-
-### Principal Components Analysis
-
-PCA:
-```
-python -m baselines.pca --data-folder path/to/data/folder --state-dim 3
-```
 
 ## SRL Server for Reinforcement Learning
 
