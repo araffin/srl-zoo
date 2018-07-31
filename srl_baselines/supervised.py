@@ -74,12 +74,12 @@ class SupervisedLearning(BaseLearner):
                                                           test_size=0.33, random_state=self.seed)
 
         train_loader = SupervisedDataLoader(x_train, y_train, images_path, batch_size=BATCH_SIZE,
-                                            max_queue_len=4, is_training=True)
+                                            max_queue_len=4, shuffle=True)
         val_loader = SupervisedDataLoader(x_val, y_val, images_path, batch_size=TEST_BATCH_SIZE,
-                                          max_queue_len=1, is_training=False)
+                                          max_queue_len=1, shuffle=False)
         # For plotting
-        data_loader = SupervisedDataLoader(x_indices, true_states, images_path, batch_size=TEST_BATCH_SIZE,
-                                           max_queue_len=1, is_training=False)
+        data_loader = SupervisedDataLoader(x_indices, true_states, images_path, no_targets=True, batch_size=TEST_BATCH_SIZE,
+                                           max_queue_len=1, shuffle=False)
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = nn.MSELoss()

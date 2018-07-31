@@ -119,6 +119,9 @@ if __name__ == '__main__':
     else:
         losses_weights_dict = {loss_key: weight_value for loss_key, weight_value in zip(args.losses, losses_weights)}
 
+    assert not("triplet" in losses and not args.multi_view),\
+           "Triplet loss with single view is not supported, please use the --multi-view option"
+
     if args.multi_view is True:
         # Setting variables involved data-loading from multiple cameras,
         # involved also in adapting the input layers of NN to that data
