@@ -11,7 +11,8 @@ import torch as th
 from tqdm import tqdm
 
 from losses.losses import LossManager, autoEncoderLoss, roboticPriorsLoss, tripletLoss, rewardModelLoss, \
-    rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss, vaeLoss, l1Loss, l2Loss
+    rewardPriorLoss, forwardModelLoss, inverseModelLoss, episodePriorLoss, l1Loss, l2Loss, kullbackLeiblerLoss, \
+    perceptualSimilarityLoss, generationLoss
 from losses.utils import findPriorsPairs
 from pipeline import NAN_ERROR
 from plotting.representation_plot import plotRepresentation, plt, plotImage
@@ -429,14 +430,17 @@ class SRL4robotics(BaseLearner):
                                     weight=self.losses_weights_dict[loss_type], loss_manager=loss_manager)
 
                 if self.use_vae:
-                    vaeLoss(decoded_obs, next_decoded_obs, obs, next_obs, mu, next_mu, logvar, next_logvar,
-                            weight=self.losses_weights_dict['vae'],
-                            loss_manager=loss_manager, beta=self.beta,
-                            perceptual_similarity_loss=self.perceptual_similarity_loss,
-                            encoded_real=states_denoiser, encoded_prediction=states_denoiser_predicted,
-                            next_encoded_real=next_states_denoiser,
-                            next_encoded_prediction=next_states_denoiser_predicted,
-                            weight_perceptual=self.losses_weights_dict['perceptual'])
+
+                    kullbackLeiblerLoss(mu, next_mu, logvar, next_logvar, loss_manager=loss_manager, beta=self.beta)
+
+                    if self.perceptual_similarity_loss:
+                        perceptualSimilarityLoss(states_denoiser, states_denoiser_predicted, next_states_denoiser,
+                                                next_states_denoiser_predicted,
+                                                weight=self.losses_weights_dict['perceptual'],
+                                                loss_manager=loss_manager)
+                    else:
+                        generationLoss(decoded_obs, next_decoded_obs, obs, next_obs,
+                                       weight=self.losses_weights_dict['vae'], loss_manager=loss_manager)
 
                 if self.reward_prior:
                     rewards_st = rewards[minibatchlist[minibatch_idx]]

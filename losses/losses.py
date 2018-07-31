@@ -193,29 +193,55 @@ def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_m
     return weight * ae_loss
 
 
-def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logvar,
-            weight, loss_manager, beta=1, perceptual_similarity_loss=False, encoded_real=None, encoded_prediction=None,
-            next_encoded_real = None, next_encoded_prediction = None, weight_perceptual=0.):
+def generationLoss(decoded, next_decoded, obs, next_obs, weight, loss_manager):
     """
-    Reconstruction + KL divergence losses summed over all elements and batch
+    Pixel-wise generation Loss
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :param decoded: reconstructed Observation (th.Tensor)
     :param next_decoded: next reconstructed Observation (th.Tensor)
     :param obs: Observation (th.Tensor)
     :param next_obs: next Observation (th.Tensor)
-    :param mu: mean of the distribution of samples (th.Tensor)
-    :param next_mu: mean of the distribution of next samples (th.Tensor)
-    :param logvar: log of the variance of the distribution of samples (th.Tensor)
-    :param next_logvar: log of the variance of the distribution of next samples (th.Tensor)
-    :param weight: coefficient to weight the loss (float)
+    :param weight: (float)
+    :return: (th.Tensor)
+    """
+    generation_loss = F.mse_loss(decoded, obs, reduction='sum')
+    generation_loss += F.mse_loss(next_decoded, next_obs, reduction='sum')
+    loss_name = 'generation_loss'
+    loss_manager.addToLosses(loss_name, weight, generation_loss)
+    return weight * generation_loss
+
+
+def perceptualSimilarityLoss(encoded_real, encoded_prediction, next_encoded_real, next_encoded_prediction,
+                            weight, loss_manager):
+    """
+    Perceptual similarity Loss for VAE as in
+    # "DARLA: Improving Zero-Shot Transfer in Reinforcement Learning", Higgins et al.
+    # see https://arxiv.org/pdf/1707.08475.pdf
+
     :param loss_manager: loss criterion needed to log the loss value (LossManager)
-    :param beta: (float) used to weight the KL divergence for disentangling
-    :param perceptual_similarity_loss: whether or not to compute the perceptual similarity loss (bool)
     :param encoded_real: states encoding the real observation by the DAE (th.Tensor)
     :param encoded_prediction: states encoding the vae's predicted observation by the DAE  (th.Tensor)
     :param next_encoded_real: states encoding the next real observation by the DAE (th.Tensor)
     :param next_encoded_prediction: states encoding the vae's predicted next observation by the DAE (th.Tensor)
-    :param weight_perceptual: loss for the DAE's embedding l2 distance (float)
+    :param weight: loss for the DAE's embedding l2 distance (float)
     :return: (th.Tensor)
+    """
+
+    pretrained_dae_encoding_loss = F.mse_loss(encoded_real, encoded_prediction, reduction='sum')
+    pretrained_dae_encoding_loss += F.mse_loss(next_encoded_real, next_encoded_prediction, reduction='sum')
+    loss_manager.addToLosses("denoising perceptual similarity", weight, pretrained_dae_encoding_loss)
+    return weight * pretrained_dae_encoding_loss
+
+
+def kullbackLeiblerLoss(mu, next_mu, logvar, next_logvar, loss_manager, beta=1):
+    """
+    KL divergence losses summed over all elements and batch
+    :param mu: mean of the distribution of samples (th.Tensor)
+    :param next_mu: mean of the distribution of next samples (th.Tensor)
+    :param logvar: log of the variance of the distribution of samples (th.Tensor)
+    :param next_logvar: log of the variance of the distribution of next samples (th.Tensor)
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
+    :param beta: (float) used to weight the KL divergence for disentangling
     """
 
     # see Appendix B from VAE paper:
@@ -223,26 +249,8 @@ def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logv
     # https://arxiv.org/abs/1312.6114
     kl_divergence = -0.5 * th.sum(1 + logvar - mu.pow(2) - logvar.exp())
     kl_divergence += -0.5 * th.sum(1 + next_logvar - next_mu.pow(2) - next_logvar.exp())
-
-    # If using Perceptual Similarity loss as in
-    # "DARLA: Improving Zero-Shot Transfer in Reinforcement Learning", Higgins et al.
-    # see https://arxiv.org/pdf/1707.08475.pdf
-    if perceptual_similarity_loss:
-        pretrained_dae_encoding_loss = F.mse_loss(encoded_real,  encoded_prediction, size_average=False)
-        pretrained_dae_encoding_loss += F.mse_loss(next_encoded_real, next_encoded_prediction, size_average=False)
-        loss_manager.addToLosses("denoising perceptual similarity", weight_perceptual, pretrained_dae_encoding_loss)
-        vae_loss = weight_perceptual * pretrained_dae_encoding_loss + beta * kl_divergence
-        loss_manager.addToLosses('kl_loss', beta, kl_divergence)
-
-    # or if using Pixel-wise generation Loss
-    else:
-        generation_loss = F.mse_loss(decoded, obs, size_average=False)
-        generation_loss += F.mse_loss(next_decoded, next_obs, size_average=False)
-        vae_loss = generation_loss + beta * kl_divergence
-        loss_name = 'kl_loss'
-        loss_manager.addToLosses(loss_name, weight, vae_loss)
-
-    return weight * vae_loss
+    loss_manager.addToLosses('kl_loss', beta, kl_divergence)
+    return beta * kl_divergence
 
 
 def mutualInformationLoss(states, rewards_st, weight, loss_manager):
