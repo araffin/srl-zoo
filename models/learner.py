@@ -136,7 +136,7 @@ class SRL4robotics(BaseLearner):
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, l2_reg=0.0, cuda=False,
                  multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1,
-                 split_index=-1, path_denoiser=None, occlusion_percentage=None):
+                 split_index=-1, path_to_dae=None, occlusion_percentage=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -162,7 +162,7 @@ class SRL4robotics(BaseLearner):
             self.use_triplets = "triplet" in self.losses
             self.perceptual_similarity_loss = "perceptual" in self.losses
             self.use_dae = "dae" in self.losses
-            self.path_denoiser = path_denoiser
+            self.path_to_dae = path_to_dae
             if split_index > 0:
                 self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action,
                                              model_type=model_type,
@@ -298,10 +298,9 @@ class SRL4robotics(BaseLearner):
 
             self.denoiser = SRLModules(state_dim=200, action_dim=self.dim_action, model_type="custom_cnn",
                        cuda=self.cuda, losses=["dae"])
-            self.denoiser.eval()
-            self.device = th.device("cuda" if th.cuda.is_available() and self.cuda else "cpu")
-            self.denoiser = self.denoiser.to(self.device)
             self.denoiser.load_state_dict(th.load(self.path_to_dae))
+            self.denoiser.eval()
+            self.denoiser = self.denoiser.to(self.device)
             for param in self.denoiser.parameters():
                 param.requires_grad = False
 

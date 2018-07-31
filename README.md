@@ -147,7 +147,7 @@ python train.py --data-folder data/path/to/dataset --losses autoencoder inverse
 
 Train a vae with the perseptual similarity loss:
 ```
-python train.py --data-folder data/path/to/dataset --losses vae perceptual --path-denoiser logs/path/to/pretrained_dae/srl_model.pth
+python train.py --data-folder data/path/to/dataset --losses vae perceptual --path-to-dae logs/path/to/pretrained_dae/srl_model.pth
 ```
 
 

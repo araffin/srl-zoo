@@ -93,8 +93,8 @@ if __name__ == '__main__':
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
     parser.add_argument('--split-index', type=int, default=-1,
                         help='Split representation models (default: -1, no split)')
-    parser.add_argument('--path-denoiser', type=str, default="",
-                        help='Path till a pre-trained denoising model when using the perceptual loss with VAE')
+    parser.add_argument('--path-to-dae', type=str, default="",
+                        help='Path to a pre-trained dae model when using the perceptual loss with VAE')
     parser.add_argument('--losses-weights', type=float, nargs='+', default=[], help="losses's weights")
     parser.add_argument('--occlusion-percentage', type=float, default=0.5,
                          help='Max percentage of input occlusion for masks when using DAE')
@@ -112,6 +112,8 @@ if __name__ == '__main__':
     # Dealing with losses to use
     losses = list(set(args.losses))
     losses_weights = list(args.losses_weights)
+    assert len(losses_weights) == 0 or len(losses_weights) == len(losses), \
+        "Please when doing so, specify as many weights as the number of losses you want to apply !"
     if len(losses_weights) == 0:
         losses_weights_dict = None
     else:
@@ -126,8 +128,6 @@ if __name__ == '__main__':
         else:
             preprocessing.preprocess.N_CHANNELS = 6
 
-    assert len(losses_weights) == 0 or len(losses_weights) == len(losses), \
-        "Please when doing so, specify as many weights as the number of losses you want to apply !"
     assert not ("autoencoder" in losses and "vae" in losses), "Model cannot be both an Autoencoder and a VAE (come on!)"
     assert not (("autoencoder" in losses or "vae" in losses)
                 and args.model_type == "resnet"), "Model cannot be an Autoencoder or VAE using ResNet Architecture !"
@@ -174,7 +174,7 @@ if __name__ == '__main__':
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, l2_reg=args.l2_reg, cuda=args.cuda, multi_view=args.multi_view,
                        losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta, \
-                       split_index=args.split_index, path_denoiser=args.path_denoiser,
+                       split_index=args.split_index, path_to_dae=args.path_to_dae,
                        occlusion_percentage=args.occlusion_percentage)
 
     if args.training_set_size > 0:
