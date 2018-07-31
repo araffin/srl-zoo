@@ -10,24 +10,33 @@ https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
 from __future__ import print_function, division, absolute_import
 
 import argparse
+
 import numpy as np
 import torch as th
 
 import models.learner as learner
-from models.learner import SRL4robotics
-from pipeline import getLogFolderName, saveConfig, knnCall
-from plotting.losses_plot import plotLosses
 import plotting.representation_plot as plot_script
-from plotting.representation_plot import plotRepresentation, plt, plotImage
 import preprocessing
-from utils import parseDataFolder, printYellow, createFolder, detachToNumpy, getInputBuiltin
+from models.learner import SRL4robotics
+from pipeline import getLogFolderName, saveConfig
+from plotting.losses_plot import plotLosses
+from plotting.representation_plot import plotRepresentation
+from utils import parseDataFolder, createFolder, getInputBuiltin, loadData
+
 
 def buildConfig(args):
     """
     :param args: (parsed args object)
+    :return: (dict)
     """
+    # Fix to use this function in srl_baselines/
+    split_index = args.split_index if hasattr(args, "split_index") else -1
+    beta = args.beta if hasattr(args, "beta") else -1
+    l1_reg = args.l1_reg if hasattr(args, "l1_reg") else 0
+    l2_reg = args.l2_reg if hasattr(args, "l2_reg") else 0
     exp_config = {
         "batch-size": args.batch_size,
+        "beta": beta,
         "data-folder": args.data_folder,
         "epochs": args.epochs,
         "learning-rate": args.learning_rate,
@@ -38,10 +47,12 @@ def buildConfig(args):
         "state-dim": args.state_dim,
         "knn-samples": 200,
         "knn-seed": 1,
-        "l1-reg": 0,
+        "l1-reg": l1_reg,
+        "l2-reg": l2_reg,
         "losses": args.losses,
         "n-neighbors": 5,
-        "n-to-plot": 5
+        "n-to-plot": 5,
+        "split-index": split_index
     }
     return exp_config
 
@@ -59,6 +70,7 @@ if __name__ == '__main__':
                         help='Limit size (number of samples) of the training set (default: -1)')
     parser.add_argument('-lr', '--learning-rate', type=float, default=0.005, help='learning rate (default: 0.005)')
     parser.add_argument('--l1-reg', type=float, default=0.0, help='L1 regularization coeff (default: 0.0)')
+    parser.add_argument('--l2-reg', type=float, default=0.0, help='L2 regularization coeff (default: 0.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--no-display-plots', action='store_true', default=False,
                         help='disables live plots of the representation learned')
@@ -69,7 +81,7 @@ if __name__ == '__main__':
     parser.add_argument('--log-folder', type=str, default="",
                         help='Folder where the experiment model and plots will be saved. ' +
                              'By default, automatically computing KNN-MSE and saving logs at location ' +
-                             'logs/DatasetName/YY-MM-DD_HHhMM_SS_ModelType_ST_DIMN_LOSEES')
+                             'logs/DatasetName/YY-MM-DD_HHhMM_SS_ModelType_ST_DIMN_LOSSES')
     parser.add_argument('--multi-view', action='store_true', default=False,
                         help='Enable use of multiple camera')
     parser.add_argument('--balanced-sampling', action='store_true', default=False,
@@ -78,14 +90,15 @@ if __name__ == '__main__':
                         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
                                  "autoencoder", "vae", "perceptual","dae"], )
     parser.add_argument('--beta', type=float, default=1.0,
-                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
-    parser.add_argument('--path-to-dae', type=str, default="",
-                        help='Path to a pre-trained denoising model when using the perceptual loss with VAE')
+                        help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
+    parser.add_argument('--split-index', type=int, default=-1,
+                        help='Split representation models (default: -1, no split)')
+    parser.add_argument('--path-denoiser', type=str, default="",
+                        help='Path till a pre-trained denoising model when using the perceptual loss with VAE')
     parser.add_argument('--losses-weights', type=float, nargs='+', default=[], help="losses's weights")
     parser.add_argument('--occlusion-percentage', type=float, default=0.5,
                          help='Max percentage of input occlusion for masks when using DAE')
 
-    input = getInputBuiltin()
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     args.data_folder = parseDataFolder(args.data_folder)
@@ -127,12 +140,10 @@ if __name__ == '__main__':
         "Please learn the DAE before learning a VAE with the perceptual loss "
 
     print('Loading data ... ')
-    training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
+    training_data, ground_truth, _, _ = loadData(args.data_folder)
+    rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
     actions = training_data['actions']
     n_actions = int(np.max(actions) + 1)
-
-    rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
-    ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
 
     # Try to convert old python 2 format
     try:
@@ -140,32 +151,31 @@ if __name__ == '__main__':
     except AttributeError:
         images_path = ground_truth['images_path']
 
-    # Create log folder
+    # Building the experiment config file
+    exp_config = buildConfig(args)
     if args.log_folder == "":
-        exp_config = buildConfig(args)
+        # Automatically create dated log folder for configs
         createFolder("logs/{}".format(exp_config['data-folder']), "Dataset log folder already exist")
-
         # Check that the dataset is already preprocessed
         log_folder, experiment_name = getLogFolderName(exp_config)
-        print('Log folder: {}'.format(log_folder))
-
-        exp_config['log-folder'] = log_folder
-        exp_config['experiment-name'] = experiment_name
-        exp_config['n_actions'] = n_actions
-        exp_config['multi-view'] = args.multi_view
-        if "dae" in losses:
-            exp_config['occlusion-percentage'] = args.occlusion_percentage
-
-        # Save config in log folder & results as well
         args.log_folder = log_folder
-        saveConfig(exp_config, print_config=True)
+    else:
+        experiment_name = "{}_{}".format(args.model_type, losses)
+    exp_config['log-folder'] = args.log_folder
+    exp_config['experiment-name'] = experiment_name
+    exp_config['n_actions'] = n_actions
+    exp_config['multi-view'] = args.multi_view
+    if "dae" in losses:
+        exp_config['occlusion-percentage'] = args.occlusion_percentage
+    print('Log folder: {}'.format(args.log_folder))
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
-                       l1_reg=args.l1_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta,
-                       path_to_dae=args.path_to_dae, occlusion_percentage=args.occlusion_percentage)
+                       l1_reg=args.l1_reg, l2_reg=args.l2_reg, cuda=args.cuda, multi_view=args.multi_view,
+                       losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta, \
+                       split_index=args.split_index, path_denoiser=args.path_denoiser,
+                       occlusion_percentage=args.occlusion_percentage)
 
     if args.training_set_size > 0:
         limit = args.training_set_size
@@ -174,7 +184,14 @@ if __name__ == '__main__':
         rewards = rewards[:limit]
         episode_starts = episode_starts[:limit]
 
-    loss_history, learned_states = srl.learn(images_path, actions, rewards, episode_starts)
+    # Save configs in log folder
+    saveConfig(exp_config, print_config=True)
+
+    loss_history, learned_states, pairs_name_weights = srl.learn(images_path, actions, rewards, episode_starts)
+
+    # Update config with weights for each losses
+    exp_config['losses_weights'] = pairs_name_weights
+    saveConfig(exp_config, print_config=True)
 
     # Save plot
     plotLosses(loss_history, args.log_folder)
@@ -190,4 +207,4 @@ if __name__ == '__main__':
 
     # Do not close plot at the end of training
     if learner.DISPLAY_PLOTS:
-        input('\nPress any key to exit.')
+        getInputBuiltin()('\nPress any key to exit.')

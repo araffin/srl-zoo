@@ -12,11 +12,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
-# Python 2/3 compatibility
-try:
-    input = raw_input
-except NameError:
-    pass
+from utils import parseDataFolder, getInputBuiltin, loadData
 
 # Init seaborn
 sns.set()
@@ -124,8 +120,7 @@ def plotRepresentation(states, rewards, images_path, name="Learned State Represe
 class ImageFinder(object):
     """
     Callback for matplotlib to display an annotation when points are
-    clicked on.  The point which is closest to the click and within
-    xtol and ytol is identified.
+    clicked on.  The point which is closest to the click.
     """
 
     def __init__(self, states, rewards, image_plot, ax, images_path, view=0):
@@ -138,6 +133,17 @@ class ImageFinder(object):
         self.states = states
         self.rewards = rewards
         self.view = view
+
+        # Highlight the selected state
+        self.kwargs = dict(s=130, color='green', alpha=0.7)
+        coords = self.getCoords(0)
+        if states.shape[1] > 2:
+            self.dot = ax.scatter([coords[0]], [coords[1]], [coords[2]], **self.kwargs)
+        else:
+            self.dot = ax.scatter([coords[0]], [coords[1]], **self.kwargs)
+
+    def getCoords(self, state_idx):
+        return self.states[state_idx].tolist()
 
     def __call__(self, event):
         if event.inaxes:
@@ -166,6 +172,12 @@ class ImageFinder(object):
             path = self.images_path[state_idx]
             # Load the image that corresponds to the clicked point in the space
             self.image_plot.set_data(loadImage(path, self.view))
+            coords = self.getCoords(state_idx)
+            self.dot.set_offsets(coords[:2])
+            if self.states.shape[1] > 2:
+                # Recreate the highlighted dot each time because set_offsets does not work in 3d
+                self.dot.remove()
+                self.dot = self.ax.scatter([coords[0]], [coords[1]], [coords[2]], **self.kwargs)
 
 
 if __name__ == '__main__':
@@ -179,9 +191,7 @@ if __name__ == '__main__':
                         help='Enable use of multiple camera')
     args = parser.parse_args()
 
-    # Remove `data/` from the path if needed
-    if args.data_folder.startswith('data/'):
-        args.data_folder = args.data_folder[5:]
+    args.data_folder = parseDataFolder(args.data_folder)
 
     if args.input_file != "":
         print("Loading {}...".format(args.input_file))
@@ -190,17 +200,15 @@ if __name__ == '__main__':
         plotRepresentation(states_rewards['states'], states_rewards['rewards'], images_path,
                            multi_view=args.multi_view)
 
-        input('\nPress any key to exit.')
+        getInputBuiltin()('\nPress any key to exit.')
 
     else:
 
         print("Plotting ground truth...")
-        # TODO: support relative pos
-        ground_truth = np.load('data/{}/ground_truth.npz'.format(args.data_folder))
-        states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
-        images_path = np.load('data/{}/ground_truth.npz'.format(args.data_folder))['images_path']
-        rewards = np.load('data/{}/preprocessed_data.npz'.format(args.data_folder))['rewards']
+        training_data, ground_truth, true_states, _ = loadData(args.data_folder)
+        images_path = ground_truth['images_path']
+        rewards = training_data['rewards']
         name = "Ground Truth States - {}".format(args.data_folder)
 
-        plotRepresentation(states, rewards, images_path, name, fit_pca=False, multi_view=args.multi_view)
-        input('\nPress any key to exit.')
+        plotRepresentation(true_states, rewards, images_path, name, fit_pca=False, multi_view=args.multi_view)
+        getInputBuiltin()('\nPress any key to exit.')

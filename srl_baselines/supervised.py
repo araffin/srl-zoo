@@ -18,25 +18,26 @@ from plotting.representation_plot import plotRepresentation, plt
 from preprocessing.data_loader import SupervisedDataLoader
 from preprocessing.preprocess import getInputDim
 from train import buildConfig
-from utils import parseDataFolder, createFolder, getInputBuiltin
+from utils import parseDataFolder, createFolder, getInputBuiltin, loadData
 
 DISPLAY_PLOTS = True
 EPOCH_FLAG = 1  # Plot every 1 epoch
 BATCH_SIZE = 32
-TEST_BATCH_SIZE = 512
+TEST_BATCH_SIZE = 256
 
 
 class SupervisedLearning(BaseLearner):
-    """
-    :param state_dim: (int)
-    :param model_type: (str) one of "resnet" or "mlp"
-    :param seed: (int)
-    :param learning_rate: (float)
-    :param cuda: (bool)
-    """
 
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, cuda=False):
+        """
+        :param state_dim: (int)
+        :param model_type: (str) one of "resnet", "custom_cnn" or "mlp"
+        :param log_folder: (str
+        :param seed: (int)
+        :param learning_rate: (float)
+        :param cuda: (bool)
+        """
 
         super(SupervisedLearning, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -72,11 +73,13 @@ class SupervisedLearning(BaseLearner):
         x_train, x_val, y_train, y_val = train_test_split(x_indices, true_states,
                                                           test_size=0.33, random_state=self.seed)
 
-        train_loader = SupervisedDataLoader(x_train, y_train, images_path, batch_size=self.batch_size)
-        val_loader = SupervisedDataLoader(x_val, y_val, images_path, batch_size=TEST_BATCH_SIZE, is_training=False)
+        train_loader = SupervisedDataLoader(x_train, y_train, images_path, batch_size=BATCH_SIZE,
+                                            max_queue_len=4, is_training=True)
+        val_loader = SupervisedDataLoader(x_val, y_val, images_path, batch_size=TEST_BATCH_SIZE,
+                                          max_queue_len=1, is_training=False)
         # For plotting
         data_loader = SupervisedDataLoader(x_indices, true_states, images_path, batch_size=TEST_BATCH_SIZE,
-                                           no_targets=True, is_training=False)
+                                           max_queue_len=1, is_training=False)
 
         # TRAINING -----------------------------------------------------------------------------------------------------
         criterion = nn.MSELoss()
@@ -84,16 +87,15 @@ class SupervisedLearning(BaseLearner):
         best_error = np.inf
         best_model_path = "{}/srl_supervised_model.pth".format(self.log_folder)
 
-        self.model.train()
         start_time = time.time()
         epoch_train_loss = [[] for _ in range(N_EPOCHS)]
         epoch_val_loss = [[] for _ in range(N_EPOCHS)]
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
             train_loss, val_loss = 0, 0
-            train_loader.resetAndShuffle()
             pbar = tqdm(total=len(train_loader))
-            for batch_idx, (obs, target_states) in enumerate(train_loader):
+            self.model.train()  # Restore train mode
+            for obs, target_states in train_loader:
                 obs, target_states = obs.to(self.device), target_states.to(self.device)
 
                 pred_states = self.model(obs)
@@ -109,7 +111,6 @@ class SupervisedLearning(BaseLearner):
             train_loss /= len(train_loader)
 
             self.model.eval()
-            val_loader.resetIterator()
             with th.no_grad():
                 # Pass on the validation set
                 for obs, target_states in val_loader:
@@ -121,7 +122,6 @@ class SupervisedLearning(BaseLearner):
                     epoch_val_loss[epoch].append(loss.item())
 
                 val_loss /= len(val_loader)
-            self.model.train()  # Restore train mode
 
             # Save best model
             if val_loss < best_error:
@@ -180,7 +180,6 @@ if __name__ == '__main__':
                         help='Use relative position as ground_truth')
     parser.add_argument('--log-folder', type=str, default='', help='Override the default log-folder')
 
-    input = getInputBuiltin()
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     DISPLAY_PLOTS = not args.no_display_plots
@@ -189,9 +188,11 @@ if __name__ == '__main__':
     BATCH_SIZE = args.batch_size
     args.data_folder = parseDataFolder(args.data_folder)
     log_folder = args.log_folder
+
     if log_folder == '':
         name = getModelName(args)
         log_folder = "logs/{}/baselines/{}".format(args.data_folder, name)
+
     createFolder(log_folder, "supervised folder already exist")
 
     folder_path = '{}/NearestNeighbors/'.format(log_folder)
@@ -200,23 +201,8 @@ if __name__ == '__main__':
     print('Log folder: {}'.format(log_folder))
 
     print('Loading data ... ')
-    training_data = np.load("data/{}/preprocessed_data.npz".format(args.data_folder))
+    training_data, ground_truth, true_states, _ = loadData(args.data_folder)
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
-
-    # TODO: normalize true states
-    ground_truth = np.load("data/{}/ground_truth.npz".format(args.data_folder))
-    # Backward compatibility with previous names
-    true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
-    target_positions = ground_truth[
-        'target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
-
-    if args.relative_pos:
-        print("Using relative position")
-        button_idx = -1
-        for i in range(len(episode_starts)):
-            if episode_starts[i] == 1:
-                button_idx += 1
-            true_states[i] -= target_positions[button_idx]
 
     images_path = ground_truth['images_path']
     state_dim = true_states.shape[1]
@@ -246,4 +232,4 @@ if __name__ == '__main__':
     plotRepresentation(learned_states, rewards, name, add_colorbar=True, path=path)
 
     if DISPLAY_PLOTS:
-        input('\nPress any key to exit.')
+        getInputBuiltin()('\nPress any key to exit.')

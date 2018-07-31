@@ -2,19 +2,18 @@ from __future__ import print_function, division, absolute_import
 
 import argparse
 import json
-import os
 
-import numpy as np
 import cv2
-import torch
+import numpy as np
+import torch as th
 from sklearn.neighbors import KNeighborsClassifier
 
+from models.learner import SRL4robotics
 from preprocessing.utils import deNormalize
-from models import SRLModules
 from utils import detachToNumpy
 
 VALID_MODELS = ["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-               "autoencoder", "vae"]
+                "autoencoder", "vae"]
 
 
 def getImage(srl_model, mu, device):
@@ -25,15 +24,15 @@ def getImage(srl_model, mu, device):
     :param device: (pytorch device)
     :return: ([float])
     """
-    with torch.no_grad():
-        mu = torch.from_numpy(np.array(mu).reshape(1, -1)).to(torch.float)
+    with th.no_grad():
+        mu = th.from_numpy(np.array(mu).reshape(1, -1)).float()
         mu = mu.to(device)
 
         net_out = srl_model.decode(mu)
 
         img = detachToNumpy(net_out)[0].T
 
-    img = deNormalize(img)
+    img = deNormalize(img, mode="image_net")
     return img[:, :, ::-1]
 
 
@@ -62,59 +61,45 @@ def main():
 
     args = parser.parse_args()
     use_cuda = not args.no_cuda
-    device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
+    device = th.device("cuda" if th.cuda.is_available() and use_cuda else "cpu")
 
-    # making sure you chose the right folder
-    assert os.path.exists(args.log_dir), "Error: folder '{}' does not exist".format(args.log_dir)
-
-    with open(args.log_dir + 'exp_config.json', 'r') as f:
-        exp_config = json.load(f)
-
+    srl_model, exp_config = SRL4robotics.loadSavedModel(args.log_dir, VALID_MODELS, cuda=use_cuda)
+    # Retrieve the pytorch model
+    srl_model = srl_model.model
+    losses = exp_config['losses']
     state_dim = exp_config['state-dim']
-    loss_type = exp_config['losses']
-    n_actions = exp_config['n_actions']
-    model_type = exp_config['model-type']
-
-    # is this a valid model ?
-    difference = set(loss_type).symmetric_difference(VALID_MODELS)
-    assert set(loss_type).intersection(VALID_MODELS) != set(), "Error: Not supported losses " + ", ".join(difference)
-
-    if os.path.exists(args.log_dir + 'srl_model.pth'):
-        model_path = args.log_dir + 'srl_model.pth'
 
     # model param and info
-    is_auto_encoder = 'autoencoder' in loss_type or 'vae' in loss_type
+    is_auto_encoder = 'autoencoder' in losses or 'vae' in losses
+
+    # Load all the states and images
+    data = json.load(open(args.log_dir + 'image_to_state.json'))
+    X = np.array(list(data.values())).astype(float)
+    y = list(data.keys())
+
     if is_auto_encoder:
-        assert os.path.exists(
-            args.log_dir + "exp_config.json"), "Error: could not find 'exp_config.json' in '{}'".format(
-            args.log_dir)
-        srl_model = SRLModules(state_dim=state_dim, action_dim=n_actions, model_type=model_type,
-                               cuda=use_cuda, losses=loss_type)
-        srl_model.eval()
-        srl_model.load_state_dict(torch.load(model_path))
-        srl_model.to(device)
-
-        ae_type = 'autoencoder' if 'autoencoder' in loss_type else 'vae'
+        ae_type = 'autoencoder' if 'autoencoder' in losses else 'vae'
         createFigureAndSlider(ae_type, state_dim)
+        # Boundaries for the AE slider
+        min_x_ae = np.min(X, axis=0)
+        max_x_ae = np.max(X, axis=0)
 
-    if not is_auto_encoder or len(loss_type) > 1:
-        data = json.load(open(args.log_dir + 'image_to_state.json'))
+    if not is_auto_encoder or len(losses) > 1:
+        state_dim_second_split = state_dim - exp_config['split-index'] if exp_config['split-index'] > 0 else state_dim
+
         srl_model_knn = KNeighborsClassifier()
 
-        # Load all the points and images, find bounds and train KNN model
-        X = np.array(list(data.values())).astype(float)
-        y = list(data.keys())
-        srl_model_knn.fit(X, np.arange(X.shape[0]))
+        # Find bounds and train KNN model
+        srl_model_knn.fit(X[:, -state_dim_second_split:], np.arange(X.shape[0]))
 
-        min_X = np.min(X, axis=0)
-        max_X = np.max(X, axis=0)
+        min_X = np.min(X[:, -state_dim_second_split:], axis=0)
+        max_X = np.max(X[:, -state_dim_second_split:], axis=0)
 
-        fig_name = "KNN on " + ", ".join([item + " " for item in loss_type])[:-1]
-        createFigureAndSlider(fig_name, state_dim)
-
+        fig_name = "KNN on " + ", ".join([item + " " for item in losses])[:-1]
+        createFigureAndSlider(fig_name, state_dim_second_split)
 
     # run the param through the network
-    while 1:
+    while True:
         # stop if escape is pressed
         k = cv2.waitKey(1) & 0xFF
         if k == 27:
@@ -125,7 +110,8 @@ def main():
             mu_ae = []
             for i in range(state_dim):
                 mu_ae.append(cv2.getTrackbarPos(str(i), 'slider for ' + ae_type))
-            mu_ae = (np.array(mu_ae) - 50) / 10
+            # Rescale the values to fit the bounds of the representation
+            mu_ae = (np.array(mu_ae) / 100) * (max_x_ae - min_x_ae) + min_x_ae
             img_ae = getImage(srl_model.model, mu_ae, device)
 
             # stop if user closed a window
@@ -134,11 +120,10 @@ def main():
 
             cv2.imshow(ae_type, img_ae)
 
-        if not is_auto_encoder or len(loss_type) > 1:
+        if not is_auto_encoder or len(losses) > 1:
             mu = []
-            for i in range(state_dim):
+            for i in range(state_dim_second_split):
                 mu.append(cv2.getTrackbarPos(str(i), 'slider for ' + fig_name))
-
             # rescale for the bounds of the priors representation, and find nearest image
             img_path = y[srl_model_knn.predict([(np.array(mu) / 100) * (max_X - min_X) + min_X])[0]]
             # Remove trailing .jpg if present

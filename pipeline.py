@@ -139,7 +139,7 @@ def baselineCall(exp_config, baseline="supervised"):
             args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
         if baseline == "supervised":
-            ok = subprocess.call(['python', '-m', 'baselines.{}'.format(baseline)] + args)
+            ok = subprocess.call(['python', '-m', 'srl_baselines.{}'.format(baseline)] + args)
         else:
             ok = subprocess.call(['python', 'train.py'.format(baseline)] + args)
 
@@ -158,7 +158,7 @@ def pcaCall(exp_config):
     for arg in config_args:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
-    ok = subprocess.call(['python', '-m', 'baselines.pca'] + args)
+    ok = subprocess.call(['python', '-m', 'srl_baselines.pca'] + args)
     printConfigOnError(ok, exp_config, "pcaCall")
 
 
@@ -201,7 +201,7 @@ def knnCall(exp_config):
     for arg in ['log-folder', 'n-neighbors', 'n-to-plot']:
         args.extend(['--{}'.format(arg), str(exp_config[arg])])
 
-    ok = subprocess.call(['python', '-m', 'plotting.knn_images'] + args)
+    ok = subprocess.call(['python', '-m', 'evaluation.knn_images'] + args)
     printConfigOnError(ok, exp_config, "knnCall")
 
 

@@ -16,7 +16,7 @@ from models.learner import BaseLearner
 from pipeline import saveConfig
 import plotting.representation_plot as plot_script
 from plotting.representation_plot import plotRepresentation
-from preprocessing.data_loader import AutoEncoderDataLoader
+from preprocessing.data_loader import DataLoader
 from utils import parseDataFolder, createFolder, getInputBuiltin
 
 
@@ -96,8 +96,9 @@ batch_size = max(n_components + 1, args.batch_size)
 print("batch_size = {}".format(batch_size))
 
 # Create data loader
-data_loader = AutoEncoderDataLoader(x_indices, images_path, batch_size=batch_size,
-                                    no_targets=True, is_training=False)
+minibatchlist = DataLoader.createTestMinibatchList(len(images_path), batch_size)
+# Training = False -> outputs only the current observation, not a tuple
+data_loader = DataLoader(minibatchlist, images_path, n_workers=4, is_training=False)
 
 print("Fitting PCA with n_components={}".format(n_components))
 ipca = IncrementalPCA(n_components=n_components)
