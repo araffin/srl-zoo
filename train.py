@@ -53,11 +53,10 @@ if __name__ == '__main__':
                         help='Enable use of multiple camera')
     parser.add_argument('--balanced-sampling', action='store_true', default=False,
                         help='Force balanced sampling for episode independent prior instead of uniform')
-    parser.add_argument('--losses', nargs='+', default=["priors"], type=
-        loss_argument(
-            choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-                     "autoencoder", "vae", "perceptual","dae"]),
-            help='The wanted losses. Can also impose weight for every defined loss: "<name>:<weight>".')
+    parser.add_argument('--losses', nargs='+', default=["priors"], **loss_argument(
+                        choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
+                                 "autoencoder", "vae", "perceptual", "dae"],
+                        help='The wanted losses. Can also impose weight for every defined loss: "<name>:<weight>".'))
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
     parser.add_argument('--split-index', type=int, default=-1,

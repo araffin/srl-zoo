@@ -10,27 +10,35 @@ from termcolor import colored
 import argparse
 
 
-def loss_argument(choices):
+def loss_argument(choices, help):
     """
-    Creates a custom type for loss parsing
+    Creates a custom type for loss parsing, it overrides the type, choice and help of add_argument, in order to
+    properly extract the loss type, and still be able to print the choices available.
 
     :param choices: ([str]) the list of valid losses
-    :return: (function (str): ((str, float) or str))
+    :return: (dict) the arguments for parse arg
     """
-    def _arg(arg):
+    def _arg_type(arg):
         has_weight = ':' in arg
         if has_weight:
             if arg.split(':')[0] not in choices:
-                raise argparse.ArgumentError("invalid choice: {} (choose from {})".format(arg.split(':')[0], choices))
+                raise argparse.ArgumentTypeError("invalid choice: {} (choose from {})".format(arg.split(':')[0], choices))
             try:
-                return (arg.split(':')[0], float(arg.split(':')[1]))
+                return arg.split(':')[0], float(arg.split(':')[1])
             except ValueError:
-                raise argparse.ArgumentError("Error: must be of format '<str>:<float>' or '<str>'")
+                raise argparse.ArgumentTypeError("Error: must be of format '<str>:<float>' or '<str>'")
         else:
             if arg not in choices:
-                raise argparse.ArgumentError("invalid choice: {} (choose from {})".format(arg, choices))
+                raise argparse.ArgumentTypeError("invalid choice: {} (choose from {})".format(arg, choices))
             return arg
-    return _arg
+
+    def _choices_print():
+        str_out = "{"
+        for loss in choices[:-1]:
+            str_out += loss + ", "
+        return str_out + choices[-1] + '}'
+
+    return {'type': _arg_type, 'help': _choices_print() + " " + help}
 
 def buildConfig(args):
     """
