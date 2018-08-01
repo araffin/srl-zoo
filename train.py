@@ -95,6 +95,8 @@ if __name__ == '__main__':
                         help='Split representation models (default: -1, no split)')
     parser.add_argument('--path-to-dae', type=str, default="",
                         help='Path to a pre-trained dae model when using the perceptual loss with VAE')
+    parser.add_argument('--state-dim-dae', type=int, default=200,
+                        help='state dimension of the pre-trained dae (default: 200)')
     parser.add_argument('--losses-weights', type=float, nargs='+', default=[], help="losses's weights")
     parser.add_argument('--occlusion-percentage', type=float, default=0.5,
                          help='Max percentage of input occlusion for masks when using DAE')
@@ -177,7 +179,7 @@ if __name__ == '__main__':
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, l2_reg=args.l2_reg, cuda=args.cuda, multi_view=args.multi_view,
                        losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta, \
-                       split_index=args.split_index, path_to_dae=args.path_to_dae,
+                       split_index=args.split_index, path_to_dae=args.path_to_dae, state_dim_dae=args.state_dim_dae,
                        occlusion_percentage=args.occlusion_percentage)
 
     if args.training_set_size > 0:

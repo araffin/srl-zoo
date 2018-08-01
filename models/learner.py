@@ -137,7 +137,7 @@ class SRL4robotics(BaseLearner):
     def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, l2_reg=0.0, cuda=False,
                  multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1,
-                 split_index=-1, path_to_dae=None, occlusion_percentage=None):
+                 split_index=-1, path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -188,15 +188,15 @@ class SRL4robotics(BaseLearner):
             learnable_params += [p for p in self.discriminator.parameters()]
 
         self.optimizer = th.optim.Adam(learnable_params, lr=learning_rate)
-        self.l1_reg = l1_reg
-        self.l2_reg = l2_reg
         self.log_folder = log_folder
         self.model_type = model_type
 
         self.losses_weights_dict = {"forward": 1.0, "inverse": 1.0, "reward": 1.0, "priors": 1.0,
                                     "episode-prior": 1.0, "reward-prior": 10, "triplet": 1.0,
-                                    "autoencoder": 1.0, "vae": 1.0, "perceptual": 1e-6, "dae": 1.0}
+                                    "autoencoder": 1.0, "vae": 1.0, "perceptual": 1e-6, "dae": 1.0,
+                                    'l1_reg': l1_reg, "l2_reg": l2_reg}
         self.occlusion_percentage = occlusion_percentage
+        self.state_dim_dae = state_dim_dae
 
         if losses_weights_dict is not None:
             self.losses_weights_dict.update(losses_weights_dict)
@@ -296,7 +296,7 @@ class SRL4robotics(BaseLearner):
 
         if self.use_vae and self.perceptual_similarity_loss and self.path_to_dae is not None:
 
-            self.denoiser = SRLModules(state_dim=200, action_dim=self.dim_action, model_type="custom_cnn",
+            self.denoiser = SRLModules(state_dim=self.state_dim_dae, action_dim=self.dim_action, model_type="custom_cnn",
                                        cuda=self.cuda, losses=["dae"])
             self.denoiser.load_state_dict(th.load(self.path_to_dae))
             self.denoiser.eval()
@@ -390,11 +390,11 @@ class SRL4robotics(BaseLearner):
                 actions_st = th.from_numpy(actions_st).view(-1, 1).requires_grad_(False).to(self.device)
 
                 # L1 regularization
-                if self.l1_reg > 0:
-                    l1Loss(loss_manager.reg_params, self.l1_reg, loss_manager)
+                if self.losses_weights_dict['l1_reg'] > 0:
+                    l1Loss(loss_manager.reg_params, self.losses_weights_dict['l1_reg'], loss_manager)
 
-                if self.l2_reg > 0:
-                    l2Loss(loss_manager.reg_params, self.l2_reg, loss_manager)
+                if self.losses_weights_dict['l2_reg'] > 0:
+                    l2Loss(loss_manager.reg_params, self.losses_weights_dict['l2_reg'], loss_manager)
 
                 if not self.no_priors:
                     roboticPriorsLoss(states, next_states, minibatch_idx=minibatch_idx,
@@ -524,7 +524,13 @@ class SRL4robotics(BaseLearner):
                                     if self.use_dae:
                                         plotImage(deNormalize(detachToNumpy(noisy_obs[0][k * 3:(k + 1) * 3, :, :])),
                                                   "Noisy Input Image (Train)".format(k + 1))
-
+                                    if self.perceptual_similarity_loss:
+                                        plotImage(deNormalize(
+                                            detachToNumpy(decoded_obs_denoiser[0][k * 3:(k + 1) * 3, :, :])),
+                                                  "Reconstructed Image DAE")
+                                        plotImage(deNormalize(
+                                            detachToNumpy(decoded_obs_denoiser_predicted[0][k * 3:(k + 1) * 3, :, :])),
+                                                  "Reconstructed Image predicted DAE")
                                     plotImage(deNormalize(detachToNumpy(decoded_obs[0][k * 3:(k + 1) * 3, :, :])),
                                               "Reconstructed Image {}".format(k + 1))
 
