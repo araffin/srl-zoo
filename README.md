@@ -155,6 +155,11 @@ Combining an autoencoder with an inverse model is as easy as:
 python train.py --data-folder data/path/to/dataset --losses autoencoder inverse
 ```
 
+You can as well specify the weight of each loss:
+```
+python train.py --data-folder data/path/to/dataset --losses autoencoder:1 inverse:10
+```
+
 Train a vae with the perceptual similarity loss:
 ```
 python train.py --data-folder data/path/to/dataset --losses vae perceptual --path-to-dae logs/path/to/pretrained_dae/srl_model.pth --state-dim-dae ST_DIM_DAE
