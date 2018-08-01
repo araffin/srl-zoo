@@ -38,6 +38,7 @@ def getLogFolderName(exp_config):
 
     srl_str = "ST_DIM{}".format(exp_config['state-dim'])
 
+
     losses = exp_config["losses"]
     if losses is not str():
         losses = "_".join(losses)

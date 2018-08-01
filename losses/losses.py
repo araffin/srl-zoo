@@ -314,7 +314,7 @@ def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, b
     """
     # The "episode prior" idea is really close
     # to http://proceedings.mlr.press/v37/ganin15.pdf and GANs
-    # We train a discriminator that try to distinguish states for same/different episodes
+    # We train a discriminator that try to distinguish states from same/different episodes
     # and then use the opposite gradient to update the states in order to fool it
 
     # lambda_ is the weight we give to the episode prior loss

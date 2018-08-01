@@ -21,40 +21,7 @@ from models.learner import SRL4robotics
 from pipeline import getLogFolderName, saveConfig
 from plotting.losses_plot import plotLosses
 from plotting.representation_plot import plotRepresentation
-from utils import parseDataFolder, createFolder, getInputBuiltin, loadData
-
-
-def buildConfig(args):
-    """
-    :param args: (parsed args object)
-    :return: (dict)
-    """
-    # Fix to use this function in srl_baselines/
-    split_index = args.split_index if hasattr(args, "split_index") else -1
-    beta = args.beta if hasattr(args, "beta") else -1
-    l1_reg = args.l1_reg if hasattr(args, "l1_reg") else 0
-    l2_reg = args.l2_reg if hasattr(args, "l2_reg") else 0
-    exp_config = {
-        "batch-size": args.batch_size,
-        "beta": beta,
-        "data-folder": args.data_folder,
-        "epochs": args.epochs,
-        "learning-rate": args.learning_rate,
-        "training-set-size": args.training_set_size,
-        "log-folder": "",
-        "model-type": args.model_type,
-        "seed": args.seed,
-        "state-dim": args.state_dim,
-        "knn-samples": 200,
-        "knn-seed": 1,
-        "l1-reg": l1_reg,
-        "l2-reg": l2_reg,
-        "losses": args.losses,
-        "n-neighbors": 5,
-        "n-to-plot": 5,
-        "split-index": split_index
-    }
-    return exp_config
+from utils import parseDataFolder, createFolder, getInputBuiltin, loadData, buildConfig, loss_argument
 
 
 if __name__ == '__main__':
@@ -86,9 +53,11 @@ if __name__ == '__main__':
                         help='Enable use of multiple camera')
     parser.add_argument('--balanced-sampling', action='store_true', default=False,
                         help='Force balanced sampling for episode independent prior instead of uniform')
-    parser.add_argument('--losses', type=str, nargs='+', default=["priors"], help='losses(s)',
-                        choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-                                 "autoencoder", "vae", "perceptual","dae"], )
+    parser.add_argument('--losses', nargs='+', default=["priors"], type=
+        loss_argument(
+            choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
+                     "autoencoder", "vae", "perceptual","dae"]),
+            help='The wanted losses. Can also impose weight for every defined loss: "<name>:<weight>".')
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
     parser.add_argument('--split-index', type=int, default=-1,
@@ -97,7 +66,6 @@ if __name__ == '__main__':
                         help='Path to a pre-trained dae model when using the perceptual loss with VAE')
     parser.add_argument('--state-dim-dae', type=int, default=200,
                         help='state dimension of the pre-trained dae (default: 200)')
-    parser.add_argument('--losses-weights', type=float, nargs='+', default=[], help="losses's weights")
     parser.add_argument('--occlusion-percentage', type=float, default=0.5,
                          help='Max percentage of input occlusion for masks when using DAE')
 
@@ -112,17 +80,25 @@ if __name__ == '__main__':
     plot_script.INTERACTIVE_PLOT = learner.DISPLAY_PLOTS
 
     # Dealing with losses to use
-    losses = list(set(args.losses))
-    losses_weights = list(args.losses_weights)
-    assert len(losses_weights) == 0 or len(losses_weights) == len(losses), \
-        "Please when doing so, specify as many weights as the number of losses you want to apply !"
-    if len(losses_weights) == 0:
-        losses_weights_dict = None
-    else:
-        losses_weights_dict = {loss_key: weight_value for loss_key, weight_value in zip(args.losses, losses_weights)}
+    has_weight = [isinstance(loss, tuple) for loss in args.losses]
+    if any(has_weight) and not all(has_weight):
+        raise ValueError(
+            "Either no losses have a defined weight, or all losses have a defined weight. {}".format(args.losses))
 
-    assert not("triplet" in losses and not args.multi_view),\
+    # If not specifying weight's for the losses
+    if not all(has_weight):
+        losses = list(set(args.losses))
+        losses_weights_dict = None
+    # otherwise collecting weights
+    else:
+        losses_weights_dict = {}
+        for loss, weight in args.losses:
+            losses_weights_dict[loss] = weight
+        losses = list(losses_weights_dict.keys())
+
+        assert not("triplet" in losses and not args.multi_view),\
            "Triplet loss with single view is not supported, please use the --multi-view option"
+    args.losses = losses
 
     if args.multi_view is True:
         # Setting variables involved data-loading from multiple cameras,
