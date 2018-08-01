@@ -126,7 +126,6 @@ class DataLoader(object):
         with Parallel(n_jobs=self.n_workers, batch_size="auto", backend="threading") as parallel:
             while start or self.infinite_loop:
                 start = False
-                batch_obs_noisy, batch_next_obs_noisy = None, None
 
                 if self.shuffle:
                     indices = np.random.permutation(self.n_minibatches).astype(np.int64)
@@ -134,6 +133,7 @@ class DataLoader(object):
                     indices = np.arange(len(self.minibatchlist), dtype=np.int64)
 
                 for minibatch_idx in indices:
+                    batch_noisy, batch_obs_noisy, batch_next_obs_noisy = None, None, None
                     if self.shuffle:
                         images = np.stack((self.images_path[self.minibatchlist[minibatch_idx]],
                                            self.images_path[self.minibatchlist[minibatch_idx] + 1]))
@@ -144,24 +144,26 @@ class DataLoader(object):
                     if self.n_workers <= 1:
                         batch = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets)
                                                         for image_path in images]
-
-                        batch_noisy = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets,
-                                                        apply_occlusion=self.apply_occlusion,
-                                                        occlusion_percentage=self.occlusion_percentage)
-                                        for image_path in images] if self.apply_occlusion else None
+                        if self.apply_occlusion:
+                            batch_noisy = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets,
+                                                            apply_occlusion=self.apply_occlusion,
+                                                            occlusion_percentage=self.occlusion_percentage)
+                                            for image_path in images]
 
                     else:
                         batch = parallel(
                             delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets)
                                                             for image_path in images)
-                        batch_noisy = parallel(
-                            delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets,
-                                                            apply_occlusion=self.apply_occlusion,
-                                                            occlusion_percentage=self.occlusion_percentage)
-                            for image_path in images) if self.apply_occlusion else None
+                        if self.apply_occlusion:
+                            batch_noisy = parallel(
+                                delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets,
+                                                                apply_occlusion=self.apply_occlusion,
+                                                                occlusion_percentage=self.occlusion_percentage)
+                                for image_path in images)
 
                     batch = th.cat(batch, dim=0)
-                    batch_noisy = th.cat(batch_noisy, dim=0) if self.apply_occlusion else None
+                    if self.apply_occlusion:
+                        batch_noisy = th.cat(batch_noisy, dim=0)
 
                     if self.shuffle:
                         batch_obs, batch_next_obs = batch[:len(images) // 2], batch[len(images) // 2:]
