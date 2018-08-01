@@ -7,7 +7,63 @@ import json
 import torch as th
 import numpy as np
 from termcolor import colored
+import argparse
 
+
+def loss_argument(choices):
+    """
+    Creates a custom type for loss parsing
+
+    :param choices: ([str]) the list of valid losses
+    :return: (function (str): ((str, float) or str))
+    """
+    def _arg(arg):
+        has_weight = ':' in arg
+        if has_weight:
+            if arg.split(':')[0] not in choices:
+                raise argparse.ArgumentError("invalid choice: {} (choose from {})".format(arg.split(':')[0], choices))
+            try:
+                return (arg.split(':')[0], float(arg.split(':')[1]))
+            except ValueError:
+                raise argparse.ArgumentError("Error: must be of format '<str>:<float>' or '<str>'")
+        else:
+            if arg not in choices:
+                raise argparse.ArgumentError("invalid choice: {} (choose from {})".format(arg, choices))
+            return arg
+    return _arg
+
+def buildConfig(args):
+    """
+    Building the config file for the trainer
+    :param args: (parsed args object)
+    :return: (dict)
+    """
+    # Fix to use this function in srl_baselines/
+    split_index = args.split_index if hasattr(args, "split_index") else -1
+    beta = args.beta if hasattr(args, "beta") else -1
+    l1_reg = args.l1_reg if hasattr(args, "l1_reg") else 0
+    l2_reg = args.l2_reg if hasattr(args, "l2_reg") else 0
+    exp_config = {
+        "batch-size": args.batch_size,
+        "beta": beta,
+        "data-folder": args.data_folder,
+        "epochs": args.epochs,
+        "learning-rate": args.learning_rate,
+        "training-set-size": args.training_set_size,
+        "log-folder": "",
+        "model-type": args.model_type,
+        "seed": args.seed,
+        "state-dim": args.state_dim,
+        "knn-samples": 200,
+        "knn-seed": 1,
+        "l1-reg": l1_reg,
+        "l2-reg": l2_reg,
+        "losses": args.losses,
+        "n-neighbors": 5,
+        "n-to-plot": 5,
+        "split-index": split_index
+    }
+    return exp_config
 
 def loadData(data_folder):
     """

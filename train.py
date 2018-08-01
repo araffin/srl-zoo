@@ -21,40 +21,7 @@ from models.learner import SRL4robotics
 from pipeline import getLogFolderName, saveConfig
 from plotting.losses_plot import plotLosses
 from plotting.representation_plot import plotRepresentation
-from utils import parseDataFolder, createFolder, getInputBuiltin, loadData
-
-
-def buildConfig(args):
-    """
-    :param args: (parsed args object)
-    :return: (dict)
-    """
-    # Fix to use this function in srl_baselines/
-    split_index = args.split_index if hasattr(args, "split_index") else -1
-    beta = args.beta if hasattr(args, "beta") else -1
-    l1_reg = args.l1_reg if hasattr(args, "l1_reg") else 0
-    l2_reg = args.l2_reg if hasattr(args, "l2_reg") else 0
-    exp_config = {
-        "batch-size": args.batch_size,
-        "beta": beta,
-        "data-folder": args.data_folder,
-        "epochs": args.epochs,
-        "learning-rate": args.learning_rate,
-        "training-set-size": args.training_set_size,
-        "log-folder": "",
-        "model-type": args.model_type,
-        "seed": args.seed,
-        "state-dim": args.state_dim,
-        "knn-samples": 200,
-        "knn-seed": 1,
-        "l1-reg": l1_reg,
-        "l2-reg": l2_reg,
-        "losses": args.losses,
-        "n-neighbors": 5,
-        "n-to-plot": 5,
-        "split-index": split_index
-    }
-    return exp_config
+from utils import parseDataFolder, createFolder, getInputBuiltin, loadData, buildConfig, loss_argument
 
 
 if __name__ == '__main__':
@@ -86,13 +53,21 @@ if __name__ == '__main__':
                         help='Enable use of multiple camera')
     parser.add_argument('--balanced-sampling', action='store_true', default=False,
                         help='Force balanced sampling for episode independent prior instead of uniform')
-    parser.add_argument('--losses', type=str, nargs='+', default=["priors"], help='losses(s)',
-                        choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-                                 "autoencoder", "vae"], )
+    parser.add_argument('--losses', nargs='+', default=["priors"], type=
+        loss_argument(
+            choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
+                     "autoencoder", "vae", "perceptual","dae"]),
+            help='The wanted losses. Can also impose weight for every defined loss: "<name>:<weight>".')
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
     parser.add_argument('--split-index', type=int, default=-1,
                         help='Split representation models (default: -1, no split)')
+    parser.add_argument('--path-to-dae', type=str, default="",
+                        help='Path to a pre-trained dae model when using the perceptual loss with VAE')
+    parser.add_argument('--state-dim-dae', type=int, default=200,
+                        help='state dimension of the pre-trained dae (default: 200)')
+    parser.add_argument('--occlusion-percentage', type=float, default=0.5,
+                         help='Max percentage of input occlusion for masks when using DAE')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
@@ -105,10 +80,25 @@ if __name__ == '__main__':
     plot_script.INTERACTIVE_PLOT = learner.DISPLAY_PLOTS
 
     # Dealing with losses to use
-    losses = list(set(args.losses))
+    has_weight = [isinstance(loss, tuple) for loss in args.losses]
+    if any(has_weight) and not all(has_weight):
+        raise ValueError(
+            "Either no losses have a defined weight, or all losses have a defined weight. {}".format(args.losses))
 
-    assert not("triplet" in losses and not args.multi_view),\
+    # If not specifying weight's for the losses
+    if not all(has_weight):
+        losses = list(set(args.losses))
+        losses_weights_dict = None
+    # otherwise collecting weights
+    else:
+        losses_weights_dict = {}
+        for loss, weight in args.losses:
+            losses_weights_dict[loss] = weight
+        losses = list(losses_weights_dict.keys())
+
+        assert not("triplet" in losses and not args.multi_view),\
            "Triplet loss with single view is not supported, please use the --multi-view option"
+    args.losses = losses
 
     if args.multi_view is True:
         # Setting variables involved data-loading from multiple cameras,
@@ -125,6 +115,10 @@ if __name__ == '__main__':
     assert not ("vae" in losses and args.model_type == "linear"), "Model cannot be VAE using Linear Architecture !"
     assert not (args.multi_view and args.model_type == "resnet"), \
         "Default ResNet input layer is not suitable for stacked images!"
+    assert not (args.path_to_dae == "" and "vae" in losses and "perceptual" in losses),\
+        "To use the perceptual loss with a VAE, please specify a path to a pre-trained DAE model"
+    assert not ("dae" in losses and "perceptual" in losses), \
+        "Please learn the DAE before learning a VAE with the perceptual loss "
 
     print('Loading data ... ')
     training_data, ground_truth, _, _ = loadData(args.data_folder)
@@ -152,13 +146,17 @@ if __name__ == '__main__':
     exp_config['experiment-name'] = experiment_name
     exp_config['n_actions'] = n_actions
     exp_config['multi-view'] = args.multi_view
+    if "dae" in losses:
+        exp_config['occlusion-percentage'] = args.occlusion_percentage
     print('Log folder: {}'.format(args.log_folder))
 
     print('Learning a state representation ... ')
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, l2_reg=args.l2_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       losses=losses, n_actions=n_actions, beta=args.beta, split_index=args.split_index)
+                       losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta, \
+                       split_index=args.split_index, path_to_dae=args.path_to_dae, state_dim_dae=args.state_dim_dae,
+                       occlusion_percentage=args.occlusion_percentage)
 
     if args.training_set_size > 0:
         limit = args.training_set_size

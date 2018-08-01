@@ -11,8 +11,9 @@ Available methods:
 - Supervised Learning
 - Forward, Inverse Models
 - Triplet Network (for stereovision only)
-- Reward losses
+- Reward loss
 - Combination and stacking of methods
+- **[experimental]** Reward Prior, Episode-prior, Perceptual Similarity loss (DARLA), Mutual Information loss 
 
 Related papers:
 - "State Representation Learning for Control: An Overview" (Lesort et al., 2018), link: [https://arxiv.org/pdf/1802.04181.pdf](https://arxiv.org/pdf/1802.04181.pdf)
@@ -111,19 +112,28 @@ sudo apt-get install python-opencv (opencv 2.4 - python2)
 
 ## Learning a State Representation
 
-To learn a state representation, you need to impose constrains on the representation using one or more losses. For example, to train an autoencoder, you need to use a reconstruction loss.
+To learn a state representation, you need to enforce constrains on the representation using one or more losses. For example, to train an autoencoder, you need to use a reconstruction loss.
 Most losses are not exclusive, that means you can combine them.
 
 All losses are defined in `losses/losses.py`. The available losses are:
 
 - autoencoder: reconstruction loss, using current and next observation
+- denoising autoencoder (dae): same as for the auto-encoder, except that the model reconstruct inputs from
+                             noisy observations containing a random zero-pixel mask
 - vae: (beta)-VAE loss (reconstruction + kullback leiber divergence loss)
 - inverse: predict the action given current and next state
 - forward: predict the next state given current state and taken action
 - reward: predict the reward (positive or not) given current and next state
 - priors: robotic priors losses (see "Learning State Representations with Robotic Priors")
 - triplet: triplet loss for multi-cam setting (see *Multiple Cameras* section)
-- reward-prior [Experimental] Maximise correlation between states and reward (does not make sense for sparse reward)
+
+**[Experimental]**
+- reward-prior: Maximises the correlation between states and rewards (does not make sense for sparse reward)
+- episode-prior: Learn an episode-agnostic state space, thanks to a discriminator distinguishing states from same/different episodes
+- perceptual similarity loss (for VAE):  Instead of the reconstruction loss in the beta-VAE loss, it
+uses the distance between the reconstructed input and real input in the embedding of a pre-trained DAE.
+ - mutual information loss: Maximises the mutual information between states and rewards
+
 
 All possible arguments can be display using `python train.py --help`. You can limit the training set size (`--training-set-size` argument), change the minibatch size (`-bs`), number of epochs (`--epochs`), ...
 
@@ -144,6 +154,17 @@ Combining an autoencoder with an inverse model is as easy as:
 ```
 python train.py --data-folder data/path/to/dataset --losses autoencoder inverse
 ```
+
+You can as well specify the weight of each loss:
+```
+python train.py --data-folder data/path/to/dataset --losses autoencoder:1 inverse:10
+```
+
+Train a vae with the perceptual similarity loss:
+```
+python train.py --data-folder data/path/to/dataset --losses vae perceptual --path-to-dae logs/path/to/pretrained_dae/srl_model.pth --state-dim-dae ST_DIM_DAE
+```
+
 
 ### Stacking/Splitting Models Instead of Combining Them
 
@@ -237,6 +258,7 @@ optional arguments:
   --plot-against        Plot against each dimension
   --correlation         Plot the Pearson Matrix of correlation between the Ground truth and learned states.
   --projection          Plot 1D projection of predicted state on ground truth
+  --print-corr          Only print correlation measurements values (together with --correlation option)
 
 ```
 You can plot a learned representation with:
@@ -251,16 +273,22 @@ python -m plotting.representation_plot --data-folder path/to/datasetFolder/
 
 To have a different color per episode, you have to pass `--data-folder` argument along with `--color-episode`.
 
-Correlation plot with ground truth states:
+Plotting each dimension of the state representation against another:
+
+```
+python -m plotting.representation_plot -i path/to/states_rewards.npz --plot-against
+```
+
+**[Evaluation plot]** Plotting the matrix of correlation with the ground truth states:
 
 ```
 python -m plotting.representation_plot -i path/to/states_rewards.npz --data-folder path/to/datasetFolder/ --correlation
 ```
 
-Plotting each dimension of the state representation against another:
+**[Experimental evaluation metric]** Plotting a vector of maximum correlation (with the ground truth states) and a normalized scalar to assess the disentanglement of the states learned and their global quality:
 
 ```
-python -m plotting.representation_plot -i path/to/states_rewards.npz --plot-against
+python -m plotting.representation_plot -i path/to/states_rewards.npz --data-folder path/to/datasetFolder/ --correlation --print-corr
 ```
 
 ### Interactive Plot

@@ -20,7 +20,22 @@ from .preprocess import IMAGE_WIDTH, IMAGE_HEIGHT
 from .utils import preprocessInput
 
 
-def preprocessImage(image, convert_to_rgb=True):
+def sample_coordinates(coord_1, max_distance, percentage):
+    """
+    Sampling from a coordinate A, a second one B within a maximum distance [max_distance X percentage]
+
+    :param coord_1: sample first coordinate (int)
+    :param max_distance: max value of coordinate in the axis (int)
+    :param percentage: maximum occlusion as a percentage (float)
+    :return: (tuple of int)
+    """
+    min_coord_2 = max(0, coord_1 - max_distance * percentage)
+    max_coord_2 = min(coord_1 + max_distance * percentage, max_distance)
+    coord_2 = np.random.randint(low=min_coord_2, high=max_coord_2)
+    return min(coord_1, coord_2), max(coord_1, coord_2)
+
+
+def preprocessImage(image, convert_to_rgb=True, apply_occlusion=False, occlusion_percentage=0.5):
     """
     :param image: (numpy matrix) BGR image
     :param convert_to_rgb: (bool) whether the conversion to rgb is needed or not
@@ -33,12 +48,23 @@ def preprocessImage(image, convert_to_rgb=True):
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
     # Normalize
     im = preprocessInput(im.astype(np.float32), mode="image_net")
-    return im
 
+    if apply_occlusion:
+        h_1 = np.random.randint(IMAGE_HEIGHT)
+        h_1, h_2 = sample_coordinates(h_1, IMAGE_HEIGHT, percentage=occlusion_percentage)
+        w_1 = np.random.randint(IMAGE_WIDTH)
+        w_1, w_2 = sample_coordinates(w_1, IMAGE_WIDTH, percentage=occlusion_percentage)
+        noisy_img = im
+        # This mask is set by applying zero values to corresponding pixels.
+        noisy_img[h_1:h_2, w_1:w_2, :] = 0.
+        im = noisy_img
+
+    return im
 
 class DataLoader(object):
     def __init__(self, minibatchlist, images_path, n_workers=1, multi_view=False, use_triplets=False,
-                 infinite_loop=True, max_queue_len=4, is_training=False):
+                 infinite_loop=True, max_queue_len=4, is_training=False, apply_occlusion=False,
+                 occlusion_percentage=0.5):
         """
         A Custom dataloader to work with our datasets, and to prepare data for the different models
         (inverse, priors, autoencoder, ...)
@@ -49,7 +75,10 @@ class DataLoader(object):
         :param use_triplets: (bool)
         :param infinite_loop: (bool) whether to have an iterator that can be resetted, set to False, it
         :param max_queue_len: (int) Max number of minibatches that can be preprocessed at the same time
+        :param apply_occlusion: is the use of occlusion enabled - when using DAE (bool)
+        :param occlusion percentage: max percentage of occlusion when using DAE (float)
         :param is_training: (bool)
+
             Set to True, the dataloader will output both `obs` and `next_obs` (a tuple of th.Tensor)
             Set to false, it will only output one th.Tensor.
         """
@@ -64,6 +93,9 @@ class DataLoader(object):
         self.process = None
         self.use_triplets = use_triplets
         self.multi_view = multi_view
+        # apply occlusion for training a DAE
+        self.apply_occlusion = apply_occlusion
+        self.occlusion_percentage = occlusion_percentage
         self.startProcess()
 
     @staticmethod
@@ -94,46 +126,69 @@ class DataLoader(object):
         with Parallel(n_jobs=self.n_workers, batch_size="auto", backend="threading") as parallel:
             while start or self.infinite_loop:
                 start = False
+
                 if self.shuffle:
                     indices = np.random.permutation(self.n_minibatches).astype(np.int64)
                 else:
                     indices = np.arange(len(self.minibatchlist), dtype=np.int64)
 
                 for minibatch_idx in indices:
+                    batch_noisy, batch_obs_noisy, batch_next_obs_noisy = None, None, None
                     if self.shuffle:
                         images = np.stack((self.images_path[self.minibatchlist[minibatch_idx]],
                                            self.images_path[self.minibatchlist[minibatch_idx] + 1]))
                         images = images.flatten()
-                        # print(images)
                     else:
                         images = self.images_path[self.minibatchlist[minibatch_idx]]
 
                     if self.n_workers <= 1:
-                        batch = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets) for image_path
-                                 in images]
+                        batch = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets)
+                                                        for image_path in images]
+                        if self.apply_occlusion:
+                            batch_noisy = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets,
+                                                            apply_occlusion=self.apply_occlusion,
+                                                            occlusion_percentage=self.occlusion_percentage)
+                                            for image_path in images]
+
                     else:
                         batch = parallel(
-                            delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets) for
-                            image_path in images)
+                            delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets)
+                                                            for image_path in images)
+                        if self.apply_occlusion:
+                            batch_noisy = parallel(
+                                delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets,
+                                                                apply_occlusion=self.apply_occlusion,
+                                                                occlusion_percentage=self.occlusion_percentage)
+                                for image_path in images)
 
                     batch = th.cat(batch, dim=0)
+                    if self.apply_occlusion:
+                        batch_noisy = th.cat(batch_noisy, dim=0)
 
                     if self.shuffle:
                         batch_obs, batch_next_obs = batch[:len(images) // 2], batch[len(images) // 2:]
-                        self.queue.put((minibatch_idx, batch_obs, batch_next_obs))
+                        if batch_noisy is not None:
+                            batch_obs_noisy, batch_next_obs_noisy = batch_noisy[:len(images) // 2], \
+                                                                    batch_noisy[len(images) // 2:]
+                        self.queue.put((minibatch_idx, batch_obs, batch_next_obs, batch_obs_noisy, batch_next_obs_noisy))
                     else:
-                        self.queue.put(batch)
+                        self.queue.put((batch, batch_noisy))
 
                     # Free memory
                     if self.shuffle:
                         del batch_obs
                         del batch_next_obs
+                        if batch_noisy is not None:
+                            del batch_obs_noisy
+                            del batch_next_obs_noisy
                     del batch
+                    del batch_noisy
 
                 self.queue.put(None)
 
     @classmethod
-    def _makeBatchElement(cls, image_path, multi_view=False, use_triplets=False):
+    def _makeBatchElement(cls, image_path, multi_view=False, use_triplets=False, apply_occlusion=False,
+                          occlusion_percentage=None):
         """
         :param image_path: (str) path to an image (without the 'data/' prefix)
         :param multi_view: (bool)
@@ -145,13 +200,16 @@ class DataLoader(object):
 
         if multi_view:
             images = []
+            noisy_images =[]
+
             # Load different view of the same timestep
             for i in range(2):
                 im = cv2.imread("{}_{}.jpg".format(image_path, i + 1))
                 if im is None:
                     raise ValueError("tried to load {}_{}.jpg, but it was not found".format(image_path, i + 1))
-                images.append(preprocessImage(im))
-
+                images.append(preprocessImage(im, apply_occlusion=apply_occlusion,
+                                                    occlusion_percentage=occlusion_percentage))
+            ####################
             # loading a negative observation
             if use_triplets:
                 # End of file format for positive & negative observations (camera 1) - length : 6 characters
@@ -180,12 +238,12 @@ class DataLoader(object):
                 images.append(im3)
 
             im = np.dstack(images)
-
         else:
             im = cv2.imread("{}.jpg".format(image_path))
             if im is None:
                 raise ValueError("tried to load {}.jpg, but it was not found".format(image_path))
-            im = preprocessImage(im)
+
+            im = preprocessImage(im, apply_occlusion=apply_occlusion, occlusion_percentage=occlusion_percentage)
 
         # Channel first (for pytorch convolutions) + one dim for the batch
         # th.tensor creates a copy

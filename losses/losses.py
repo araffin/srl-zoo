@@ -193,37 +193,64 @@ def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_m
     return weight * ae_loss
 
 
-def vaeLoss(decoded, next_decoded, obs, next_obs, mu, next_mu, logvar, next_logvar,
-            weight, loss_manager, beta=1):
+def generationLoss(decoded, next_decoded, obs, next_obs, weight, loss_manager):
     """
-    Reconstruction + KL divergence losses summed over all elements and batch
+    Pixel-wise generation Loss
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :param decoded: reconstructed Observation (th.Tensor)
     :param next_decoded: next reconstructed Observation (th.Tensor)
     :param obs: Observation (th.Tensor)
     :param next_obs: next Observation (th.Tensor)
-    :param mu: mean of the distribution of samples (th.Tensor)
-    :param next_mu: mean of the distribution of next samples (th.Tensor)
-    :param logvar: log std of the distribution of samples (th.Tensor)
-    :param next_logvar: log std of the distribution of next samples (th.Tensor)
-    :param weight: coefficient to weight the loss (float)
+    :param weight: (float)
+    :return: (th.Tensor)
+    """
+    generation_loss = F.mse_loss(decoded, obs, reduction='sum')
+    generation_loss += F.mse_loss(next_decoded, next_obs, reduction='sum')
+    loss_name = 'generation_loss'
+    loss_manager.addToLosses(loss_name, weight, generation_loss)
+    return weight * generation_loss
+
+
+def perceptualSimilarityLoss(encoded_real, encoded_prediction, next_encoded_real, next_encoded_prediction,
+                            weight, loss_manager):
+    """
+    Perceptual similarity Loss for VAE as in
+    # "DARLA: Improving Zero-Shot Transfer in Reinforcement Learning", Higgins et al.
+    # see https://arxiv.org/pdf/1707.08475.pdf
+
     :param loss_manager: loss criterion needed to log the loss value (LossManager)
-    :param beta: (float) used to weight the KL divergence for disentangling
+    :param encoded_real: states encoding the real observation by the DAE (th.Tensor)
+    :param encoded_prediction: states encoding the vae's predicted observation by the DAE  (th.Tensor)
+    :param next_encoded_real: states encoding the next real observation by the DAE (th.Tensor)
+    :param next_encoded_prediction: states encoding the vae's predicted next observation by the DAE (th.Tensor)
+    :param weight: loss for the DAE's embedding l2 distance (float)
     :return: (th.Tensor)
     """
 
-    generation_loss = F.mse_loss(decoded, obs, reduction='sum')
-    generation_loss += F.mse_loss(next_decoded, next_obs, reduction='sum')
+    pretrained_dae_encoding_loss = F.mse_loss(encoded_real, encoded_prediction, reduction='sum')
+    pretrained_dae_encoding_loss += F.mse_loss(next_encoded_real, next_encoded_prediction, reduction='sum')
+    loss_manager.addToLosses("denoising perceptual similarity", weight, pretrained_dae_encoding_loss)
+    return weight * pretrained_dae_encoding_loss
+
+
+def kullbackLeiblerLoss(mu, next_mu, logvar, next_logvar, loss_manager, beta=1):
+    """
+    KL divergence losses summed over all elements and batch
+    :param mu: mean of the distribution of samples (th.Tensor)
+    :param next_mu: mean of the distribution of next samples (th.Tensor)
+    :param logvar: log of the variance of the distribution of samples (th.Tensor)
+    :param next_logvar: log of the variance of the distribution of next samples (th.Tensor)
+    :param loss_manager: loss criterion needed to log the loss value (LossManager)
+    :param beta: (float) used to weight the KL divergence for disentangling
+    """
 
     # see Appendix B from VAE paper:
     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
     # https://arxiv.org/abs/1312.6114
     kl_divergence = -0.5 * th.sum(1 + logvar - mu.pow(2) - logvar.exp())
     kl_divergence += -0.5 * th.sum(1 + next_logvar - next_mu.pow(2) - next_logvar.exp())
-
-    vae_loss = generation_loss + beta * kl_divergence
-
-    loss_manager.addToLosses('kl_loss', weight, vae_loss)
-    return weight * vae_loss
+    loss_manager.addToLosses('kl_loss', beta, kl_divergence)
+    return beta * kl_divergence
 
 
 def mutualInformationLoss(states, rewards_st, weight, loss_manager):
@@ -287,7 +314,7 @@ def episodePriorLoss(minibatch_idx, minibatch_episodes, states, discriminator, b
     """
     # The "episode prior" idea is really close
     # to http://proceedings.mlr.press/v37/ganin15.pdf and GANs
-    # We train a discriminator that try to distinguish states for same/different episodes
+    # We train a discriminator that try to distinguish states from same/different episodes
     # and then use the opposite gradient to update the states in order to fool it
 
     # lambda_ is the weight we give to the episode prior loss

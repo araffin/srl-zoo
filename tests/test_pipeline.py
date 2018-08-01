@@ -71,7 +71,7 @@ def testExtraSRLTrain():
 
 
 def testExtraBaselineTrain():
-    for baseline in ['vae', 'autoencoder']:
+    for baseline in ['vae', 'autoencoder', 'dae']:
         # single camera
         args = ['--no-display-plots', '--data-folder', TEST_DATA_FOLDER,
                 '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
