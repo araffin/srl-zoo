@@ -69,7 +69,8 @@ def buildConfig(args):
         "losses": args.losses,
         "n-neighbors": 5,
         "n-to-plot": 5,
-        "split-index": split_index
+        "split-index": split_index,
+        "inverse-model-type": args.inverse_model_type
     }
     return exp_config
 

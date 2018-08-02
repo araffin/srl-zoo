@@ -44,6 +44,9 @@ if __name__ == '__main__':
     parser.add_argument('--model-type', type=str, default="custom_cnn",
                         choices=['custom_cnn', 'resnet', 'mlp', 'linear'],
                         help='Model architecture (default: "custom_cnn")')
+    parser.add_argument('--inverse-model-type', type=str, default="linear",
+                        choices=['mlp', 'linear'],
+                        help='Inverse model s architecture (default: "linear")')
     parser.add_argument('--data-folder', type=str, default="", help='Dataset folder', required=True)
     parser.add_argument('--log-folder', type=str, default="",
                         help='Folder where the experiment model and plots will be saved. ' +
@@ -150,7 +153,8 @@ if __name__ == '__main__':
     print('Log folder: {}'.format(args.log_folder))
 
     print('Learning a state representation ... ')
-    srl = SRL4robotics(args.state_dim, model_type=args.model_type, seed=args.seed,
+    srl = SRL4robotics(args.state_dim, model_type=args.model_type,inverse_model_type=args.inverse_model_type,
+                       seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, l2_reg=args.l2_reg, cuda=args.cuda, multi_view=args.multi_view,
                        losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta, \

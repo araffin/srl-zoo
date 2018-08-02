@@ -134,7 +134,7 @@ class SRL4robotics(BaseLearner):
     :param occlusion_percentage: max percentage of occlusion when using DAE (float)
     """
 
-    def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
+    def __init__(self, state_dim, model_type="resnet", inverse_model_type="linear", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, l2_reg=0.0, cuda=False,
                  multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1,
                  split_index=-1, path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
@@ -166,11 +166,11 @@ class SRL4robotics(BaseLearner):
             self.path_to_dae = path_to_dae
             if split_index > 0:
                 self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action,
-                                             model_type=model_type,
-                                             cuda=cuda, losses=losses, split_index=split_index)
+                                             model_type=model_type, cuda=cuda, losses=losses,
+                                             split_index=split_index, inverse_model_type=inverse_model_type)
             else:
                 self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
-                                        cuda=cuda, losses=losses)
+                                        cuda=cuda, losses=losses,inverse_model_type=inverse_model_type)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
         print("Using {} model".format(model_type))
