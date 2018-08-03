@@ -262,6 +262,8 @@ def plotCorrelation(states_rewards, ground_truth, target_positions, only_print=F
     :param target_positions: (numpy array)
     :param only_print: (bool) only print the correlation mesurements (max of correlation for each of
     Ground Truth's dimension)
+    :return returns the max correlation for each of Ground Truth's dimension with the predicted states
+            as well as its mean
     """
     np.set_printoptions(precision=2)
     correlation_max_vector = np.array([])
@@ -295,13 +297,13 @@ def plotCorrelation(states_rewards, ground_truth, target_positions, only_print=F
             correlation_max_vector = np.append(correlation_max_vector, max(abs(corr_copy[idx])))
 
     # Printing the max correlation for each of Ground Truth's dimension with the predicted states
-    # as well as a normalized sum
+    # as well as the mean
     correlation_scalar = sum(correlation_max_vector)
     print("\nCorrelation value of the model's prediction with the Ground Truth:\n Max correlation vector: {}"
-          "\n Sum of max correlation: {:.2f}\n Normalized sum: {:.2f}"
-          .format(correlation_max_vector, correlation_scalar, correlation_scalar/len(correlation_max_vector)))
+          "\n Mean : {:.2f}".format(correlation_max_vector, correlation_scalar/len(correlation_max_vector)))
     if not only_print:
         pauseOrClose(fig)
+    return correlation_max_vector, correlation_scalar/len(correlation_max_vector)
 
 
 if __name__ == '__main__':
