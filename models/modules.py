@@ -111,7 +111,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param cuda: (bool)
         :param model_type: (str)
         :param losses: ([str])
-        :param split_index: (tupe(int,int)) Number of dimensions for the first, second and third split
+        :param split_index: (tuple(int,int)) Number of dimensions for the first, second and third split
         :param n_hidden_reward: (int) Number of hidden units for the reward model
         """
 
@@ -138,8 +138,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
                                      slice(self.split_index[0], self.split_index[1]))  # [:, first_split_index:second_split_index]
         self.third_split_indices = (slice(None, None), slice(self.split_index[1], None))# [:, second_split_index:]
 
-        self.initForwardNet(self.dim_second_method, action_dim)
-        self.initInverseNet(self.dim_second_method, action_dim, model_type=inverse_model_type)
+        self.initForwardNet(self.state_dim, action_dim)
+        self.initInverseNet(self.state_dim, action_dim, model_type=inverse_model_type)
         self.initRewardNet(self.state_dim, n_hidden=n_hidden_reward)
 
         # Architecture
@@ -237,8 +237,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param next_state: (th.Tensor)
         :return: probability of each action
         """
-        return self.inverse_net(th.cat((state[self.second_split_indices],
-                                        next_state[self.second_split_indices]), dim=1))
+        return self.inverse_net(th.cat((self.detachSplit(state, position=2),
+                                        self.detachSplit(next_state, position=2)), dim=1))
 
     def forwardModel(self, state, action):
         """
@@ -248,8 +248,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :return: (th.Tensor)
         """
         # Predict the delta between the next state and current state
-        concat = th.cat((state[self.second_split_indices], encodeOneHot(action, self.action_dim)), dim=1)
-        return state[self.second_split_indices] + self.forward_net(concat)
+        concat = th.cat((self.detachSplit(state, position=2), encodeOneHot(action, self.action_dim)), dim=1)
+        return self.detachSplit(state, position=2) + self.forward_net(concat)
 
     def rewardModel(self, state, next_state):
         """
