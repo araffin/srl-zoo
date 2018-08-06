@@ -147,8 +147,9 @@ class SRL4robotics(BaseLearner):
         self.beta = beta
         # For splitting representation
         self.split_index = split_index
-        self.state_dim_first_split = split_index if split_index > 0 else state_dim
-        self.state_dim_second_split = state_dim - split_index if split_index > 0 else state_dim
+        self.first_split = split_index[0] if split_index[0] > 0 else state_dim
+        self.second_split = split_index[1] if split_index[1] > split_index[0] > 0 else state_dim
+        self.third_split = state_dim
 
         if model_type in ["linear", "mlp", "resnet", "custom_cnn"] \
                 or "autoencoder" in losses or "vae" in losses:
@@ -164,11 +165,12 @@ class SRL4robotics(BaseLearner):
             self.perceptual_similarity_loss = "perceptual" in self.losses
             self.use_dae = "dae" in self.losses
             self.path_to_dae = path_to_dae
-            if split_index > 0:
+            if split_index[1] > split_index[0] > 0:
                 self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action,
                                              model_type=model_type, cuda=cuda, losses=losses,
                                              split_index=split_index, inverse_model_type=inverse_model_type)
             else:
+                print("You are not using splits! ")
                 self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
                                         cuda=cuda, losses=losses,inverse_model_type=inverse_model_type)
         else:
@@ -403,7 +405,8 @@ class SRL4robotics(BaseLearner):
 
                 if self.use_forward_loss:
                     next_states_pred = self.model.forwardModel(states, actions_st)
-                    forwardModelLoss(next_states_pred, next_states[:, -self.state_dim_second_split:],
+                    forwardModelLoss(next_states_pred[:, self.first_split:self.second_split],
+                                     next_states[:, self.first_split:self.second_split],
                                      weight=self.losses_weights_dict['forward'],
                                      loss_manager=loss_manager)
 

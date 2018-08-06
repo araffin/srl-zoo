@@ -18,7 +18,7 @@ import models.learner as learner
 import plotting.representation_plot as plot_script
 import preprocessing
 from models.learner import SRL4robotics
-from pipeline import getLogFolderName, saveConfig
+from pipeline import getLogFolderName, saveConfig, correlationCall
 from plotting.losses_plot import plotLosses
 from plotting.representation_plot import plotRepresentation
 from utils import parseDataFolder, createFolder, getInputBuiltin, loadData, buildConfig, loss_argument
@@ -62,8 +62,8 @@ if __name__ == '__main__':
                         help='The wanted losses. Can also impose weight for every defined loss: "<name>:<weight>".'))
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
-    parser.add_argument('--split-index', type=int, default=-1,
-                        help='Split representation models (default: -1, no split)')
+    parser.add_argument('--split-index', type=int, nargs='+', default=[-1,-1],
+                        help='Split representation models (default: ("(-1,-1)"), no split)')
     parser.add_argument('--path-to-dae', type=str, default="",
                         help='Path to a pre-trained dae model when using the perceptual loss with VAE')
     parser.add_argument('--state-dim-dae', type=int, default=200,
@@ -186,8 +186,9 @@ if __name__ == '__main__':
     name = "Learned State Representation\n {}".format(args.log_folder.split('/')[-1])
     path = "{}/learned_states.png".format(args.log_folder)
 
-    # PLOT REPRESENTATION
+    # PLOT REPRESENTATION & CORRELATION
     plotRepresentation(learned_states, rewards, name, add_colorbar=True, path=path)
+    correlationCall(exp_config, plot=not args.no_display_plots)
 
     # Do not close plot at the end of training
     if learner.DISPLAY_PLOTS:

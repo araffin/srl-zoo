@@ -101,7 +101,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
 class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
     def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn",
-                losses=None, split_index=1, n_hidden_reward=16, inverse_model_type="linear"):
+                losses=None, split_index=(-1,-1), n_hidden_reward=16, inverse_model_type="linear"):
         """
         A model that can split representation, combining
         AE/VAE for the first split with Inverse + Forward in the second split
@@ -111,11 +111,12 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param cuda: (bool)
         :param model_type: (str)
         :param losses: ([str])
-        :param split_index: (int) Number of dimensions for the first split
+        :param split_index: (tupe(int,int)) Number of dimensions for the first, second and third split
         :param n_hidden_reward: (int) Number of hidden units for the reward model
         """
 
-        assert split_index < state_dim, "The second split must be of dim >= 1, consider increasing the state_dim or decreasing the split_index"
+        assert split_index[0] < split_index[1] < state_dim, \
+            "The second split must be of dim >= 1, consider increasing the state_dim or decreasing the split_index"
 
         self.model_type = model_type
         self.losses = losses
@@ -127,10 +128,15 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         self.cuda = cuda
         self.state_dim = state_dim
 
-        self.dim_first_method = split_index
-        self.dim_second_method = state_dim - split_index
-        self.first_split_indices = (slice(None, None), slice(None, split_index))  # [:, :split_index]
-        self.second_split_indices = (slice(None, None), slice(split_index, None))  # [:, split_index:]
+        self.split_index = split_index
+        self.dim_first_method = split_index[0]
+        self.dim_second_method = split_index[1] - split_index[0]
+        self.dim_third_method = state_dim - split_index[1]
+
+        self.first_split_indices = (slice(None, None), slice(None, self.split_index[0]))  # [:, :first_split_index]
+        self.second_split_indices = (slice(None, None),
+                                     slice(self.split_index[0], self.split_index[1]))  # [:, first_split_index:second_split_index]
+        self.third_split_indices = (slice(None, None), slice(self.split_index[1], None))# [:, second_split_index:]
 
         self.initForwardNet(self.dim_second_method, action_dim)
         self.initInverseNet(self.dim_second_method, action_dim, model_type=inverse_model_type)
@@ -181,15 +187,27 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         else:
             return self.model.forward(x)
 
-    def detachSecondSplit(self, tensor):
+    def detachSplit(self, tensor, position=1):
         """
-        Detach second split from the graph,
+        Detach splits from the graph,
         so no gradients are backpropagated
-        for the second half of the states
+        for those splits part of the states
         :param tensor: (th.Tensor)
+        :param positon (int) position of the split not to detach
         :return: (th.Tensor)
         """
-        return th.cat([tensor[self.first_split_indices], tensor[self.second_split_indices].detach()], dim=1)
+        #if detaching all but the first split
+        if position == 1:
+            return th.cat([tensor[self.first_split_indices], tensor[self.second_split_indices].detach(),
+                           tensor[self.third_split_indices].detach()], dim=1)
+        #if detaching all but the second split
+        elif position == 2:
+            return th.cat([tensor[self.first_split_indices].detach(), tensor[self.second_split_indices],
+                           tensor[self.third_split_indices].detach()], dim=1)
+        else:
+            # if detaching  all but the third split
+            return th.cat([tensor[self.first_split_indices].detach(), tensor[self.second_split_indices].detach(),
+                           tensor[self.third_split_indices]], dim=1)
 
     def forwardVAE(self, x):
         """
@@ -198,9 +216,9 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         input_shape = x.size()
         mu, logvar = self.model.encode(x)
-        z = self.model.reparameterize(self.detachSecondSplit(mu), self.detachSecondSplit(logvar))
+        z = self.model.reparameterize(self.detachSplit(mu, position=1), self.detachSplit(logvar, position=1))
         decoded = self.model.decode(z).view(input_shape)
-        return decoded, self.detachSecondSplit(mu), self.detachSecondSplit(logvar)
+        return decoded, self.detachSplit(mu, position=1), self.detacHSplit(logvar, position=1)
 
     def forwardAutoencoder(self, x):
         """
@@ -209,7 +227,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         input_shape = x.size()
         encoded = self.model.encode(x)
-        decoded = self.model.decode(self.detachSecondSplit(encoded)).view(input_shape)
+        decoded = self.model.decode(self.detachSplit(encoded, position=1)).view(input_shape)
         return encoded, decoded
 
     def inverseModel(self, state, next_state):
@@ -219,7 +237,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param next_state: (th.Tensor)
         :return: probability of each action
         """
-        return self.inverse_net(th.cat((state[self.second_split_indices], next_state[self.second_split_indices]), dim=1))
+        return self.inverse_net(th.cat((state[self.second_split_indices],
+                                        next_state[self.second_split_indices]), dim=1))
 
     def forwardModel(self, state, action):
         """
@@ -239,4 +258,5 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param action: (th Tensor)
         :return: (th.Tensor)
         """
-        return self.reward_net(th.cat((self.detachSecondSplit(state), self.detachSecondSplit(next_state)), dim=1))
+        return self.reward_net(th.cat((self.detachSplit(state, position=3),
+                                       self.detachSplit(next_state, position=3)), dim=1))
