@@ -153,6 +153,7 @@ if __name__ == '__main__':
     print('Log folder: {}'.format(args.log_folder))
 
     print('Learning a state representation ... ')
+
     srl = SRL4robotics(args.state_dim, model_type=args.model_type,inverse_model_type=args.inverse_model_type,
                        seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,

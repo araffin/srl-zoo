@@ -137,7 +137,7 @@ class SRL4robotics(BaseLearner):
     def __init__(self, state_dim, model_type="resnet", inverse_model_type="linear", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, l2_reg=0.0, cuda=False,
                  multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1,
-                 split_index=-1, path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
+                 split_index=[-1,-1] , path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -229,14 +229,17 @@ class SRL4robotics(BaseLearner):
         n_actions = exp_config['n_actions']
         model_type = exp_config['model-type']
         multi_view = exp_config.get('multi-view', False)
-        split_index = exp_config.get('split-index', -1)
+        split_index = exp_config.get('split-index', [-1,-1])
         model_path = log_folder + 'srl_model.pth'
+        inverse_model_type = exp_config.get('inverse-model-type', 'linear')
+        occlusion_percentage = exp_config.get('occlusion-percentage', 0)
 
         difference = set(losses).symmetric_difference(valid_models)
         assert set(losses).intersection(valid_models) != set(), "Error: Not supported losses " + ", ".join(difference)
 
         srl_model = SRL4robotics(state_dim, model_type=model_type, cuda=cuda, multi_view=multi_view,
-                                 losses=losses, n_actions=n_actions, split_index=split_index)
+                                 losses=losses, n_actions=n_actions, split_index=split_index,
+                                 inverse_model_type=inverse_model_type, occlusion_percentage=occlusion_percentage)
         srl_model.model.load_state_dict(th.load(model_path))
 
         return srl_model, exp_config

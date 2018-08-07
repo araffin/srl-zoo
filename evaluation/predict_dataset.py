@@ -32,7 +32,8 @@ rewards = rewards[:limit]
 minibatchlist = DataLoader.createTestMinibatchList(len(images_path), MAX_BATCH_SIZE_GPU)
 
 data_loader = DataLoader(minibatchlist, images_path, n_workers=4, multi_view=exp_config.get('multi-view', False),
-                         use_triplets='triplet' in exp_config['losses'], max_queue_len=1, is_training=False)
+                         use_triplets='triplet' in exp_config['losses'], max_queue_len=1, is_training=False,
+                         apply_occlusion=srl_model.use_dae, occlusion_percentage=srl_model.occlusion_percentage)
 
 
 print("Predicting states for {} observations...".format(len(images_path)))

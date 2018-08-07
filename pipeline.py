@@ -410,7 +410,6 @@ if __name__ == '__main__':
                     printYellow("Skipping evaluation...")
                     continue
                 # Evaluate the representation with kNN
-                correlationCall(exp_config)
                 knnCall(exp_config)
 
     else:

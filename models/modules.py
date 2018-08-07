@@ -218,7 +218,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         mu, logvar = self.model.encode(x)
         z = self.model.reparameterize(self.detachSplit(mu, position=1), self.detachSplit(logvar, position=1))
         decoded = self.model.decode(z).view(input_shape)
-        return decoded, self.detachSplit(mu, position=1), self.detacHSplit(logvar, position=1)
+        return decoded, self.detachSplit(mu, position=1), self.detachSplit(logvar, position=1)
 
     def forwardAutoencoder(self, x):
         """
