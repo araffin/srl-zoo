@@ -101,7 +101,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
 class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
     def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn",
-                losses=None, split_index=(-1,-1), n_hidden_reward=16, inverse_model_type="linear"):
+                 losses=None, split_index=-1, n_hidden_reward=16, inverse_model_type="linear"):
         """
         A model that can split representation, combining
         AE/VAE for the first split with Inverse + Forward in the second split
@@ -111,12 +111,28 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param cuda: (bool)
         :param model_type: (str)
         :param losses: ([str])
-        :param split_index: (tuple(int,int)) Number of dimensions for the first, second and third split
+        :param split_index: (int or [int])) Number of dimensions for the different split
         :param n_hidden_reward: (int) Number of hidden units for the reward model
         """
 
-        assert split_index[0] < split_index[1] < state_dim, \
-            "The second split must be of dim >= 1, consider increasing the state_dim or decreasing the split_index"
+        # TODO: rename split_index -> split_indices + change in RL repo
+        if isinstance(split_index, int):
+            assert split_index < state_dim, \
+                "The second split must be of dim >= 1, consider increasing the state_dim or decreasing the split_index"
+            split_indices = [split_index]
+        else:
+            # TODO: sanity check: split_indices ordered + < state_dim
+            split_indices = split_index
+
+        # Compute the number of dimensions for each method
+        n_dimensions = [split_indices[0]]
+        for i in range(len(split_indices) - 1):
+            n_dimensions.append(split_indices[i + 1] - split_indices[i])
+
+        n_dimensions.append(state_dim - split_indices[-1])
+
+        assert sum(n_dimensions) == state_dim
+        self.n_dimensions = n_dimensions
 
         self.model_type = model_type
         self.losses = losses
@@ -128,15 +144,9 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         self.cuda = cuda
         self.state_dim = state_dim
 
-        self.split_index = split_index
-        self.dim_first_method = split_index[0]
-        self.dim_second_method = split_index[1] - split_index[0]
-        self.dim_third_method = state_dim - split_index[1]
-
-        self.first_split_indices = (slice(None, None), slice(None, self.split_index[0]))  # [:, :first_split_index]
-        self.second_split_indices = (slice(None, None),
-                                     slice(self.split_index[0], self.split_index[1]))  # [:, first_split_index:second_split_index]
-        self.third_split_indices = (slice(None, None), slice(self.split_index[1], None))# [:, second_split_index:]
+        self.ae_index = 0
+        # self.reward_index = 1
+        self.inverse_index = len(split_indices)
 
         self.initForwardNet(self.state_dim, action_dim)
         self.initInverseNet(self.state_dim, action_dim, model_type=inverse_model_type)
@@ -158,7 +168,6 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
                 self.model = DenseVAE(input_dim=getInputDim(), state_dim=state_dim)
             else:
                 self.model = SRLDenseNetwork(getInputDim(), state_dim, cuda=cuda)
-
 
         elif model_type == "linear":
             if "autoencoder" in losses:
@@ -187,27 +196,25 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         else:
             return self.model.forward(x)
 
-    def detachSplit(self, tensor, position=1):
+    def detachSplit(self, tensor, index):
         """
         Detach splits from the graph,
         so no gradients are backpropagated
         for those splits part of the states
         :param tensor: (th.Tensor)
-        :param positon (int) position of the split not to detach
+        :param index (int) position of the split not to detach
         :return: (th.Tensor)
         """
-        #if detaching all but the first split
-        if position == 1:
-            return th.cat([tensor[self.first_split_indices], tensor[self.second_split_indices].detach(),
-                           tensor[self.third_split_indices].detach()], dim=1)
-        #if detaching all but the second split
-        elif position == 2:
-            return th.cat([tensor[self.first_split_indices].detach(), tensor[self.second_split_indices],
-                           tensor[self.third_split_indices].detach()], dim=1)
-        else:
-            # if detaching  all but the third split
-            return th.cat([tensor[self.first_split_indices].detach(), tensor[self.second_split_indices].detach(),
-                           tensor[self.third_split_indices]], dim=1)
+        tensors = []
+        start_idx = 0
+        for idx, n_dim in enumerate(self.n_dimensions):
+            if idx != index:
+                tensors.append(tensor[:, start_idx:start_idx + n_dim].detach())
+            else:
+                tensors.append(tensor[:, start_idx:start_idx + n_dim])
+            start_idx += n_dim
+
+        return th.cat(tensors, dim=1)
 
     def forwardVAE(self, x):
         """
@@ -216,9 +223,9 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         input_shape = x.size()
         mu, logvar = self.model.encode(x)
-        z = self.model.reparameterize(self.detachSplit(mu, position=1), self.detachSplit(logvar, position=1))
+        z = self.model.reparameterize(self.detachSplit(mu, index=0), self.detachSplit(logvar, index=0))
         decoded = self.model.decode(z).view(input_shape)
-        return decoded, self.detachSplit(mu, position=1), self.detachSplit(logvar, position=1)
+        return decoded, self.detachSplit(mu, index=0), self.detachSplit(logvar, index=0)
 
     def forwardAutoencoder(self, x):
         """
@@ -227,7 +234,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         input_shape = x.size()
         encoded = self.model.encode(x)
-        decoded = self.model.decode(self.detachSplit(encoded, position=1)).view(input_shape)
+        decoded = self.model.decode(self.detachSplit(encoded, index=0)).view(input_shape)
         return encoded, decoded
 
     def inverseModel(self, state, next_state):
@@ -237,8 +244,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param next_state: (th.Tensor)
         :return: probability of each action
         """
-        return self.inverse_net(th.cat((self.detachSplit(state, position=2),
-                                        self.detachSplit(next_state, position=2)), dim=1))
+        return self.inverse_net(th.cat((self.detachSplit(state, index=self.inverse_index),
+                                        self.detachSplit(next_state, index=self.inverse_index)), dim=1))
 
     def forwardModel(self, state, action):
         """
@@ -248,8 +255,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :return: (th.Tensor)
         """
         # Predict the delta between the next state and current state
-        concat = th.cat((self.detachSplit(state, position=2), encodeOneHot(action, self.action_dim)), dim=1)
-        return self.detachSplit(state, position=2) + self.forward_net(concat)
+        concat = th.cat((self.detachSplit(state, index=2), encodeOneHot(action, self.action_dim)), dim=1)
+        return self.detachSplit(state, index=2) + self.forward_net(concat)
 
     def rewardModel(self, state, next_state):
         """
@@ -258,5 +265,5 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param action: (th Tensor)
         :return: (th.Tensor)
         """
-        return self.reward_net(th.cat((self.detachSplit(state, position=3),
-                                       self.detachSplit(next_state, position=3)), dim=1))
+        return self.reward_net(th.cat((self.detachSplit(state, index=1),
+                                       self.detachSplit(next_state, index=1)), dim=1))

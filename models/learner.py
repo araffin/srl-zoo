@@ -137,7 +137,7 @@ class SRL4robotics(BaseLearner):
     def __init__(self, state_dim, model_type="resnet", inverse_model_type="linear", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, l2_reg=0.0, cuda=False,
                  multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1,
-                 split_index=[-1,-1] , path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
+                 split_index=-1 , path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -145,11 +145,6 @@ class SRL4robotics(BaseLearner):
         self.losses = losses
         self.dim_action = n_actions
         self.beta = beta
-        # For splitting representation
-        self.split_index = split_index
-        self.first_split = split_index[0] if split_index[0] > 0 else state_dim
-        self.second_split = split_index[1] if split_index[1] > split_index[0] > 0 else state_dim
-        self.third_split = state_dim
 
         if model_type in ["linear", "mlp", "resnet", "custom_cnn"] \
                 or "autoencoder" in losses or "vae" in losses:
@@ -165,12 +160,12 @@ class SRL4robotics(BaseLearner):
             self.perceptual_similarity_loss = "perceptual" in self.losses
             self.use_dae = "dae" in self.losses
             self.path_to_dae = path_to_dae
-            if split_index[1] > split_index[0] > 0:
+            if isinstance(split_index, list) and split_index[0] > 0:
+                print("Using splitted representation")
                 self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action,
                                              model_type=model_type, cuda=cuda, losses=losses,
                                              split_index=split_index, inverse_model_type=inverse_model_type)
             else:
-                print("You are not using splits! ")
                 self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
                                         cuda=cuda, losses=losses,inverse_model_type=inverse_model_type)
         else:
@@ -193,16 +188,16 @@ class SRL4robotics(BaseLearner):
         self.log_folder = log_folder
         self.model_type = model_type
 
-        self.losses_weights_dict = {"forward": 1.0, "inverse": 1.0, "reward": 1.0, "priors": 1.0,
+        self.losses_weights_dict = {"forward": 1.0, "inverse": 2.0, "reward": 1.0, "priors": 1.0,
                                     "episode-prior": 1.0, "reward-prior": 10, "triplet": 1.0,
-                                    "autoencoder": 1.0, "vae": 1.0, "perceptual": 1e-6, "dae": 1.0,
+                                    "autoencoder": 1.0, "vae": 0.5e-6, "perceptual": 1e-6, "dae": 1.0,
                                     'l1_reg': l1_reg, "l2_reg": l2_reg}
         self.occlusion_percentage = occlusion_percentage
         self.state_dim_dae = state_dim_dae
 
         if losses_weights_dict is not None:
             self.losses_weights_dict.update(losses_weights_dict)
-        print("\nYour are using the following weights for uour lossses: ", self.losses_weights_dict, '\n')
+        print("\nYour are using the following weights for the losses: ", self.losses_weights_dict, '\n')
         if self.use_dae and self.occlusion_percentage is not None:
             print("Using a maximum occlusion surface of {}".format(str(self.occlusion_percentage)))
 
@@ -408,8 +403,7 @@ class SRL4robotics(BaseLearner):
 
                 if self.use_forward_loss:
                     next_states_pred = self.model.forwardModel(states, actions_st)
-                    forwardModelLoss(next_states_pred[:, self.first_split:self.second_split],
-                                     next_states[:, self.first_split:self.second_split],
+                    forwardModelLoss(next_states_pred, next_states,
                                      weight=self.losses_weights_dict['forward'],
                                      loss_manager=loss_manager)
 
