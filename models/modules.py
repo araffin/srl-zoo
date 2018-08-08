@@ -115,9 +115,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param n_hidden_reward: (int) Number of hidden units for the reward model
         """
 
-        assert split_index[0] < split_index[1] < state_dim, \
-            "The second split must be of dim >= 1, consider increasing the state_dim or decreasing the split_index"
-
+        assert split_index[0] <= split_index[1] < state_dim
         self.model_type = model_type
         self.losses = losses
 
@@ -130,7 +128,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         self.split_index = split_index
         self.dim_first_method = split_index[0]
-        self.dim_second_method = split_index[1] - split_index[0]
+        second_split = split_index[1] - split_index[0]
+        self.dim_second_method = self.dim_first_method if second_split == 0 else second_split
         self.dim_third_method = state_dim - split_index[1]
 
         self.first_split_indices = (slice(None, None), slice(None, self.split_index[0]))  # [:, :first_split_index]

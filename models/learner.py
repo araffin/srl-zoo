@@ -148,7 +148,13 @@ class SRL4robotics(BaseLearner):
         # For splitting representation
         self.split_index = split_index
         self.first_split = split_index[0] if split_index[0] > 0 else state_dim
-        self.second_split = split_index[1] if split_index[1] > split_index[0] > 0 else state_dim
+
+        # if using Three splits
+        if split_index[1] > split_index[0] > 0:
+            self.second_split = split_index[1]
+        elif split_index[1] == split_index[0]:
+            # If using 2 splits or not split at all
+            self.second_split = split_index[0] if split_index[0] > 0 else state_dim
         self.third_split = state_dim
 
         if model_type in ["linear", "mlp", "resnet", "custom_cnn"] \
@@ -165,7 +171,7 @@ class SRL4robotics(BaseLearner):
             self.perceptual_similarity_loss = "perceptual" in self.losses
             self.use_dae = "dae" in self.losses
             self.path_to_dae = path_to_dae
-            if split_index[1] > split_index[0] > 0:
+            if split_index[1] >= split_index[0] > 0:
                 self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action,
                                              model_type=model_type, cuda=cuda, losses=losses,
                                              split_index=split_index, inverse_model_type=inverse_model_type)
