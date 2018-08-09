@@ -160,7 +160,7 @@ class SRL4robotics(BaseLearner):
             self.perceptual_similarity_loss = "perceptual" in self.losses
             self.use_dae = "dae" in self.losses
             self.path_to_dae = path_to_dae
-            
+
             if isinstance(split_index, list) and split_index[0] > 0:
                 print("Using splitted representation")
                 self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action,
