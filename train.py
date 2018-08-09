@@ -58,11 +58,13 @@ if __name__ == '__main__':
     parser.add_argument('--losses', nargs='+', default=["priors"], **loss_argument(
         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
                  "autoencoder", "vae", "perceptual", "dae"],
-        help='The wanted losses. Can also impose weight for every defined loss: "<name>:<weight>".'))
+        help='The wanted losses. Can also specify a weight and dimension that applies with proper arguments: "<name>:<weight>:<dimension>".'))
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
-    parser.add_argument('--split-dimensions', type=int, nargs='+', default=[-1],
-                        help='Split representation models (default: ("[-1]"), no split)')
+    parser.add_argument('--split', action='store_true', default=False,
+                        help='Split representation models, by specifying along with --loss argument "<name>:<dimension>')
+    parser.add_argument('--weights', action='store_true', default=False,
+                        help='Specifying a weight for each loss along with --loss argument "<name>:<weight>')
     parser.add_argument('--path-to-dae', type=str, default="",
                         help='Path to a pre-trained dae model when using the perceptual loss with VAE')
     parser.add_argument('--state-dim-dae', type=int, default=200,
@@ -81,26 +83,44 @@ if __name__ == '__main__':
     plot_script.INTERACTIVE_PLOT = learner.DISPLAY_PLOTS
 
     # Dealing with losses to use
-    has_weight = [isinstance(loss, tuple) for loss in args.losses]
-    if any(has_weight) and not all(has_weight):
-        raise ValueError(
-            "Either no losses have a defined weight, or all losses have a defined weight. {}".format(args.losses))
+    has_loss_description = [isinstance(loss, tuple) for loss in args.losses]
+    has_consistant_description, has_weight, has_split = False, False, False
+    if all(has_loss_description):
+        len_description = [len(item_loss) for item_loss in args.losses]
+        has_consistant_description = sum(len_description)/len(len_description) == len_description[0]
+        has_weight = has_consistant_description and args.weights
+        has_split = has_consistant_description and args.split
 
-    # If not specifying weight's for the losses
-    if not all(has_weight):
+    if any(has_loss_description) and not all(has_loss_description):
+        raise ValueError(
+            "Either no losses have a defined weight or dimension, or all losses have a defined weight. {}".format(args.losses))
+    if not any(has_loss_description) and (args.split or args.weights):
+        raise ValueError("Please specify losses weights or dimensions")
+    
+    # If not describing the the losses (weight and or dimension)
+    if not has_consistant_description:
         losses = list(set(args.losses))
         losses_weights_dict = None
-    # otherwise collecting weights
+        split_dimensions = -1
+
+    # otherwise collecting descriptions
     else:
         losses_weights_dict = {}
-        for loss, weight in args.losses:
+        split_dimensions = {}
+        for loss, weight, split_dim in args.losses:
             losses_weights_dict[loss] = weight
+            split_dimensions[loss] = split_dim
         losses = list(losses_weights_dict.keys())
+
+        if not has_weight:
+            split_dimensions = losses_weights_dict
+            losses_weights_dict = None
+            losses = list(split_dimensions.keys())
 
         assert not ("triplet" in losses and not args.multi_view), \
             "Triplet loss with single view is not supported, please use the --multi-view option"
     args.losses = losses
-
+    args.split_dimensions = split_dimensions
     if args.multi_view is True:
         # Setting variables involved data-loading from multiple cameras,
         # involved also in adapting the input layers of NN to that data
@@ -158,7 +178,7 @@ if __name__ == '__main__':
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, l2_reg=args.l2_reg, cuda=args.cuda, multi_view=args.multi_view,
                        losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta,
-                       split_dimensions=args.split_dimensions, path_to_dae=args.path_to_dae, state_dim_dae=args.state_dim_dae,
+                       split_dimensions=split_dimensions, path_to_dae=args.path_to_dae, state_dim_dae=args.state_dim_dae,
                        occlusion_percentage=args.occlusion_percentage)
 
     if args.training_set_size > 0:

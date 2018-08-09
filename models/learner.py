@@ -137,7 +137,7 @@ class SRL4robotics(BaseLearner):
     def __init__(self, state_dim, model_type="resnet", inverse_model_type="linear", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, l2_reg=0.0, cuda=False,
                  multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1,
-                 split_dimensions=-1 , path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
+                 split_dimensions=-1, path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -161,7 +161,7 @@ class SRL4robotics(BaseLearner):
             self.use_dae = "dae" in self.losses
             self.path_to_dae = path_to_dae
 
-            if isinstance(split_dimensions, list) and split_dimensions[0] > 0:
+            if isinstance(split_dimensions, dict) and sum(split_dimensions.values()) > 0:
                 print("Using splitted representation")
                 self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action,
                                              model_type=model_type, cuda=cuda, losses=losses,
@@ -225,7 +225,7 @@ class SRL4robotics(BaseLearner):
         n_actions = exp_config['n_actions']
         model_type = exp_config['model-type']
         multi_view = exp_config.get('multi-view', False)
-        split_dimensions = exp_config.get('split-dimensions', [-1,-1])
+        split_dimensions = exp_config.get('split-dimensions', -1)
         model_path = log_folder + 'srl_model.pth'
         inverse_model_type = exp_config.get('inverse-model-type', 'linear')
         occlusion_percentage = exp_config.get('occlusion-percentage', 0)

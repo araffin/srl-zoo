@@ -133,10 +133,10 @@ def testStackedModels():
             '--epochs', NUM_EPOCHS, '--training-set-size', TRAINING_SET_SIZE,
             '--seed', SEED, '--val-size', 0.1,
             '--state-dim', 100, '--model-type', 'custom_cnn', '-bs', 128,
-            '--losses', 'dae:1', 'inverse:5',
+            '--losses', 'dae:1:20', 'inverse:5:80',
             '--inverse-model-type', 'mlp',
             '--occlusion-percentage', 0.3,
-            '--split-dimensions', 30, 70,
+            '--split','--weights'
             '--l2-reg', 0.0001]
     args = list(map(str, args))
     ok = subprocess.call(['python', 'train.py'] + args)

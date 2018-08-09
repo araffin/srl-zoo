@@ -111,14 +111,14 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param cuda: (bool)
         :param model_type: (str)
         :param losses: ([str])
-        :param split_dimensions: (int or [int])) Number of dimensions for the different split
+        :param split_dimensions: ([int])) Number of dimensions for the different split
         :param n_hidden_reward: (int) Number of hidden units for the reward model
         """
         assert len(split_dimensions) == len(losses), "Please specify as many split dimensions {} as losses {} !".\
             format(len(split_dimensions), len(losses))
-        assert sum(split_dimensions) == state_dim, \
+        assert sum(split_dimensions.values()) == state_dim, \
             "The sum of all splits' dimension {} must be equal to the state dimension {} !"\
-                .format(sum(split_dimensions), str(state_dim))
+                .format(sum(split_dimensions.values()), str(state_dim))
 
         self.split_dimensions = split_dimensions
         self.model_type = model_type
@@ -130,10 +130,6 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         self.cuda = cuda
         self.state_dim = state_dim
-
-        self.ae_index = 0
-        # self.reward_index = 1
-        self.inverse_index = len(split_dimensions)
 
         self.initForwardNet(self.state_dim, action_dim)
         self.initInverseNet(self.state_dim, action_dim, model_type=inverse_model_type)
@@ -168,6 +164,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         if "triplet" in losses:
             raise ValueError("triplet not supported when splitting representation")
 
+
+
     def getStates(self, observations):
         """
         :param observations: (th.Tensor)
@@ -194,13 +192,12 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         tensors = []
         start_idx = 0
-        for idx, n_dim in enumerate(self.split_dimensions):
-
+        for key, n_dim in self.split_dimensions.items():
+            n_dim = int(n_dim)
             # dealing with a split shared with the previous loss dimensions
             if n_dim == 0 and start_idx > 0:
                 start_idx -= 1
-
-            if idx != index:
+            if key != index:
                 tensors.append(tensor[:, start_idx:start_idx + n_dim].detach())
             else:
                 tensors.append(tensor[:, start_idx:start_idx + n_dim])
@@ -218,9 +215,11 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         input_shape = x.size()
         mu, logvar = self.model.encode(x)
-        z = self.model.reparameterize(self.detachSplit(mu, index=0), self.detachSplit(logvar, index=0))
+        z = self.model.reparameterize(self.detachSplit(mu, index='vae'),
+                                      self.detachSplit(logvar, index='vae'))
         decoded = self.model.decode(z).view(input_shape)
-        return decoded, self.detachSplit(mu, index=0), self.detachSplit(logvar, index=0)
+        return decoded, self.detachSplit(mu, index='vae'), \
+               self.detachSplit(logvar, index='vae')
 
     def forwardAutoencoder(self, x):
         """
@@ -229,7 +228,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         input_shape = x.size()
         encoded = self.model.encode(x)
-        decoded = self.model.decode(self.detachSplit(encoded, index=0)).view(input_shape)
+        decoded = self.model.decode(self.detachSplit(encoded, index='autoencoder')).view(input_shape)
         return encoded, decoded
 
     def inverseModel(self, state, next_state):
@@ -239,8 +238,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param next_state: (th.Tensor)
         :return: probability of each action
         """
-        return self.inverse_net(th.cat((self.detachSplit(state, index=self.inverse_index),
-                                        self.detachSplit(next_state, index=self.inverse_index)), dim=1))
+        return self.inverse_net(th.cat((self.detachSplit(state, index='inverse'),
+                                        self.detachSplit(next_state, index='inverse')), dim=1))
 
     def forwardModel(self, state, action):
         """
@@ -250,8 +249,9 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :return: (th.Tensor)
         """
         # Predict the delta between the next state and current state
-        concat = th.cat((self.detachSplit(state, index=2), encodeOneHot(action, self.action_dim)), dim=1)
-        return self.detachSplit(state, index=2) + self.forward_net(concat)
+        concat = th.cat((self.detachSplit(state, index='forward'),
+                         encodeOneHot(action, self.action_dim)), dim=1)
+        return self.detachSplit(state, index='forward') + self.forward_net(concat)
 
     def rewardModel(self, state, next_state):
         """
@@ -260,5 +260,5 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param action: (th Tensor)
         :return: (th.Tensor)
         """
-        return self.reward_net(th.cat((self.detachSplit(state, index=1),
-                                       self.detachSplit(next_state, index=1)), dim=1))
+        return self.reward_net(th.cat((self.detachSplit(state, index='reward'),
+                                       self.detachSplit(next_state, index='reward')), dim=1))

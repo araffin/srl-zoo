@@ -19,14 +19,18 @@ def loss_argument(choices, help):
     :return: (dict) the arguments for parse arg
     """
     def _arg_type(arg):
-        has_weight = ':' in arg
-        if has_weight:
+        arg_separator = arg.count(':')
+        if arg_separator >= 1:
             if arg.split(':')[0] not in choices:
                 raise argparse.ArgumentTypeError("invalid choice: {} (choose from {})".format(arg.split(':')[0], choices))
             try:
-                return arg.split(':')[0], float(arg.split(':')[1])
+                loss, first_arg, second_arg = arg.split(':')[0], float(arg.split(':')[1]), 0
+                if arg_separator == 2:
+                    second_arg = int(arg.split(':')[2])
+                return loss, first_arg, second_arg
             except ValueError:
-                raise argparse.ArgumentTypeError("Error: must be of format '<str>:<float>' or '<str>'")
+                raise argparse.\
+                    ArgumentTypeError("Error: must be of format '<str>:<float>:<int>', '<str>:<float/int>' or '<str>'")
         else:
             if arg not in choices:
                 raise argparse.ArgumentTypeError("invalid choice: {} (choose from {})".format(arg, choices))
