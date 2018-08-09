@@ -136,7 +136,7 @@ def testStackedModels():
             '--losses', 'dae:1', 'inverse:5',
             '--inverse-model-type', 'mlp',
             '--occlusion-percentage', 0.3,
-            '--split-index', 33, 66,
+            '--split-dimensions', 30, 70,
             '--l2-reg', 0.0001]
     args = list(map(str, args))
     ok = subprocess.call(['python', 'train.py'] + args)

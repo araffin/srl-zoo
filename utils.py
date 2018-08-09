@@ -47,7 +47,7 @@ def buildConfig(args):
     :return: (dict)
     """
     # Fix to use this function in srl_baselines/
-    split_index = args.split_index if hasattr(args, "split_index") else -1
+    split_dimensions = args.split_dimensions if hasattr(args, "split_dimensions") else -1
     beta = args.beta if hasattr(args, "beta") else -1
     l1_reg = args.l1_reg if hasattr(args, "l1_reg") else 0
     l2_reg = args.l2_reg if hasattr(args, "l2_reg") else 0
@@ -71,7 +71,7 @@ def buildConfig(args):
         "losses": args.losses,
         "n-neighbors": 5,
         "n-to-plot": 5,
-        "split-index": split_index,
+        "split-dimensions": split_dimensions,
         "inverse-model-type": args.inverse_model_type
     }
     return exp_config

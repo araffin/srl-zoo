@@ -61,7 +61,7 @@ if __name__ == '__main__':
         help='The wanted losses. Can also impose weight for every defined loss: "<name>:<weight>".'))
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
-    parser.add_argument('--split-index', type=int, nargs='+', default=[-1],
+    parser.add_argument('--split-dimensions', type=int, nargs='+', default=[-1],
                         help='Split representation models (default: ("[-1]"), no split)')
     parser.add_argument('--path-to-dae', type=str, default="",
                         help='Path to a pre-trained dae model when using the perceptual loss with VAE')
@@ -158,7 +158,7 @@ if __name__ == '__main__':
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, l2_reg=args.l2_reg, cuda=args.cuda, multi_view=args.multi_view,
                        losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta,
-                       split_index=args.split_index, path_to_dae=args.path_to_dae, state_dim_dae=args.state_dim_dae,
+                       split_dimensions=args.split_dimensions, path_to_dae=args.path_to_dae, state_dim_dae=args.state_dim_dae,
                        occlusion_percentage=args.occlusion_percentage)
 
     if args.training_set_size > 0:

@@ -171,7 +171,7 @@ python train.py --data-folder data/path/to/dataset --losses vae perceptual --pat
 Because losses do not optimize the same objective and can be opposed, it may make sense to stack representations learned with different objectives, instead of combining them. For instance, you can stack an autoencoder (with a state dimension of 20) with an inverse model (of dimension 2) using:
 
 ```
-python train.py --data-folder data/path/to/dataset --losses autoencoder inverse --state-dim 22 --split-index 20
+python train.py --data-folder data/path/to/dataset --losses autoencoder inverse --state-dim 22 --split-dimensions 20 2
 ```
 
 The details of how models are splitted can be found inside the `SRLModulesSplit` class, defined in `models/modules.py`. All models share the same *encoder* or *features extractor*, that maps observations to states.

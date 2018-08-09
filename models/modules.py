@@ -101,7 +101,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
 class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
     def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn",
-                 losses=None, split_index=-1, n_hidden_reward=16, inverse_model_type="linear"):
+                 losses=None, split_dimensions=-1, n_hidden_reward=16, inverse_model_type="linear"):
         """
         A model that can split representation, combining
         AE/VAE for the first split with Inverse + Forward in the second split
@@ -111,29 +111,16 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param cuda: (bool)
         :param model_type: (str)
         :param losses: ([str])
-        :param split_index: (int or [int])) Number of dimensions for the different split
+        :param split_dimensions: (int or [int])) Number of dimensions for the different split
         :param n_hidden_reward: (int) Number of hidden units for the reward model
         """
+        assert len(split_dimensions) == len(losses), "Please specify as many split dimensions {} as losses {} !".\
+            format(len(split_dimensions), len(losses))
+        assert sum(split_dimensions) == state_dim, \
+            "The sum of all splits' dimension {} must be equal to the state dimension {} !"\
+                .format(sum(split_dimensions), str(state_dim))
 
-        # TODO: rename split_index -> split_indices + change in RL repo
-        if isinstance(split_index, int):
-            assert split_index < state_dim, \
-                "The second split must be of dim >= 1, consider increasing the state_dim or decreasing the split_index"
-            split_indices = [split_index]
-        else:
-            # TODO: sanity check: split_indices ordered + < state_dim
-            split_indices = split_index
-
-        # Compute the number of dimensions for each method
-        n_dimensions = [split_indices[0]]
-        for i in range(len(split_indices) - 1):
-            n_dimensions.append(split_indices[i + 1] - split_indices[i])
-
-        n_dimensions.append(state_dim - split_indices[-1])
-
-        assert sum(n_dimensions) == state_dim
-        self.n_dimensions = n_dimensions
-
+        self.split_dimensions = split_dimensions
         self.model_type = model_type
         self.losses = losses
 
@@ -146,7 +133,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         self.ae_index = 0
         # self.reward_index = 1
-        self.inverse_index = len(split_indices)
+        self.inverse_index = len(split_dimensions)
 
         self.initForwardNet(self.state_dim, action_dim)
         self.initInverseNet(self.state_dim, action_dim, model_type=inverse_model_type)
@@ -207,13 +194,21 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         tensors = []
         start_idx = 0
-        for idx, n_dim in enumerate(self.n_dimensions):
+        for idx, n_dim in enumerate(self.split_dimensions):
+
+            # dealing with a split shared with the previous loss dimensions
+            if n_dim == 0 and start_idx > 0:
+                start_idx -= 1
+
             if idx != index:
                 tensors.append(tensor[:, start_idx:start_idx + n_dim].detach())
             else:
                 tensors.append(tensor[:, start_idx:start_idx + n_dim])
             start_idx += n_dim
 
+            # Returning to the proper index after dealing with a shared split
+            if n_dim == 0 and start_idx > 0:
+                start_idx += 1
         return th.cat(tensors, dim=1)
 
     def forwardVAE(self, x):

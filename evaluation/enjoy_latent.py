@@ -85,7 +85,7 @@ def main():
         max_x_ae = np.max(X, axis=0)
 
     if not is_auto_encoder or len(losses) > 1:
-        state_dim_second_split = state_dim - exp_config['split-index'] if exp_config['split-index'] > 0 else state_dim
+        state_dim_second_split = state_dim - exp_config['split-dimensions'] if exp_config['split-dimensions'] > 0 else state_dim
 
         srl_model_knn = KNeighborsClassifier()
 
