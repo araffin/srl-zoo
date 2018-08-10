@@ -58,13 +58,10 @@ if __name__ == '__main__':
     parser.add_argument('--losses', nargs='+', default=["priors"], **loss_argument(
         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
                  "autoencoder", "vae", "perceptual", "dae", "random"],
-        help='The wanted losses. One may also specify a weight and dimension that apply as follows: "<name>:<weight>:<dimension>".'))
+        help='The wanted losses. One may also want to specify a weight and dimension '
+             'that apply as follows: "<name>:<weight>:<dimension>".'))
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
-    parser.add_argument('--splits', action='store_true', default=False,
-                        help='Applying splits to representation models, along with --loss argument "<name>:<dimension>')
-    parser.add_argument('--weights', action='store_true', default=False,
-                        help='Allowing to specify a weight for each loss along with --loss argument "<name>:<weight>')
     parser.add_argument('--path-to-dae', type=str, default="",
                         help='Path to a pre-trained dae model when using the perceptual loss with VAE')
     parser.add_argument('--state-dim-dae', type=int, default=200,
@@ -87,16 +84,14 @@ if __name__ == '__main__':
     has_consistant_description, has_weight, has_splits = False, False, False
     if all(has_loss_description):
         len_description = [len(item_loss) for item_loss in args.losses]
-        print("descr:", sum(len_description) / len(len_description), len_description[0])
         has_consistant_description = sum(len_description)/len(len_description) == len_description[0]
-        has_weight = has_consistant_description and args.weights
-        has_splits = has_consistant_description and args.splits
+        has_weight = has_consistant_description
+        has_splits = has_consistant_description and  len_description[0] == 3
 
     if (any(has_loss_description) and not all(has_loss_description)):
         raise ValueError(
-            "Either no losses have a defined weight or dimension, or all losses have a defined weight. {}".format(args.losses))
-    if not any(has_loss_description) and (args.splits or args.weights):
-        raise ValueError("Please specify losses weights or dimensions")
+            "Either no losses have a defined weight or dimension, or all losses have a defined weight. {}"
+            .format(args.losses))
 
     # If not describing the the losses (weight and or dimension)
     if not has_consistant_description:
@@ -131,10 +126,6 @@ if __name__ == '__main__':
         else:
             preprocessing.preprocess.N_CHANNELS = 6
 
-    assert not (args.splits and args.weights and not len_description[0] == 3), \
-        "You either forgot to specify losses weights or splits dimensions while using those options"
-    # assert not (len_description[0] == 3 and not(args.splits and args.weights)), \
-    #     "You specified losses weights and splits dimensions while not using the proper options"
     assert not ("autoencoder" in losses and "vae" in losses), "Model cannot be both an Autoencoder and a VAE (come on!)"
     assert not (("autoencoder" in losses or "vae" in losses)
                 and args.model_type == "resnet"), "Model cannot be an Autoencoder or VAE using ResNet Architecture !"
@@ -183,8 +174,8 @@ if __name__ == '__main__':
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, l2_reg=args.l2_reg, cuda=args.cuda, multi_view=args.multi_view,
                        losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta,
-                       split_dimensions=split_dimensions, path_to_dae=args.path_to_dae, state_dim_dae=args.state_dim_dae,
-                       occlusion_percentage=args.occlusion_percentage)
+                       split_dimensions=split_dimensions, path_to_dae=args.path_to_dae,
+                       state_dim_dae=args.state_dim_dae, occlusion_percentage=args.occlusion_percentage)
 
     if args.training_set_size > 0:
         limit = args.training_set_size
