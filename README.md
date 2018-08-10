@@ -13,7 +13,8 @@ Available methods:
 - Triplet Network (for stereovision only)
 - Reward loss
 - Combination and stacking of methods
-- **[experimental]** Reward Prior, Episode-prior, Perceptual Similarity loss (DARLA), Mutual Information loss 
+- Random Features
+- **[experimental]** Reward Prior, Episode-prior, Perceptual Similarity loss (DARLA), Mutual Information loss
 
 Related papers:
 - "State Representation Learning for Control: An Overview" (Lesort et al., 2018), link: [https://arxiv.org/pdf/1802.04181.pdf](https://arxiv.org/pdf/1802.04181.pdf)
@@ -157,7 +158,7 @@ python train.py --data-folder data/path/to/dataset --losses autoencoder inverse
 
 You can as well specify the weight of each loss:
 ```
-python train.py --data-folder data/path/to/dataset --losses autoencoder:1 inverse:10
+python train.py --data-folder data/path/to/dataset --losses autoencoder:1 inverse:10 --weights
 ```
 
 Train a vae with the perceptual similarity loss:
@@ -171,7 +172,7 @@ python train.py --data-folder data/path/to/dataset --losses vae perceptual --pat
 Because losses do not optimize the same objective and can be opposed, it may make sense to stack representations learned with different objectives, instead of combining them. For instance, you can stack an autoencoder (with a state dimension of 20) with an inverse model (of dimension 2) using:
 
 ```
-python train.py --data-folder data/path/to/dataset --losses autoencoder inverse --state-dim 22 --split-dimensions 20 2
+python train.py --data-folder data/path/to/dataset --losses autoencoder:20 inverse:2 --state-dim 22 --splits
 ```
 
 The details of how models are splitted can be found inside the `SRLModulesSplit` class, defined in `models/modules.py`. All models share the same *encoder* or *features extractor*, that maps observations to states.

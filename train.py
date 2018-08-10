@@ -57,14 +57,14 @@ if __name__ == '__main__':
                         help='Force balanced sampling for episode independent prior instead of uniform')
     parser.add_argument('--losses', nargs='+', default=["priors"], **loss_argument(
         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-                 "autoencoder", "vae", "perceptual", "dae"],
-        help='The wanted losses. Can also specify a weight and dimension that applies with proper arguments: "<name>:<weight>:<dimension>".'))
+                 "autoencoder", "vae", "perceptual", "dae", "random"],
+        help='The wanted losses. One may also specify a weight and dimension that apply as follows: "<name>:<weight>:<dimension>".'))
     parser.add_argument('--beta', type=float, default=1.0,
                         help='(For beta-VAE only) Factor on the KL divergence, higher value means more disentangling.')
-    parser.add_argument('--split', action='store_true', default=False,
-                        help='Split representation models, by specifying along with --loss argument "<name>:<dimension>')
+    parser.add_argument('--splits', action='store_true', default=False,
+                        help='Applying splits to representation models, along with --loss argument "<name>:<dimension>')
     parser.add_argument('--weights', action='store_true', default=False,
-                        help='Specifying a weight for each loss along with --loss argument "<name>:<weight>')
+                        help='Allowing to specify a weight for each loss along with --loss argument "<name>:<weight>')
     parser.add_argument('--path-to-dae', type=str, default="",
                         help='Path to a pre-trained dae model when using the perceptual loss with VAE')
     parser.add_argument('--state-dim-dae', type=int, default=200,
@@ -84,19 +84,20 @@ if __name__ == '__main__':
 
     # Dealing with losses to use
     has_loss_description = [isinstance(loss, tuple) for loss in args.losses]
-    has_consistant_description, has_weight, has_split = False, False, False
+    has_consistant_description, has_weight, has_splits = False, False, False
     if all(has_loss_description):
         len_description = [len(item_loss) for item_loss in args.losses]
+        print("descr:", sum(len_description) / len(len_description), len_description[0])
         has_consistant_description = sum(len_description)/len(len_description) == len_description[0]
         has_weight = has_consistant_description and args.weights
-        has_split = has_consistant_description and args.split
+        has_splits = has_consistant_description and args.splits
 
-    if any(has_loss_description) and not all(has_loss_description):
+    if (any(has_loss_description) and not all(has_loss_description)):
         raise ValueError(
             "Either no losses have a defined weight or dimension, or all losses have a defined weight. {}".format(args.losses))
-    if not any(has_loss_description) and (args.split or args.weights):
+    if not any(has_loss_description) and (args.splits or args.weights):
         raise ValueError("Please specify losses weights or dimensions")
-    
+
     # If not describing the the losses (weight and or dimension)
     if not has_consistant_description:
         losses = list(set(args.losses))
@@ -130,6 +131,10 @@ if __name__ == '__main__':
         else:
             preprocessing.preprocess.N_CHANNELS = 6
 
+    assert not (args.splits and args.weights and not len_description[0] == 3), \
+        "You either forgot to specify losses weights or splits dimensions while using those options"
+    # assert not (len_description[0] == 3 and not(args.splits and args.weights)), \
+    #     "You specified losses weights and splits dimensions while not using the proper options"
     assert not ("autoencoder" in losses and "vae" in losses), "Model cannot be both an Autoencoder and a VAE (come on!)"
     assert not (("autoencoder" in losses or "vae" in losses)
                 and args.model_type == "resnet"), "Model cannot be an Autoencoder or VAE using ResNet Architecture !"
