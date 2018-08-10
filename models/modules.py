@@ -101,7 +101,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
 class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
     def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn",
-                 losses=None, split_dimensions=-1, n_hidden_reward=16, inverse_model_type="linear"):
+                 losses=None, split_dimensions=None, n_hidden_reward=16, inverse_model_type="linear"):
         """
         A model that can split representation, combining
         AE/VAE for the first split with Inverse + Forward in the second split
@@ -111,13 +111,14 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param cuda: (bool)
         :param model_type: (str)
         :param losses: ([str])
-        :param split_dimensions: (int or [int])) Number of dimensions for the different split
+        :param split_dimensions: ([int])) Number of dimensions for the different splits
         :param n_hidden_reward: (int) Number of hidden units for the reward model
         """
+        # Comment for backward compatibility
         assert len(split_dimensions) == len(losses), "Please specify as many split dimensions {} as losses {} !".\
-            format(len(split_dimensions), len(losses))
+        format(len(split_dimensions), len(losses))
         assert sum(split_dimensions) == state_dim, \
-            "The sum of all splits' dimension {} must be equal to the state dimension {} !"\
+            "The sum of all splits' dimensions {} must be equal to the state dimension {}"\
                 .format(sum(split_dimensions), str(state_dim))
 
         self.split_dimensions = split_dimensions
@@ -132,12 +133,18 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         self.state_dim = state_dim
 
         self.ae_index = 0
-        # self.reward_index = 1
-        self.inverse_index = len(split_dimensions)
+        self.reward_index = len(split_dimensions) - 2
+        self.inverse_index = len(split_dimensions) - 1
+
+        # Uncomment for backward compatibility
+        # self.initForwardNet(split_dimensions[self.inverse_index], action_dim)
+        # self.initInverseNet(split_dimensions[self.inverse_index], action_dim, model_type=inverse_model_type)
+        # self.initRewardNet(self.state_dim, n_hidden=n_hidden_reward)
 
         self.initForwardNet(self.state_dim, action_dim)
         self.initInverseNet(self.state_dim, action_dim, model_type=inverse_model_type)
         self.initRewardNet(self.state_dim, n_hidden=n_hidden_reward)
+
 
         # Architecture
         if model_type == "custom_cnn":
@@ -201,7 +208,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
                 start_idx -= 1
 
             if idx != index:
-                tensors.append(tensor[:, start_idx:start_idx + n_dim].detach())
+                # tensors.append(tensor[:, start_idx:start_idx + n_dim].detach())
+                tensors.append(th.zeros_like(tensor[:, start_idx:start_idx + n_dim]))
             else:
                 tensors.append(tensor[:, start_idx:start_idx + n_dim])
             start_idx += n_dim
@@ -260,5 +268,5 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param action: (th Tensor)
         :return: (th.Tensor)
         """
-        return self.reward_net(th.cat((self.detachSplit(state, index=1),
-                                       self.detachSplit(next_state, index=1)), dim=1))
+        return self.reward_net(th.cat((self.detachSplit(state, index=self.reward_index),
+                                       self.detachSplit(next_state, index=self.reward_index)), dim=1))
