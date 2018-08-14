@@ -115,13 +115,13 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param n_hidden_reward: (int) Number of hidden units for the reward model
         """
         # Comment for backward compatibility
-        assert len(split_dimensions) == len(losses), "Please specify as many split dimensions {} as losses {} !".\
-        format(len(split_dimensions), len(losses))
+        assert len(split_dimensions) == len(losses), "Please specify as many split dimensions {} as losses {} !". \
+            format(len(split_dimensions), len(losses))
 
         n_dims = sum(split_dimensions.values())
         n_dims += 1 if -1 in split_dimensions.values() else 0
         assert n_dims == state_dim, \
-            "The sum of all splits' dimensions {} must be equal to the state dimension {}"\
+            "The sum of all splits' dimensions {} must be equal to the state dimension {}" \
                 .format(sum(split_dimensions.values()), str(state_dim))
 
         self.split_dimensions = split_dimensions
@@ -143,7 +143,6 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         self.initForwardNet(self.state_dim, action_dim)
         self.initInverseNet(self.state_dim, action_dim, model_type=inverse_model_type)
         self.initRewardNet(self.state_dim, n_hidden=n_hidden_reward)
-
 
         # Architecture
         if model_type == "custom_cnn":
@@ -173,8 +172,6 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         if "triplet" in losses:
             raise ValueError("triplet not supported when splitting representation")
-
-
 
     def getStates(self, observations):
         """
@@ -215,7 +212,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
             if key != index:
                 tensors.append(tensor[:, start_idx:start_idx + n_dim].detach())
-                #tensors.append(th.zeros_like(tensor[:, start_idx:start_idx + n_dim]))
+                # tensors.append(th.zeros_like(tensor[:, start_idx:start_idx + n_dim]))
             else:
                 if n_dim == 0:
                     # Keeping the dimensions share with the previous loss/split attached
@@ -239,8 +236,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         z = self.model.reparameterize(self.detachSplit(mu, index='vae'),
                                       self.detachSplit(logvar, index='vae'))
         decoded = self.model.decode(z).view(input_shape)
-        return decoded, self.detachSplit(mu, index='vae'), \
-               self.detachSplit(logvar, index='vae')
+        return decoded, self.detachSplit(mu, index='vae'), self.detachSplit(logvar, index='vae')
 
     def forwardAutoencoder(self, x):
         """
