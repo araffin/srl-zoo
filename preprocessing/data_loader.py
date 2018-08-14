@@ -39,6 +39,9 @@ def preprocessImage(image, convert_to_rgb=True, apply_occlusion=False, occlusion
     """
     :param image: (numpy matrix) BGR image
     :param convert_to_rgb: (bool) whether the conversion to rgb is needed or not
+    :param apply_occlusion: (bool) whether to occludes part of the images or not
+                            (used for training denoising autoencoder)
+    :param occlusion_percentage: (float) max percentage of occlusion (in width and height)
     :return: (numpy matrix)
     """
     # Resize
@@ -61,6 +64,7 @@ def preprocessImage(image, convert_to_rgb=True, apply_occlusion=False, occlusion
 
     return im
 
+
 class DataLoader(object):
     def __init__(self, minibatchlist, images_path, n_workers=1, multi_view=False, use_triplets=False,
                  infinite_loop=True, max_queue_len=4, is_training=False, apply_occlusion=False,
@@ -76,7 +80,7 @@ class DataLoader(object):
         :param infinite_loop: (bool) whether to have an iterator that can be resetted, set to False, it
         :param max_queue_len: (int) Max number of minibatches that can be preprocessed at the same time
         :param apply_occlusion: is the use of occlusion enabled - when using DAE (bool)
-        :param occlusion percentage: max percentage of occlusion when using DAE (float)
+        :param occlusion_percentage: max percentage of occlusion when using DAE (float)
         :param is_training: (bool)
 
             Set to True, the dataloader will output both `obs` and `next_obs` (a tuple of th.Tensor)
@@ -143,17 +147,17 @@ class DataLoader(object):
 
                     if self.n_workers <= 1:
                         batch = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets)
-                                                        for image_path in images]
+                                 for image_path in images]
                         if self.apply_occlusion:
                             batch_noisy = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets,
-                                                            apply_occlusion=self.apply_occlusion,
-                                                            occlusion_percentage=self.occlusion_percentage)
-                                            for image_path in images]
+                                                                  apply_occlusion=self.apply_occlusion,
+                                                                  occlusion_percentage=self.occlusion_percentage)
+                                           for image_path in images]
 
                     else:
                         batch = parallel(
                             delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets)
-                                                            for image_path in images)
+                            for image_path in images)
                         if self.apply_occlusion:
                             batch_noisy = parallel(
                                 delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets,
@@ -170,9 +174,10 @@ class DataLoader(object):
                         if batch_noisy is not None:
                             batch_obs_noisy, batch_next_obs_noisy = batch_noisy[:len(images) // 2], \
                                                                     batch_noisy[len(images) // 2:]
-                        self.queue.put((minibatch_idx, batch_obs, batch_next_obs, batch_obs_noisy, batch_next_obs_noisy))
+                        self.queue.put((minibatch_idx, batch_obs, batch_next_obs,
+                                        batch_obs_noisy, batch_next_obs_noisy))
                     else:
-                        self.queue.put((batch, batch_noisy))
+                        self.queue.put(batch)
 
                     # Free memory
                     if self.shuffle:
@@ -200,7 +205,6 @@ class DataLoader(object):
 
         if multi_view:
             images = []
-            noisy_images =[]
 
             # Load different view of the same timestep
             for i in range(2):
@@ -208,7 +212,7 @@ class DataLoader(object):
                 if im is None:
                     raise ValueError("tried to load {}_{}.jpg, but it was not found".format(image_path, i + 1))
                 images.append(preprocessImage(im, apply_occlusion=apply_occlusion,
-                                                    occlusion_percentage=occlusion_percentage))
+                                              occlusion_percentage=occlusion_percentage))
             ####################
             # loading a negative observation
             if use_triplets:
