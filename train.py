@@ -11,12 +11,14 @@ from __future__ import print_function, division, absolute_import
 
 import argparse
 
+from collections import OrderedDict
 import numpy as np
 import torch as th
 
 import models.learner as learner
 import plotting.representation_plot as plot_script
 import preprocessing
+
 from models.learner import SRL4robotics
 from pipeline import getLogFolderName, saveConfig, correlationCall
 from plotting.losses_plot import plotLosses
@@ -101,8 +103,8 @@ if __name__ == '__main__':
 
     # otherwise collecting descriptions
     else:
-        losses_weights_dict = {}
-        split_dimensions = {}
+        losses_weights_dict = OrderedDict()
+        split_dimensions = OrderedDict()
         for loss, weight, split_dim in args.losses:
             losses_weights_dict[loss] = weight
             split_dimensions[loss] = split_dim

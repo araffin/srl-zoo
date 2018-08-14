@@ -117,7 +117,10 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         # Comment for backward compatibility
         assert len(split_dimensions) == len(losses), "Please specify as many split dimensions {} as losses {} !".\
         format(len(split_dimensions), len(losses))
-        assert sum(split_dimensions.values()) == state_dim, \
+
+        n_dims = sum(split_dimensions.values())
+        n_dims += 1 if -1 in split_dimensions.values() else 0
+        assert n_dims == state_dim, \
             "The sum of all splits' dimensions {} must be equal to the state dimension {}"\
                 .format(sum(split_dimensions.values()), str(state_dim))
 
@@ -199,21 +202,31 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         tensors = []
         start_idx = 0
+        pred_dim = 0
+
         for key, n_dim in self.split_dimensions.items():
             n_dim = int(n_dim)
-            # dealing with a split shared with the previous loss dimensions
-            if n_dim == 0 and start_idx > 0:
-                start_idx -= 1
-            if key != index:
-                # tensors.append(tensor[:, start_idx:start_idx + n_dim].detach())
-                tensors.append(th.zeros_like(tensor[:, start_idx:start_idx + n_dim]))
-            else:
-                tensors.append(tensor[:, start_idx:start_idx + n_dim])
-            start_idx += n_dim
 
-            # Returning to the proper index after dealing with a shared split
-            if n_dim == 0 and start_idx > 0:
-                start_idx += 1
+            # dealing with a split shared with the previous loss dimensions
+            if n_dim == -1 and start_idx > 0:
+                n_dim = 0
+                # retrieving the previous index
+                start_idx -= pred_dim
+
+            if key != index:
+                tensors.append(tensor[:, start_idx:start_idx + n_dim].detach())
+                #tensors.append(th.zeros_like(tensor[:, start_idx:start_idx + n_dim]))
+            else:
+                if n_dim == 0:
+                    # Keeping the dimensions share with the previous loss/split attached
+                    tensors[-1] = tensor[:, start_idx:start_idx + pred_dim]
+                else:
+                    tensors.append(tensor[:, start_idx:start_idx + n_dim])
+
+            # updating the index & storing dimensions of the previous loss/split
+            start_idx += n_dim
+            pred_dim = n_dim
+
         return th.cat(tensors, dim=1)
 
     def forwardVAE(self, x):
