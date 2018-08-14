@@ -24,6 +24,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param cuda: (bool)
         :param model_type: (str)
         :param losses: ([str])
+        :param inverse_model_type: (str) Architecture of the inverse model ('linear', 'mlp')
         """
         self.model_type = model_type
         self.losses = losses
@@ -113,6 +114,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param losses: ([str])
         :param split_dimensions: ([int])) Number of dimensions for the different splits
         :param n_hidden_reward: (int) Number of hidden units for the reward model
+        :param inverse_model_type: (str) Architecture of the inverse model ('linear', 'mlp')
         """
         # Comment for backward compatibility
         assert len(split_dimensions) == len(losses), "Please specify as many split dimensions {} as losses {} !". \
