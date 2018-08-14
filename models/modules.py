@@ -120,7 +120,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         n_dims = sum(split_dimensions.values())
         # Account for shared dimensions
-        n_dims += split_dimensions.values().count(-1)
+        n_dims += list(split_dimensions.values()).count(-1)
         assert n_dims == state_dim, \
             "The sum of all splits' dimensions {} must be equal to the state dimension {}" \
                 .format(sum(split_dimensions.values()), str(state_dim))
