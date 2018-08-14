@@ -214,19 +214,19 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
                 start_idx -= pred_dim
 
             if key != index:
-                tensors.append(th.zeros_like(tensor[:, start_idx:start_idx + n_dim]))
+                tensors.append(tensor[:, start_idx:start_idx + n_dim].detach())
+                #tensors.append(th.zeros_like(tensor[:, start_idx:start_idx + n_dim]))
             else:
                 if n_dim == 0:
                     # Keeping the dimensions share with the previous loss/split attached
                     tensors[-1] = tensor[:, start_idx:start_idx + pred_dim]
                 else:
                     tensors.append(tensor[:, start_idx:start_idx + n_dim])
+
             # updating the index & storing dimensions of the previous loss/split
             start_idx += n_dim
             pred_dim = n_dim
-            # Returning to the proper index after dealing with a shared split
-            if n_dim == 0 and start_idx > 0:
-                start_idx += 1
+
         return th.cat(tensors, dim=1)
 
     def forwardVAE(self, x):
