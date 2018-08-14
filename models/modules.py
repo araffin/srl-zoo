@@ -215,16 +215,14 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
                 start_idx -= pred_dim
 
             if key != index:
-                # print(start_idx, start_idx + n_dim, n_dim, "detach")
-                tensors.append(tensor[:, start_idx:start_idx + n_dim].detach())
-                # tensors.append(th.zeros_like(tensor[:, start_idx:start_idx + n_dim]))
+                # tensors.append(tensor[:, start_idx:start_idx + n_dim].detach())
+                # Mask state dimensions
+                tensors.append(th.zeros_like(tensor[:, start_idx:start_idx + n_dim]))
             else:
                 if n_dim == 0:
-                    # print(start_idx, start_idx + pred_dim, pred_dim, "prev added")
                     # Keeping the dimensions share with the previous loss/split attached
                     tensors[-1] = tensor[:, start_idx:start_idx + pred_dim]
                 else:
-                    # print(start_idx, start_idx + n_dim, n_dim, "added")
                     tensors.append(tensor[:, start_idx:start_idx + n_dim])
 
             # Update previous dimension only if needed
