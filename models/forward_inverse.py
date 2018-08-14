@@ -41,7 +41,7 @@ class BaseInverseModel(BaseModelSRL):
         """
         super(BaseInverseModel, self).__init__()
 
-    def initInverseNet(self, state_dim, action_dim, n_hidden=16, model_type="linear"):
+    def initInverseNet(self, state_dim, action_dim, n_hidden=128, model_type="linear"):
         if model_type=="linear":
             self.inverse_net = nn.Linear(state_dim * 2, action_dim)
         elif model_type=="mlp":
