@@ -1,5 +1,7 @@
 from __future__ import print_function, division
 
+import os
+import json
 import argparse
 from textwrap import fill
 
@@ -257,12 +259,13 @@ def plotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='co
 def plotCorrelation(states_rewards, ground_truth, target_positions, only_print=False):
     """
     Correlation matrix: Target pos/ground truth states vs. States predicted
+
     :param states_rewards: (numpy dict)
     :param ground_truth: (numpy dict)
     :param target_positions: (numpy array)
     :param only_print: (bool) only print the correlation mesurements (max of correlation for each of
-    Ground Truth's dimension)
-    :return returns the max correlation for each of Ground Truth's dimension with the predicted states
+        Ground Truth's dimension)
+    :return: returns the max correlation for each of Ground Truth's dimension with the predicted states
             as well as its mean
     """
     np.set_printoptions(precision=2)
@@ -303,7 +306,7 @@ def plotCorrelation(states_rewards, ground_truth, target_positions, only_print=F
           "\n Mean : {:.2f}".format(correlation_max_vector, correlation_scalar/len(correlation_max_vector)))
     if not only_print:
         pauseOrClose(fig)
-    return correlation_max_vector, correlation_scalar/len(correlation_max_vector)
+    return correlation_max_vector, correlation_scalar / len(correlation_max_vector)
 
 
 if __name__ == '__main__':
@@ -361,7 +364,15 @@ if __name__ == '__main__':
             if args.color_episode:
                 rewards = colorPerEpisode(training_data['episode_starts'])
 
-            plotCorrelation(states_rewards, ground_truth, target_positions, only_print=args.print_corr)
+            gt_corr, gt_corr_mean = plotCorrelation(states_rewards, ground_truth, target_positions, only_print=args.print_corr)
+            result_dict = {
+                'gt_corr': gt_corr.tolist(),
+                'gt_corr_mean': gt_corr_mean
+            }
+
+            log_folder = os.path.dirname(args.input_file)
+            with open("{}/gt_correlation.json".format(log_folder), 'w') as f:
+                json.dump(result_dict, f)
         else:
             plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
         if not args.print_corr:
