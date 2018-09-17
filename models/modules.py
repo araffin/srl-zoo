@@ -197,7 +197,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         so no gradients are backpropagated
         for those splits part of the states
         :param tensor: (th.Tensor)
-        :param index (int) position of the split not to detach
+        :param index (str) name of the split not to detach
         :return: (th.Tensor)
         """
         tensors = []

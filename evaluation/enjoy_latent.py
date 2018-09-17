@@ -13,8 +13,8 @@ from preprocessing.utils import deNormalize
 from utils import detachToNumpy
 
 VALID_MODELS = ["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-                "autoencoder", "vae"]
-
+                "autoencoder", "vae", "dae"]
+AUTOENCODERS = ['autoencoder', 'vae', 'dae']
 
 def getImage(srl_model, mu, device):
     """
@@ -69,8 +69,29 @@ def main():
     losses = exp_config['losses']
     state_dim = exp_config['state-dim']
 
+    split_dimensions = exp_config.get('split-dimensions')
+    # backward compatibility
+    if split_dimensions is None:
+        split_indices = exp_config.get('split-index', [-1])
+        if not isinstance(split_indices, list):
+            split_indices = [split_indices]
+
+        # Compute the number of dimensions for each method
+        if split_indices[0] > 0:
+            split_dimensions = [split_indices[0]]
+            for i in range(len(split_indices) - 1):
+                split_dimensions.append(split_indices[i + 1] - split_indices[i])
+
+            split_dimensions.append(state_dim - split_indices[-1])
+
+
     # model param and info
-    is_auto_encoder = 'autoencoder' in losses or 'vae' in losses
+    is_auto_encoder = False
+    for ae_model in AUTOENCODERS:
+        if ae_model in losses:
+            ae_type = ae_model
+            is_auto_encoder = True
+            break
 
     # Load all the states and images
     data = json.load(open(args.log_dir + 'image_to_state.json'))
@@ -78,14 +99,15 @@ def main():
     y = list(data.keys())
 
     if is_auto_encoder:
-        ae_type = 'autoencoder' if 'autoencoder' in losses else 'vae'
-        createFigureAndSlider(ae_type, state_dim)
+        state_dim_ae = state_dim
         # Boundaries for the AE slider
-        min_x_ae = np.min(X, axis=0)
-        max_x_ae = np.max(X, axis=0)
+        min_x_ae = np.min(X[:, :state_dim_ae], axis=0)
+        max_x_ae = np.max(X[:, :state_dim_ae], axis=0)
+        createFigureAndSlider(ae_type, state_dim_ae)
 
+    # Note: the enjoy_latent does not work yeat for n_splits > 2
     if not is_auto_encoder or len(losses) > 1:
-        state_dim_second_split = state_dim - exp_config['split-dimensions'] if exp_config['split-dimensions'] > 0 else state_dim
+        state_dim_second_split = state_dim
 
         srl_model_knn = KNeighborsClassifier()
 
@@ -108,8 +130,10 @@ def main():
         # make the image
         if is_auto_encoder:
             mu_ae = []
-            for i in range(state_dim):
+            for i in range(state_dim_ae):
                 mu_ae.append(cv2.getTrackbarPos(str(i), 'slider for ' + ae_type))
+            # TODO: Mask dimensions
+            # mu_ae = maskStates(mu_ae, split_dimensions, ae_type)
             # Rescale the values to fit the bounds of the representation
             mu_ae = (np.array(mu_ae) / 100) * (max_x_ae - min_x_ae) + min_x_ae
             img_ae = getImage(srl_model.model, mu_ae, device)
@@ -138,7 +162,6 @@ def main():
 
     # gracefully close
     cv2.destroyAllWindows()
-
 
 if __name__ == '__main__':
     main()

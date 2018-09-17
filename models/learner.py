@@ -197,7 +197,6 @@ class SRL4robotics(BaseLearner):
 
         if losses_weights_dict is not None:
             self.losses_weights_dict.update(losses_weights_dict)
-        print("\nYour are using the following weights for the losses: ", self.losses_weights_dict, '\n')
         if self.use_dae and self.occlusion_percentage is not None:
             print("Using a maximum occlusion surface of {}".format(str(self.occlusion_percentage)))
 
@@ -250,6 +249,7 @@ class SRL4robotics(BaseLearner):
         :return: (numpy tensor) the learned states for the given observations
         """
 
+        print("\nYour are using the following weights for the losses: ", self.losses_weights_dict, '\n')
         # PREPARE DATA -------------------------------------------------------------------------------------------------
         # here, we organize the data into minibatches
         # and find pairs for the respective loss terms
