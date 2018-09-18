@@ -1,24 +1,19 @@
 """
-This is a PyTorch implementation based on the method
-for state representation learning described in the paper "Learning State
-Representations with Robotic Priors" (Jonschkowski & Brock, 2015).
-
-This program is based on the original implementation by Rico Jonschkowski (rico.jonschkowski@tu-berlin.de):
+Part of this program is based on the implementation by Rico Jonschkowski (rico.jonschkowski@tu-berlin.de):
 https://github.com/tu-rbo/learning-state-representations-with-robotic-priors
 
 """
 from __future__ import print_function, division, absolute_import
 
 import argparse
-
 from collections import OrderedDict
+
 import numpy as np
 import torch as th
 
+import preprocessing
 import models.learner as learner
 import plotting.representation_plot as plot_script
-import preprocessing
-
 from models.learner import SRL4robotics
 from pipeline import getLogFolderName, saveConfig, correlationCall
 from plotting.losses_plot import plotLosses
@@ -94,6 +89,8 @@ if __name__ == '__main__':
         raise ValueError(
             "Either no losses have a defined weight or dimension, or all losses have a defined weight. {}".format(args.losses))
 
+    # WARNING: split_dimensions must be saved.loaded as an OrderedDict which is not the case for now
+    # Missing: loading exp_config with consistent order
     # If not describing the the losses (weight and or dimension)
     if not has_consistent_description:
         losses = list(set(args.losses))

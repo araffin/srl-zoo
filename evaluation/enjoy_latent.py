@@ -2,6 +2,7 @@ from __future__ import print_function, division, absolute_import
 
 import argparse
 import json
+from collections import OrderedDict
 
 import cv2
 import numpy as np
@@ -70,95 +71,66 @@ def main():
     losses = exp_config['losses']
     state_dim = exp_config['state-dim']
 
+    # "split-dimensions": {"autoencoder": 198, "reward": -1, "inverse": 2}
     split_dimensions = exp_config.get('split-dimensions')
-    # backward compatibility
-    if split_dimensions is None:
-        split_indices = exp_config.get('split-index', [-1])
-        if not isinstance(split_indices, list):
-            split_indices = [split_indices]
-
-        # Compute the number of dimensions for each method
-        if split_indices[0] > 0:
-            split_dimensions = [split_indices[0]]
-            for i in range(len(split_indices) - 1):
-                split_dimensions.append(split_indices[i + 1] - split_indices[i])
-
-            split_dimensions.append(state_dim - split_indices[-1])
-
-    # model param and info
-    is_auto_encoder = False
-    for ae_model in AUTOENCODERS:
-        if ae_model in losses:
-            ae_type = ae_model
-            is_auto_encoder = True
-            break
+    # TODO: Fix issue where split_dimensions should be loaded as an OrderedDict
+    split_dimensions = OrderedDict(split_dimensions)
+    loss_dims = OrderedDict()
+    for loss_name, loss_dim in split_dimensions.items():
+        print(loss_name, loss_dim)
+        if loss_dim > 0 or len(split_dimensions) == 1:
+            loss_dims[loss_name] = loss_dim
 
     # Load all the states and images
     data = json.load(open(args.log_dir + 'image_to_state.json'))
     X = np.array(list(data.values())).astype(float)
     y = list(data.keys())
 
-    if is_auto_encoder:
-        state_dim_ae = state_dim
-        # Boundaries for the AE slider
-        min_x_ae = np.min(X[:, :state_dim_ae], axis=0)
-        max_x_ae = np.max(X[:, :state_dim_ae], axis=0)
-        createFigureAndSlider(ae_type, state_dim_ae)
+    bound_max, bound_min, fig_names = {}, {}, {}
 
-    # Note: the enjoy_latent does not work yeat for n_splits > 2
-    if not is_auto_encoder or len(losses) > 1:
-        state_dim_second_split = state_dim
+    for loss_name, loss_dim in loss_dims.items():
+        # TODO: correct indices
+        # TODO: support for n_splits > 2
+        if loss_name in AUTOENCODERS:
+            fig_name = "Decoder for {}".format(loss_name)
+        else:
+            srl_model_knn = KNeighborsClassifier()
+            # Find bounds and train KNN model
+            srl_model_knn.fit(X[:, :], np.arange(X.shape[0]))
+            fig_name = "KNN on " + ", ".join([item + " " for item in losses])[:-1]
 
-        srl_model_knn = KNeighborsClassifier()
+        bound_min[loss_name] = np.min(X[:, :], axis=0)
+        bound_max[loss_name] = np.max(X[:, :], axis=0)
+        fig_names[loss_name] = fig_name
+        createFigureAndSlider(fig_name, state_dim)
 
-        # Find bounds and train KNN model
-        srl_model_knn.fit(X[:, -state_dim_second_split:], np.arange(X.shape[0]))
-
-        min_X = np.min(X[:, -state_dim_second_split:], axis=0)
-        max_X = np.max(X[:, -state_dim_second_split:], axis=0)
-
-        fig_name = "KNN on " + ", ".join([item + " " for item in losses])[:-1]
-        createFigureAndSlider(fig_name, state_dim_second_split)
-
-    # run the param through the network
-    while True:
+    should_exit = False
+    while not should_exit:
         # stop if escape is pressed
         k = cv2.waitKey(1) & 0xFF
         if k == 27:
             break
 
-        # make the image
-        if is_auto_encoder:
-            mu_ae = []
-            for i in range(state_dim_ae):
-                mu_ae.append(cv2.getTrackbarPos(str(i), 'slider for ' + ae_type))
-            # TODO: Mask dimensions
-            # mu_ae = maskStates(mu_ae, split_dimensions, ae_type)
-            # Rescale the values to fit the bounds of the representation
-            mu_ae = (np.array(mu_ae) / 100) * (max_x_ae - min_x_ae) + min_x_ae
-            img_ae = getImage(srl_model.model, mu_ae, device)
-
-            # stop if user closed a window
-            if (cv2.getWindowProperty(ae_type, 0) < 0) or (cv2.getWindowProperty('slider for ' + ae_type, 0) < 0):
-                break
-
-            cv2.imshow(ae_type, img_ae)
-
-        if not is_auto_encoder or len(losses) > 1:
+        for loss_name, loss_dim in loss_dims.items():
+            # TODO: correct indices
             mu = []
-            for i in range(state_dim_second_split):
-                mu.append(cv2.getTrackbarPos(str(i), 'slider for ' + fig_name))
-            # rescale for the bounds of the priors representation, and find nearest image
-            img_path = y[srl_model_knn.predict([(np.array(mu) / 100) * (max_X - min_X) + min_X])[0]]
-            # Remove trailing .jpg if present
-            img_path = img_path.split('.jpg')[0]
-            img = cv2.imread("data/" + img_path + ".jpg")
+            for i in range(state_dim):
+                mu.append(cv2.getTrackbarPos(str(i), 'slider for ' + fig_names[loss_name]))
+            # Rescale the values to fit the bounds of the representation
+            state = (np.array(mu) / 100) * (bound_max[loss_name] - bound_min[loss_name]) + bound_min[loss_name]
+            if loss_name in AUTOENCODERS:
+                img = getImage(srl_model.model, state, device)
+            else:
+                img_path = y[srl_model_knn.predict([state])[0]]
+                # Remove trailing .jpg if present
+                img_path = img_path.split('.jpg')[0]
+                img = cv2.imread("data/" + img_path + ".jpg")
 
             # stop if user closed a window
-            if (cv2.getWindowProperty(fig_name, 0) < 0) or (cv2.getWindowProperty('slider for ' + fig_name, 0) < 0):
+            if (cv2.getWindowProperty(fig_names[loss_name], 0) < 0) or (cv2.getWindowProperty('slider for ' + fig_names[loss_name], 0) < 0):
+                should_exit = True
                 break
-
-            cv2.imshow(fig_name, img)
+            cv2.imshow(fig_names[loss_name], img)
 
     # gracefully close
     cv2.destroyAllWindows()
