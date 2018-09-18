@@ -112,11 +112,10 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         :param cuda: (bool)
         :param model_type: (str)
         :param losses: ([str])
-        :param split_dimensions: ([int])) Number of dimensions for the different splits
+        :param split_dimensions: (OrderedDict) Number of dimensions for the different losses
         :param n_hidden_reward: (int) Number of hidden units for the reward model
         :param inverse_model_type: (str) Architecture of the inverse model ('linear', 'mlp')
         """
-        # Comment for backward compatibility
         assert len(split_dimensions) == len(losses), "Please specify as many split dimensions {} as losses {} !". \
             format(len(split_dimensions), len(losses))
 
@@ -137,11 +136,6 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         self.cuda = cuda
         self.state_dim = state_dim
-
-        # Uncomment for backward compatibility
-        # self.initForwardNet(split_dimensions[self.inverse_index], action_dim)
-        # self.initInverseNet(split_dimensions[self.inverse_index], action_dim, model_type=inverse_model_type)
-        # self.initRewardNet(self.state_dim, n_hidden=n_hidden_reward)
 
         self.initForwardNet(self.state_dim, action_dim)
         self.initInverseNet(self.state_dim, action_dim, model_type=inverse_model_type)
@@ -171,7 +165,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
                 self.model = SRLLinear(input_dim=getInputDim(), state_dim=state_dim, cuda=cuda)
 
         elif model_type == "resnet":
-            raise ValueError("Resnet not supported for autoencoders")
+            # No support because of autoencoder
+            raise ValueError("Resnet not supported when splitting representation")
 
         if "triplet" in losses:
             raise ValueError("triplet not supported when splitting representation")
