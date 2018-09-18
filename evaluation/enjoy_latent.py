@@ -16,6 +16,7 @@ VALID_MODELS = ["forward", "inverse", "reward", "priors", "episode-prior", "rewa
                 "autoencoder", "vae", "dae"]
 AUTOENCODERS = ['autoencoder', 'vae', 'dae']
 
+
 def getImage(srl_model, mu, device):
     """
     Gets an image for a chosen mu value using the srl_model
@@ -83,7 +84,6 @@ def main():
                 split_dimensions.append(split_indices[i + 1] - split_indices[i])
 
             split_dimensions.append(state_dim - split_indices[-1])
-
 
     # model param and info
     is_auto_encoder = False
@@ -162,6 +162,7 @@ def main():
 
     # gracefully close
     cv2.destroyAllWindows()
+
 
 if __name__ == '__main__':
     main()

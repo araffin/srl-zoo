@@ -23,7 +23,7 @@ from models.learner import SRL4robotics
 from pipeline import getLogFolderName, saveConfig, correlationCall
 from plotting.losses_plot import plotLosses
 from plotting.representation_plot import plotRepresentation
-from utils import parseDataFolder, createFolder, getInputBuiltin, loadData, buildConfig, loss_argument
+from utils import parseDataFolder, createFolder, getInputBuiltin, loadData, buildConfig, parseLossArguments
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='State Representation Learning with PyTorch')
@@ -57,7 +57,7 @@ if __name__ == '__main__':
                         help='Enable use of multiple camera')
     parser.add_argument('--balanced-sampling', action='store_true', default=False,
                         help='Force balanced sampling for episode independent prior instead of uniform')
-    parser.add_argument('--losses', nargs='+', default=["priors"], **loss_argument(
+    parser.add_argument('--losses', nargs='+', default=["priors"], **parseLossArguments(
         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
                  "autoencoder", "vae", "perceptual", "dae", "random"],
         help='The wanted losses. One may also want to specify a weight and dimension '
@@ -83,20 +83,19 @@ if __name__ == '__main__':
 
     # Dealing with losses to use
     has_loss_description = [isinstance(loss, tuple) for loss in args.losses]
-    has_consistant_description, has_weight, has_splits = False, False, False
+    has_consistent_description, has_weight, has_splits = False, False, False
     if all(has_loss_description):
         len_description = [len(item_loss) for item_loss in args.losses]
-        has_consistant_description = sum(len_description)/len(len_description) == len_description[0]
-        has_weight = has_consistant_description
-        has_splits = has_consistant_description and  len_description[0] == 3
+        has_consistent_description = sum(len_description) / len(len_description) == len_description[0]
+        has_weight = has_consistent_description
+        has_splits = has_consistent_description and len_description[0] == 3
 
-    if (any(has_loss_description) and not all(has_loss_description)):
+    if any(has_loss_description) and not all(has_loss_description):
         raise ValueError(
-            "Either no losses have a defined weight or dimension, or all losses have a defined weight. {}"
-            .format(args.losses))
+            "Either no losses have a defined weight or dimension, or all losses have a defined weight. {}".format(args.losses))
 
     # If not describing the the losses (weight and or dimension)
-    if not has_consistant_description:
+    if not has_consistent_description:
         losses = list(set(args.losses))
         losses_weights_dict = None
         split_dimensions = -1

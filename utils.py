@@ -10,26 +10,29 @@ from termcolor import colored
 import argparse
 
 
-def loss_argument(choices, help):
+def parseLossArguments(choices, help):
     """
     Creates a custom type for loss parsing, it overrides the type, choice and help of add_argument, in order to
     properly extract the loss type, and still be able to print the choices available.
 
     :param choices: ([str]) the list of valid losses
+    :param help: (str) help string
     :return: (dict) the arguments for parse arg
     """
+
     def _arg_type(arg):
         arg_separator = arg.count(':')
         if arg_separator >= 1:
             if arg.split(':')[0] not in choices:
-                raise argparse.ArgumentTypeError("invalid choice: {} (choose from {})".format(arg.split(':')[0], choices))
+                raise argparse.ArgumentTypeError(
+                    "invalid choice: {} (choose from {})".format(arg.split(':')[0], choices))
             try:
                 loss, first_arg, second_arg = arg.split(':')[0], float(arg.split(':')[1]), 0
                 if arg_separator == 2:
                     second_arg = int(arg.split(':')[2])
                 return loss, first_arg, second_arg
             except ValueError:
-                raise argparse.\
+                raise argparse. \
                     ArgumentTypeError("Error: must be of format '<str>:<float>:<int>', '<str>:<float/int>' or '<str>'")
         else:
             if arg not in choices:
@@ -43,6 +46,7 @@ def loss_argument(choices, help):
         return str_out + choices[-1] + '}'
 
     return {'type': _arg_type, 'help': _choices_print() + " " + help}
+
 
 def buildConfig(args):
     """
@@ -79,6 +83,7 @@ def buildConfig(args):
         "inverse-model-type": args.inverse_model_type
     }
     return exp_config
+
 
 def loadData(data_folder):
     """

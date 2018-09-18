@@ -124,8 +124,8 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         # Account for shared dimensions
         n_dims += list(split_dimensions.values()).count(-1)
         assert n_dims == state_dim, \
-            "The sum of all splits' dimensions {} must be equal to the state dimension {}" \
-                .format(sum(split_dimensions.values()), str(state_dim))
+            "The sum of all splits' dimensions {} must be equal to the state dimension {}"\
+            .format(sum(split_dimensions.values()), str(state_dim))
 
         self.split_dimensions = split_dimensions
         self.model_type = model_type
@@ -286,7 +286,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         """
         Predict reward given current state and next state
         :param state: (th.Tensor)
-        :param action: (th Tensor)
+        :param next_state: (th Tensor)
         :return: (th.Tensor)
         """
         return self.reward_net(th.cat((self.detachSplit(state, index='reward'),

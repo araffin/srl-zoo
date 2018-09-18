@@ -25,6 +25,7 @@ def getKnnMse(path):
         print("knn_mse.json not found for {}".format(path))
         return -1
 
+
 def getCorrelation(path):
     """
     Retrieve Ground Truth Correlation
@@ -97,7 +98,6 @@ for experiment in experiments:
             pass
 
     knn_mse.append(getKnnMse(knn_mse_file))
-
 
 exp_configs.update({'experiments': experiments, 'knn_mse': knn_mse,
                     'gt_corr': gt_corr, 'gt_mean': gt_mean})

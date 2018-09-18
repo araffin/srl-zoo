@@ -2,7 +2,6 @@ from __future__ import print_function, division, absolute_import
 
 import argparse
 import time
-import json
 
 import numpy as np
 import torch as th
