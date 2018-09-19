@@ -5,6 +5,8 @@ import json
 import sys
 import time
 from collections import defaultdict
+from pprint import pprint
+
 
 import numpy as np
 import torch as th
@@ -249,7 +251,8 @@ class SRL4robotics(BaseLearner):
         :return: (numpy tensor) the learned states for the given observations
         """
 
-        print("\nYour are using the following weights for the losses: ", self.losses_weights_dict, '\n')
+        print("\nYour are using the following weights for the losses:")
+        pprint(self.losses_weights_dict)
         # PREPARE DATA -------------------------------------------------------------------------------------------------
         # here, we organize the data into minibatches
         # and find pairs for the respective loss terms

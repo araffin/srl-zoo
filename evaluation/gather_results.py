@@ -53,7 +53,8 @@ for item in os.listdir(log_dir):
     if 'baselines' not in item and os.path.isdir('{}/{}'.format(log_dir, item)):
         experiments.append(item)
 
-experiments.append(*['baselines/' + f for f in os.listdir(log_dir + "/baselines")])
+for item in os.listdir(log_dir + "/baselines"):
+    experiments.append('baselines/' + item)
 
 experiments.sort()
 print("Found {} experiments".format(len(experiments)))

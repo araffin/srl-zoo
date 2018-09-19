@@ -1,2 +1,2 @@
 #!/bin/bash
-pytest --cov-config .coveragerc --cov-report html --cov-report term --cov=. tests/ --capture=no
+pytest --cov-config .coveragerc --cov-report html --cov-report term --cov=. -v tests/ --capture=no
