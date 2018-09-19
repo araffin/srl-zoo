@@ -4,7 +4,7 @@ import os
 import json
 import sys
 import time
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from pprint import pprint
 
 
@@ -218,7 +218,9 @@ class SRL4robotics(BaseLearner):
             "Error: could not find 'srl_model.pth' in '{}'".format(log_folder)
 
         with open(log_folder + 'exp_config.json', 'r') as f:
-            exp_config = json.load(f)
+            # IMPORTANT: keep the order for the losses
+            # so the json is loaded as an OrderedDict
+            exp_config = json.load(f, object_pairs_hook=OrderedDict)
 
         state_dim = exp_config['state-dim']
         losses = exp_config['losses']
