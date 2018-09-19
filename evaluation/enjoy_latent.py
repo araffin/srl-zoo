@@ -14,24 +14,25 @@ from preprocessing.utils import deNormalize
 from utils import detachToNumpy
 
 VALID_MODELS = ["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-                "autoencoder", "vae", "dae"]
+                "autoencoder", "vae", "dae", "random"]
 AUTOENCODERS = ['autoencoder', 'vae', 'dae']
 
 
-def getImage(srl_model, mu, device):
+def getImage(srl_model, state, device):
     """
-    Gets an image for a chosen mu value using the srl_model
+    Gets an image by using the decoder of a SRL model
+    (when available)
+
     :param srl_model: (Pytorch model)
-    :param mu: ([float]) the mu vector from latent space
+    :param state: ([float]) the state vector from latent space
     :param device: (pytorch device)
     :return: ([float])
     """
     with th.no_grad():
-        mu = th.from_numpy(np.array(mu).reshape(1, -1)).float()
-        mu = mu.to(device)
+        state = th.from_numpy(np.array(state).reshape(1, -1)).float()
+        state = state.to(device)
 
-        net_out = srl_model.decode(mu)
-
+        net_out = srl_model.decode(state)
         img = detachToNumpy(net_out)[0].T
 
     img = deNormalize(img, mode="image_net")
@@ -71,15 +72,18 @@ def main():
     losses = exp_config['losses']
     state_dim = exp_config['state-dim']
 
-    # "split-dimensions": {"autoencoder": 198, "reward": -1, "inverse": 2}
     split_dimensions = exp_config.get('split-dimensions')
-    # TODO: Fix issue where split_dimensions should be loaded as an OrderedDict
-    split_dimensions = OrderedDict(split_dimensions)
     loss_dims = OrderedDict()
-    for loss_name, loss_dim in split_dimensions.items():
-        print(loss_name, loss_dim)
-        if loss_dim > 0 or len(split_dimensions) == 1:
-            loss_dims[loss_name] = loss_dim
+    n_dimensions = 0
+    if split_dimensions is not None and isinstance(split_dimensions, OrderedDict):
+        for loss_name, loss_dim in split_dimensions.items():
+            print(loss_name, loss_dim)
+            if loss_dim > 0 or len(split_dimensions) == 1:
+                loss_dims[loss_name] = loss_dim
+
+    if len(loss_dims) == 0:
+        print(losses)
+        loss_dims = {losses[0]: state_dim}
 
     # Load all the states and images
     data = json.load(open(args.log_dir + 'image_to_state.json'))
@@ -87,22 +91,28 @@ def main():
     y = list(data.keys())
 
     bound_max, bound_min, fig_names = {}, {}, {}
+    start_indices, end_indices = {}, {}
+    start_idx = 0
 
     for loss_name, loss_dim in loss_dims.items():
-        # TODO: correct indices
-        # TODO: support for n_splits > 2
+        # TODO: correct names (when sharing dimensions)
+        start_indices[loss_name] = start_idx
+        end_indices[loss_name] = start_idx + loss_dim
+
         if loss_name in AUTOENCODERS:
             fig_name = "Decoder for {}".format(loss_name)
         else:
             srl_model_knn = KNeighborsClassifier()
             # Find bounds and train KNN model
-            srl_model_knn.fit(X[:, :], np.arange(X.shape[0]))
+            srl_model_knn.fit(X[:, start_indices[loss_name]:end_indices[loss_name]], np.arange(X.shape[0]))
             fig_name = "KNN on " + ", ".join([item + " " for item in losses])[:-1]
 
-        bound_min[loss_name] = np.min(X[:, :], axis=0)
-        bound_max[loss_name] = np.max(X[:, :], axis=0)
+        bound_min[loss_name] = np.min(X[:, start_indices[loss_name]:end_indices[loss_name]], axis=0)
+        bound_max[loss_name] = np.max(X[:, start_indices[loss_name]:end_indices[loss_name]], axis=0)
+
         fig_names[loss_name] = fig_name
-        createFigureAndSlider(fig_name, state_dim)
+        start_idx += loss_dim
+        createFigureAndSlider(fig_name, loss_dim)
 
     should_exit = False
     while not should_exit:
@@ -112,14 +122,18 @@ def main():
             break
 
         for loss_name, loss_dim in loss_dims.items():
-            # TODO: correct indices
-            mu = []
-            for i in range(state_dim):
-                mu.append(cv2.getTrackbarPos(str(i), 'slider for ' + fig_names[loss_name]))
+            state = []
+            for i in range(loss_dim):
+                state.append(cv2.getTrackbarPos(str(i), 'slider for ' + fig_names[loss_name]))
             # Rescale the values to fit the bounds of the representation
-            state = (np.array(mu) / 100) * (bound_max[loss_name] - bound_min[loss_name]) + bound_min[loss_name]
+            state = (np.array(state) / 100) * (bound_max[loss_name] - bound_min[loss_name]) + bound_min[loss_name]
+
+            # Mask all the irrelevant dimensions with zeros
+            full_state = np.zeros(state_dim)
+            full_state[start_indices[loss_name]:end_indices[loss_name]] = state
+
             if loss_name in AUTOENCODERS:
-                img = getImage(srl_model.model, state, device)
+                img = getImage(srl_model.model, full_state, device)
             else:
                 img_path = y[srl_model_knn.predict([state])[0]]
                 # Remove trailing .jpg if present
