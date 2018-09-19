@@ -22,12 +22,12 @@ from utils import parseDataFolder, createFolder, getInputBuiltin, loadData, buil
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='State Representation Learning with PyTorch')
-    parser.add_argument('--epochs', type=int, default=50, metavar='N',
-                        help='number of epochs to train (default: 50)')
+    parser.add_argument('--epochs', type=int, default=30, metavar='N',
+                        help='number of epochs to train (default: 30)')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     parser.add_argument('--state-dim', type=int, default=2, help='state dimension (default: 2)')
-    parser.add_argument('-bs', '--batch-size', type=int, default=256, help='batch_size (default: 256)')
+    parser.add_argument('-bs', '--batch-size', type=int, default=32, help='batch_size (default: 32)')
     parser.add_argument('--val-size', type=float, default=0.2, help='Validation set size in percentage (default: 0.2)')
     parser.add_argument('--training-set-size', type=int, default=-1,
                         help='Limit size (number of samples) of the training set (default: -1)')
@@ -52,7 +52,7 @@ if __name__ == '__main__':
                         help='Enable use of multiple camera')
     parser.add_argument('--balanced-sampling', action='store_true', default=False,
                         help='Force balanced sampling for episode independent prior instead of uniform')
-    parser.add_argument('--losses', nargs='+', default=["priors"], **parseLossArguments(
+    parser.add_argument('--losses', nargs='+', default=["inverse"], **parseLossArguments(
         choices=["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
                  "autoencoder", "vae", "perceptual", "dae", "random"],
         help='The wanted losses. One may also want to specify a weight and dimension '
