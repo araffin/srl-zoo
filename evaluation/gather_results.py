@@ -3,6 +3,7 @@ Create csv result from a folder of experiments
 """
 from __future__ import print_function, division, absolute_import
 
+import subprocess
 import argparse
 import json
 import os
@@ -39,6 +40,17 @@ def getCorrelation(path):
     except IOError:
         print("gt_correlation.json not found for {}".format(path))
         return -1, [-1]
+
+
+def computeStates(exp_config, log_dir):
+    """
+    :param exp_config: (dict)
+    :param log_dir: (str)
+    :return: (bool)
+    """
+    ok = subprocess.call(['python', '-m', 'evaluation.predict_dataset', '--name-suffix', '',
+                          '-n', str(exp_config['training-set-size']), '--log-dir', log_dir])
+    return ok == 0
 
 
 parser = argparse.ArgumentParser(description='Create a report file for a given dataset')
@@ -80,23 +92,33 @@ for experiment in experiments:
         exp_configs[key].append(exp_config.get(key, None))
 
     get_corr_file = '{}/{}/gt_correlation.json'.format(log_dir, experiment)
+
     if not os.path.isfile(get_corr_file) and not skip:
         try:
             correlationCall(exp_config, plot=False)
         except RuntimeError:
-            # TODO: compute states_rewards.npz if not found
-            pass
+            # We assume that the error is due to missing `states_rewards.npz`
+            ok = computeStates(exp_config, '{}/{}'.format(log_dir, experiment))
+            try:
+                correlationCall(exp_config, plot=False)
+            except RuntimeError:
+                pass
+
     gt_correlation = getCorrelation(get_corr_file)
     gt_mean.append(gt_correlation[0])
     gt_corr.append(gt_correlation[1])
 
     knn_mse_file = '{}/{}/knn_mse.json'.format(log_dir, experiment)
+
     if not os.path.isfile(knn_mse_file) and not skip:
         try:
             knnCall(exp_config)
         except RuntimeError:
-            # TODO: compute states_rewards.npz if not found
-            pass
+            ok = computeStates(exp_config, '{}/{}'.format(log_dir, experiment))
+            try:
+                knnCall(exp_config)
+            except RuntimeError:
+                pass
 
     knn_mse.append(getKnnMse(knn_mse_file))
 

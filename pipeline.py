@@ -181,12 +181,13 @@ def correlationCall(exp_config, plot=False):
     """
     Evaluate the representation using correlation measurement
     :param exp_config: (dict)
+    :param plot: (bool)
     """
     log_folder = exp_config["log-folder"] + "/states_rewards.npz"
-    print('log folder: ', log_folder)
     data_folder = 'data/' + exp_config['data-folder']
     use_plot = [] if plot else ["--print-corr"]
-    ok = subprocess.call(["python", "-m", "plotting.representation_plot", "-i", log_folder, "--data-folder", data_folder, "--correlation"] + use_plot)
+    ok = subprocess.call(["python", "-m", "plotting.representation_plot", "-i", log_folder,
+                          "--data-folder", data_folder, "--correlation"] + use_plot)
     printConfigOnError(ok, exp_config, "correlationCall")
 
 

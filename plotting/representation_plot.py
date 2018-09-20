@@ -303,7 +303,7 @@ def plotCorrelation(states_rewards, ground_truth, target_positions, only_print=F
     # as well as the mean
     correlation_scalar = sum(correlation_max_vector)
     print("\nCorrelation value of the model's prediction with the Ground Truth:\n Max correlation vector: {}"
-          "\n Mean : {:.2f}".format(correlation_max_vector, correlation_scalar/len(correlation_max_vector)))
+          "\n Mean : {:.2f}".format(correlation_max_vector, correlation_scalar / len(correlation_max_vector)))
     if not only_print:
         pauseOrClose(fig)
     return correlation_max_vector, correlation_scalar / len(correlation_max_vector)
@@ -367,13 +367,14 @@ if __name__ == '__main__':
 
             if args.color_episode:
                 rewards = colorPerEpisode(training_data['episode_starts'])
-
-            gt_corr, gt_corr_mean = plotCorrelation(states_rewards, ground_truth, target_positions, only_print=args.print_corr)
+            # Compute Ground Truth Correlation
+            gt_corr, gt_corr_mean = plotCorrelation(states_rewards, ground_truth, target_positions,
+                                                    only_print=args.print_corr)
             result_dict = {
                 'gt_corr': gt_corr.tolist(),
                 'gt_corr_mean': gt_corr_mean
             }
-
+            # Write the results in a json file
             log_folder = os.path.dirname(args.input_file)
             with open("{}/gt_correlation.json".format(log_folder), 'w') as f:
                 json.dump(result_dict, f)

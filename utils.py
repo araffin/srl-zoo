@@ -15,6 +15,9 @@ def parseLossArguments(choices, help):
     """
     Creates a custom type for loss parsing, it overrides the type, choice and help of add_argument, in order to
     properly extract the loss type, and still be able to print the choices available.
+    Example:
+    in: 'autoencoder:1:10' (loss:weight:state_dim)
+    out: autoencoder, 1, 10 (loss_name, weight, state_dim)
 
     :param choices: ([str]) the list of valid losses
     :param help: (str) help string
