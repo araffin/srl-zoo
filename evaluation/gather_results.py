@@ -7,6 +7,7 @@ import subprocess
 import argparse
 import json
 import os
+from collections import OrderedDict
 
 import pandas as pd
 
@@ -75,14 +76,15 @@ knn_mse = []
 gt_corr, gt_mean = [], []
 
 # Add here keys from exp_config.json that should be saved in the csv report file
-exp_configs = {'training-set-size': [], 'split-dimensions': [], 'state-dim': [], 'seed': []}
+exp_configs = {'training-set-size': [], 'split-dimensions': [],
+                'state-dim': [], 'seed': [], 'losses_weights': []}
 
 for experiment in experiments:
 
     skip = False
     try:
         with open('{}/{}/exp_config.json'.format(log_dir, experiment)) as f:
-            exp_config = json.load(f)
+            exp_config = json.load(f, object_pairs_hook=OrderedDict)
     except FileNotFoundError:
         print("exp_config not found for {}".format(experiment))
         skip = True
