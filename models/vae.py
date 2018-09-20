@@ -58,8 +58,8 @@ class CNNVAE(BaseModelVAE):
 
     def encode(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         x = self.encoder_conv(x)
         x = x.view(x.size(0), -1)
@@ -67,8 +67,8 @@ class CNNVAE(BaseModelVAE):
 
     def decode(self, z):
         """
-        :param z: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param z: (th.Tensor)
+        :return: (th.Tensor)
         """
         z = self.decoder_fc(z)
         z = z.view(z.size(0), 64, 6, 6)

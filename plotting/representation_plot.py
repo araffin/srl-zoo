@@ -1,5 +1,7 @@
 from __future__ import print_function, division
 
+import os
+import json
 import argparse
 from textwrap import fill
 
@@ -44,7 +46,7 @@ def plotRepresentation(states, rewards, name="Learned State Representation",
                        add_colorbar=True, path=None, fit_pca=False, cmap='coolwarm', true_states=None):
     """
     Plot learned state representation using rewards for coloring
-    :param states: (numpy array)
+    :param states: (np.ndarray)
     :param rewards: (numpy 1D array)
     :param name: (str)
     :param add_colorbar: (bool)
@@ -114,7 +116,7 @@ def plot3dRepresentation(states, rewards, name="Learned State Representation",
 def plotImage(image, name='Observation Sample'):
     """
     Display an image
-    :param image: (numpy tensor) (with values in [0, 1])
+    :param image: (np.ndarray) (with values in [0, 1])
     :param name: (str)
     """
     # Reorder channels
@@ -150,8 +152,8 @@ def prettyPlotAgainst(states, rewards, title="Representation", fit_pca=False, cm
     """
     State dimensions are plotted one against the other (it creates a matrix of 2d representation)
     using rewards for coloring, the diagonal is a distribution plot, and the scatter plots have a density outline.
-    :param states: (numpy tensor)
-    :param rewards: (numpy array)
+    :param states: (np.ndarray)
+    :param rewards: (np.ndarray)
     :param title: (str)
     :param fit_pca: (bool)
     :param cmap: (str)
@@ -211,8 +213,8 @@ def plotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='co
     """
     State dimensions are plotted one against the other (it creates a matrix of 2d representation)
     using rewards for coloring
-    :param states: (numpy tensor)
-    :param rewards: (numpy array)
+    :param states: (np.ndarray)
+    :param rewards: (np.ndarray)
     :param title: (str)
     :param fit_pca: (bool)
     :param cmap: (str)
@@ -257,11 +259,14 @@ def plotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='co
 def plotCorrelation(states_rewards, ground_truth, target_positions, only_print=False):
     """
     Correlation matrix: Target pos/ground truth states vs. States predicted
+
     :param states_rewards: (numpy dict)
     :param ground_truth: (numpy dict)
-    :param target_positions: (numpy array)
+    :param target_positions: (np.ndarray)
     :param only_print: (bool) only print the correlation mesurements (max of correlation for each of
-    Ground Truth's dimension)
+        Ground Truth's dimension)
+    :return: returns the max correlation for each of Ground Truth's dimension with the predicted states
+            as well as its mean
     """
     np.set_printoptions(precision=2)
     correlation_max_vector = np.array([])
@@ -295,13 +300,13 @@ def plotCorrelation(states_rewards, ground_truth, target_positions, only_print=F
             correlation_max_vector = np.append(correlation_max_vector, max(abs(corr_copy[idx])))
 
     # Printing the max correlation for each of Ground Truth's dimension with the predicted states
-    # as well as a normalized sum
+    # as well as the mean
     correlation_scalar = sum(correlation_max_vector)
     print("\nCorrelation value of the model's prediction with the Ground Truth:\n Max correlation vector: {}"
-          "\n Sum of max correlation: {:.2f}\n Normalized sum: {:.2f}"
-          .format(correlation_max_vector, correlation_scalar, correlation_scalar/len(correlation_max_vector)))
+          "\n Mean : {:.2f}".format(correlation_max_vector, correlation_scalar / len(correlation_max_vector)))
     if not only_print:
         pauseOrClose(fig)
+    return correlation_max_vector, correlation_scalar / len(correlation_max_vector)
 
 
 if __name__ == '__main__':
@@ -331,6 +336,10 @@ if __name__ == '__main__':
     assert not (args.correlation and args.data_folder == ""), \
         "You must specify a datafolder when using the correlation plot"
 
+    # Force correlation plotting when `--print-cor` is passed
+    if args.print_corr:
+        args.correlation = True
+
     args.data_folder = parseDataFolder(args.data_folder)
 
     if args.input_file != "":
@@ -358,8 +367,17 @@ if __name__ == '__main__':
 
             if args.color_episode:
                 rewards = colorPerEpisode(training_data['episode_starts'])
-
-            plotCorrelation(states_rewards, ground_truth, target_positions, only_print=args.print_corr)
+            # Compute Ground Truth Correlation
+            gt_corr, gt_corr_mean = plotCorrelation(states_rewards, ground_truth, target_positions,
+                                                    only_print=args.print_corr)
+            result_dict = {
+                'gt_corr': gt_corr.tolist(),
+                'gt_corr_mean': gt_corr_mean
+            }
+            # Write the results in a json file
+            log_folder = os.path.dirname(args.input_file)
+            with open("{}/gt_correlation.json".format(log_folder), 'w') as f:
+                json.dump(result_dict, f)
         else:
             plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
         if not args.print_corr:

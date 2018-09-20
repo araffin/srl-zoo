@@ -13,7 +13,8 @@ Available methods:
 - Triplet Network (for stereovision only)
 - Reward loss
 - Combination and stacking of methods
-- **[experimental]** Reward Prior, Episode-prior, Perceptual Similarity loss (DARLA), Mutual Information loss 
+- Random Features
+- **[experimental]** Reward Prior, Episode-prior, Perceptual Similarity loss (DARLA), Mutual Information loss
 
 Related papers:
 - "State Representation Learning for Control: An Overview" (Lesort et al., 2018), link: [https://arxiv.org/pdf/1802.04181.pdf](https://arxiv.org/pdf/1802.04181.pdf)
@@ -168,10 +169,10 @@ python train.py --data-folder data/path/to/dataset --losses vae perceptual --pat
 
 ### Stacking/Splitting Models Instead of Combining Them
 
-Because losses do not optimize the same objective and can be opposed, it may make sense to stack representations learned with different objectives, instead of combining them. For instance, you can stack an autoencoder (with a state dimension of 20) with an inverse model (of dimension 2) using:
+Because losses do not optimize the same objective and can be opposed, it may make sense to stack representations learned with different objectives, instead of combining them. For instance, you can stack an autoencoder (with a state dimension of 20) with an inverse model (of dimension 2) using  the previous weights:
 
 ```
-python train.py --data-folder data/path/to/dataset --losses autoencoder inverse --state-dim 22 --split-index 20
+python train.py --data-folder data/path/to/dataset --losses autoencoder:1:20 inverse:10:2 --state-dim 22
 ```
 
 The details of how models are splitted can be found inside the `SRLModulesSplit` class, defined in `models/modules.py`. All models share the same *encoder* or *features extractor*, that maps observations to states.
@@ -383,10 +384,10 @@ The dataset format is as follows:
 
 0. You must provide a dataset config file (see previous section) that contains at least if the ground truth is the relative position or not
 1. Images are grouped by episode in different folders (`record_{03d}/` folders)
-2. At the root of the dataset folder, preprocessed_data.npz contains numpy arrays ('episode_starts', 'rewards', 'actions')
-3. At the root of the dataset folder, ground_truth.npz contains numpy arrays ('target_positions', 'ground_truth_states', 'images_path')
+2. At the root of the dataset folder, preprocessed_data.npz contains np.ndarrays ('episode_starts', 'rewards', 'actions')
+3. At the root of the dataset folder, ground_truth.npz contains np.ndarrays ('target_positions', 'ground_truth_states', 'images_path')
 
-The exact format for each numpy array can be found in the example dataset (or in the [RL Repo](https://github.com/araffin/robotics-rl-srl)).
+The exact format for each np.ndarray can be found in the example dataset (or in the [RL Repo](https://github.com/araffin/robotics-rl-srl)).
 Note: the variables 'arm_states' and 'button_positions' were renamed 'ground_truth_states' and 'target_positions'
 
 

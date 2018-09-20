@@ -2,6 +2,7 @@ from __future__ import print_function, division, absolute_import
 
 import argparse
 import json
+from collections import OrderedDict
 
 import cv2
 import numpy as np
@@ -13,23 +14,25 @@ from preprocessing.utils import deNormalize
 from utils import detachToNumpy
 
 VALID_MODELS = ["forward", "inverse", "reward", "priors", "episode-prior", "reward-prior", "triplet",
-                "autoencoder", "vae"]
+                "autoencoder", "vae", "dae", "random"]
+AUTOENCODERS = ['autoencoder', 'vae', 'dae']
 
 
-def getImage(srl_model, mu, device):
+def getImage(srl_model, state, device):
     """
-    Gets an image for a chosen mu value using the srl_model
+    Gets an image by using the decoder of a SRL model
+    (when available)
+
     :param srl_model: (Pytorch model)
-    :param mu: ([float]) the mu vector from latent space
+    :param state: ([float]) the state vector from latent space
     :param device: (pytorch device)
     :return: ([float])
     """
     with th.no_grad():
-        mu = th.from_numpy(np.array(mu).reshape(1, -1)).float()
-        mu = mu.to(device)
+        state = th.from_numpy(np.array(state).reshape(1, -1)).float()
+        state = state.to(device)
 
-        net_out = srl_model.decode(mu)
-
+        net_out = srl_model.decode(state)
         img = detachToNumpy(net_out)[0].T
 
     img = deNormalize(img, mode="image_net")
@@ -69,72 +72,79 @@ def main():
     losses = exp_config['losses']
     state_dim = exp_config['state-dim']
 
-    # model param and info
-    is_auto_encoder = 'autoencoder' in losses or 'vae' in losses
+    split_dimensions = exp_config.get('split-dimensions')
+    loss_dims = OrderedDict()
+    n_dimensions = 0
+    if split_dimensions is not None and isinstance(split_dimensions, OrderedDict):
+        for loss_name, loss_dim in split_dimensions.items():
+            print(loss_name, loss_dim)
+            if loss_dim > 0 or len(split_dimensions) == 1:
+                loss_dims[loss_name] = loss_dim
+
+    if len(loss_dims) == 0:
+        print(losses)
+        loss_dims = {losses[0]: state_dim}
 
     # Load all the states and images
     data = json.load(open(args.log_dir + 'image_to_state.json'))
     X = np.array(list(data.values())).astype(float)
     y = list(data.keys())
 
-    if is_auto_encoder:
-        ae_type = 'autoencoder' if 'autoencoder' in losses else 'vae'
-        createFigureAndSlider(ae_type, state_dim)
-        # Boundaries for the AE slider
-        min_x_ae = np.min(X, axis=0)
-        max_x_ae = np.max(X, axis=0)
+    bound_max, bound_min, fig_names = {}, {}, {}
+    start_indices, end_indices = {}, {}
+    start_idx = 0
 
-    if not is_auto_encoder or len(losses) > 1:
-        state_dim_second_split = state_dim - exp_config['split-index'] if exp_config['split-index'] > 0 else state_dim
+    for loss_name, loss_dim in loss_dims.items():
+        # TODO: correct names (when sharing dimensions)
+        start_indices[loss_name] = start_idx
+        end_indices[loss_name] = start_idx + loss_dim
 
-        srl_model_knn = KNeighborsClassifier()
+        if loss_name in AUTOENCODERS:
+            fig_name = "Decoder for {}".format(loss_name)
+        else:
+            srl_model_knn = KNeighborsClassifier()
+            # Find bounds and train KNN model
+            srl_model_knn.fit(X[:, start_indices[loss_name]:end_indices[loss_name]], np.arange(X.shape[0]))
+            fig_name = "KNN on " + ", ".join([item + " " for item in losses])[:-1]
 
-        # Find bounds and train KNN model
-        srl_model_knn.fit(X[:, -state_dim_second_split:], np.arange(X.shape[0]))
+        bound_min[loss_name] = np.min(X[:, start_indices[loss_name]:end_indices[loss_name]], axis=0)
+        bound_max[loss_name] = np.max(X[:, start_indices[loss_name]:end_indices[loss_name]], axis=0)
 
-        min_X = np.min(X[:, -state_dim_second_split:], axis=0)
-        max_X = np.max(X[:, -state_dim_second_split:], axis=0)
+        fig_names[loss_name] = fig_name
+        start_idx += loss_dim
+        createFigureAndSlider(fig_name, loss_dim)
 
-        fig_name = "KNN on " + ", ".join([item + " " for item in losses])[:-1]
-        createFigureAndSlider(fig_name, state_dim_second_split)
-
-    # run the param through the network
-    while True:
+    should_exit = False
+    while not should_exit:
         # stop if escape is pressed
         k = cv2.waitKey(1) & 0xFF
         if k == 27:
             break
 
-        # make the image
-        if is_auto_encoder:
-            mu_ae = []
-            for i in range(state_dim):
-                mu_ae.append(cv2.getTrackbarPos(str(i), 'slider for ' + ae_type))
+        for loss_name, loss_dim in loss_dims.items():
+            state = []
+            for i in range(loss_dim):
+                state.append(cv2.getTrackbarPos(str(i), 'slider for ' + fig_names[loss_name]))
             # Rescale the values to fit the bounds of the representation
-            mu_ae = (np.array(mu_ae) / 100) * (max_x_ae - min_x_ae) + min_x_ae
-            img_ae = getImage(srl_model.model, mu_ae, device)
+            state = (np.array(state) / 100) * (bound_max[loss_name] - bound_min[loss_name]) + bound_min[loss_name]
+
+            # Mask all the irrelevant dimensions with zeros
+            full_state = np.zeros(state_dim)
+            full_state[start_indices[loss_name]:end_indices[loss_name]] = state
+
+            if loss_name in AUTOENCODERS:
+                img = getImage(srl_model.model, full_state, device)
+            else:
+                img_path = y[srl_model_knn.predict([state])[0]]
+                # Remove trailing .jpg if present
+                img_path = img_path.split('.jpg')[0]
+                img = cv2.imread("data/" + img_path + ".jpg")
 
             # stop if user closed a window
-            if (cv2.getWindowProperty(ae_type, 0) < 0) or (cv2.getWindowProperty('slider for ' + ae_type, 0) < 0):
+            if (cv2.getWindowProperty(fig_names[loss_name], 0) < 0) or (cv2.getWindowProperty('slider for ' + fig_names[loss_name], 0) < 0):
+                should_exit = True
                 break
-
-            cv2.imshow(ae_type, img_ae)
-
-        if not is_auto_encoder or len(losses) > 1:
-            mu = []
-            for i in range(state_dim_second_split):
-                mu.append(cv2.getTrackbarPos(str(i), 'slider for ' + fig_name))
-            # rescale for the bounds of the priors representation, and find nearest image
-            img_path = y[srl_model_knn.predict([(np.array(mu) / 100) * (max_X - min_X) + min_X])[0]]
-            # Remove trailing .jpg if present
-            img_path = img_path.split('.jpg')[0]
-            img = cv2.imread("data/" + img_path + ".jpg")
-
-            # stop if user closed a window
-            if (cv2.getWindowProperty(fig_name, 0) < 0) or (cv2.getWindowProperty('slider for ' + fig_name, 0) < 0):
-                break
-
-            cv2.imshow(fig_name, img)
+            cv2.imshow(fig_names[loss_name], img)
 
     # gracefully close
     cv2.destroyAllWindows()

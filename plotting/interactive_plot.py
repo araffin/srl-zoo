@@ -91,7 +91,7 @@ def plot3dRepresentation(states, rewards, images_path, name="Learned State Repre
 def plotRepresentation(states, rewards, images_path, name="Learned State Representation",
                        add_colorbar=True, fit_pca=True, multi_view=False):
     """
-    :param states: (numpy array)
+    :param states: (np.ndarray)
     :param rewards: (numpy 1D array)
     :param images_path: (str)
     :param name: (str)

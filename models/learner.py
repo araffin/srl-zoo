@@ -4,7 +4,9 @@ import os
 import json
 import sys
 import time
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
+from pprint import pprint
+
 
 import numpy as np
 import torch as th
@@ -18,7 +20,7 @@ from pipeline import NAN_ERROR
 from plotting.representation_plot import plotRepresentation, plt, plotImage
 from preprocessing.data_loader import DataLoader
 from preprocessing.utils import deNormalize
-from utils import printRed, detachToNumpy
+from utils import printRed, detachToNumpy, printYellow
 from .modules import SRLModules, SRLModulesSplit
 from .priors import Discriminator
 
@@ -33,7 +35,6 @@ N_EPOCHS = 1
 VALIDATION_SIZE = 0.2  # 20% of training data for validation
 # Experimental: episode independent prior
 BALANCED_SAMPLING = False  # Whether to do Uniform (default) or balanced sampling
-
 
 
 class BaseLearner(object):
@@ -66,8 +67,9 @@ class BaseLearner(object):
     def _predFn(self, observations):
         """
         Predict states in test mode given observations
-        :param observations: (PyTorch Tensor)
-        :return: (numpy tensor)
+        
+        :param observations: (th.Tensor)
+        :return: (np.ndarray)
         """
         # Move the tensor back to the cpu
         return detachToNumpy(self.model.getStates(observations))
@@ -75,13 +77,12 @@ class BaseLearner(object):
     def predStatesWithDataLoader(self, data_loader):
         """
         Predict states using minibatches to avoid memory issues
-        :param data_loader: (Baxter Data Loader object)
-        :return: (numpy tensor)
+        :param data_loader: (DataLoader object)
+        :return: (np.ndarray)
         """
         predictions = []
-        for (obs_var, obs_noisy_var) in data_loader:
-
-            obs_var = obs_noisy_var.to(self.device) if self.use_dae else obs_var.to(self.device)
+        for obs_var in data_loader:
+            obs_var = obs_var.to(self.device)
             predictions.append(self._predFn(obs_var))
 
         return np.concatenate(predictions, axis=0)
@@ -97,7 +98,8 @@ class BaseLearner(object):
     def saveStates(states, images_path, rewards, log_folder, name=""):
         """
         Save learned states to json and npz files
-        :param states: (numpy array)
+
+        :param states: (np.ndarray)
         :param images_path: ([str])
         :param rewards: (rewards)
         :param log_folder: (str)
@@ -118,26 +120,32 @@ class BaseLearner(object):
 
 class SRL4robotics(BaseLearner):
     """
+    Main Class for training a SRL model
+
     :param state_dim: (int)
     :param model_type: (str) one of "resnet", "mlp" or "custom_cnn"
+    :param inverse_model_type: (str) one of "linear" or "mlp"
     :param log_folder: (str)
     :param seed: (int)
     :param learning_rate: (float)
-    :param l1_reg: (float)
-    :param l2_reg: (float)
+    :param l1_reg: (float) weight for l1 regularization
+    :param l2_reg: (float) weight for l2 regularization
     :param cuda: (bool)
     :param multi_view: (bool)
     :param losses: ([str])
+    :param losses_weights_dict: (OrderedDict)
     :param n_actions: (int)
-    :param beta: (float)
-    :param path_to_dae: path to pre-trained DAE when using perceptual loss (str)
-    :param occlusion_percentage: max percentage of occlusion when using DAE (float)
+    :param beta: (float) for beta-vae
+    :param split_dimensions:
+    :param path_to_dae: (str) path to pre-trained DAE when using perceptual loss
+    :param state_dim_dae: (int)
+    :param occlusion_percentage: (float) max percentage of occlusion when using DAE
     """
 
-    def __init__(self, state_dim, model_type="resnet", log_folder="logs/default",
+    def __init__(self, state_dim, model_type="resnet", inverse_model_type="linear", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, l2_reg=0.0, cuda=False,
                  multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1,
-                 split_index=-1, path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
+                 split_dimensions=-1, path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
@@ -145,10 +153,7 @@ class SRL4robotics(BaseLearner):
         self.losses = losses
         self.dim_action = n_actions
         self.beta = beta
-        # For splitting representation
-        self.split_index = split_index
-        self.state_dim_first_split = split_index if split_index > 0 else state_dim
-        self.state_dim_second_split = state_dim - split_index if split_index > 0 else state_dim
+        self.denoiser = None
 
         if model_type in ["linear", "mlp", "resnet", "custom_cnn"] \
                 or "autoencoder" in losses or "vae" in losses:
@@ -164,16 +169,20 @@ class SRL4robotics(BaseLearner):
             self.perceptual_similarity_loss = "perceptual" in self.losses
             self.use_dae = "dae" in self.losses
             self.path_to_dae = path_to_dae
-            if split_index > 0:
+
+            if isinstance(split_dimensions, dict) and sum(split_dimensions.values()) > 0:
+                printYellow("Using splitted representation")
                 self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action,
-                                             model_type=model_type,
-                                             cuda=cuda, losses=losses, split_index=split_index)
+                                             model_type=model_type, cuda=cuda, losses=losses,
+                                             split_dimensions=split_dimensions, inverse_model_type=inverse_model_type)
             else:
                 self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
-                                        cuda=cuda, losses=losses)
+                                        cuda=cuda, losses=losses, inverse_model_type=inverse_model_type)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
+
         print("Using {} model".format(model_type))
+
         self.cuda = cuda
         self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
 
@@ -191,26 +200,29 @@ class SRL4robotics(BaseLearner):
         self.log_folder = log_folder
         self.model_type = model_type
 
-        self.losses_weights_dict = {"forward": 1.0, "inverse": 1.0, "reward": 1.0, "priors": 1.0,
+        # Default weights that are updated with the weights passed to the script
+        self.losses_weights_dict = {"forward": 1.0, "inverse": 2.0, "reward": 1.0, "priors": 1.0,
                                     "episode-prior": 1.0, "reward-prior": 10, "triplet": 1.0,
-                                    "autoencoder": 1.0, "vae": 1.0, "perceptual": 1e-6, "dae": 1.0,
-                                    'l1_reg': l1_reg, "l2_reg": l2_reg}
+                                    "autoencoder": 1.0, "vae": 0.5e-6, "perceptual": 1e-6, "dae": 1.0,
+                                    'l1_reg': l1_reg, "l2_reg": l2_reg, 'random': 1.0}
         self.occlusion_percentage = occlusion_percentage
         self.state_dim_dae = state_dim_dae
 
         if losses_weights_dict is not None:
             self.losses_weights_dict.update(losses_weights_dict)
-        print("\nYour are using the following weights for uour lossses: ", self.losses_weights_dict, '\n')
+
         if self.use_dae and self.occlusion_percentage is not None:
             print("Using a maximum occlusion surface of {}".format(str(self.occlusion_percentage)))
 
     @staticmethod
     def loadSavedModel(log_folder, valid_models, cuda=True):
         """
+        Load a saved SRL model
+
         :param log_folder: (str)
         :param valid_models: ([str])
         :param cuda: (bool)
-        :return: (SRL4robotics object, dict)
+        :return: (SRL4robotics object, OrderedDict)
         """
         # Sanity checks
         assert os.path.exists(log_folder), "Error: folder '{}' does not exist".format(log_folder)
@@ -220,21 +232,26 @@ class SRL4robotics(BaseLearner):
             "Error: could not find 'srl_model.pth' in '{}'".format(log_folder)
 
         with open(log_folder + 'exp_config.json', 'r') as f:
-            exp_config = json.load(f)
+            # IMPORTANT: keep the order for the losses
+            # so the json is loaded as an OrderedDict
+            exp_config = json.load(f, object_pairs_hook=OrderedDict)
 
         state_dim = exp_config['state-dim']
         losses = exp_config['losses']
         n_actions = exp_config['n_actions']
         model_type = exp_config['model-type']
         multi_view = exp_config.get('multi-view', False)
-        split_index = exp_config.get('split-index', -1)
+        split_dimensions = exp_config.get('split-dimensions', -1)
         model_path = log_folder + 'srl_model.pth'
+        inverse_model_type = exp_config.get('inverse-model-type', 'linear')
+        occlusion_percentage = exp_config.get('occlusion-percentage', 0)
 
         difference = set(losses).symmetric_difference(valid_models)
         assert set(losses).intersection(valid_models) != set(), "Error: Not supported losses " + ", ".join(difference)
 
         srl_model = SRL4robotics(state_dim, model_type=model_type, cuda=cuda, multi_view=multi_view,
-                                 losses=losses, n_actions=n_actions, split_index=split_index)
+                                 losses=losses, n_actions=n_actions, split_dimensions=split_dimensions,
+                                 inverse_model_type=inverse_model_type, occlusion_percentage=occlusion_percentage)
         srl_model.model.load_state_dict(th.load(model_path))
 
         return srl_model, exp_config
@@ -243,16 +260,19 @@ class SRL4robotics(BaseLearner):
         """
         Learn a state representation
         :param images_path: (numpy 1D array)
-        :param actions: (numpy matrix)
+        :param actions: (np.ndarray)
         :param rewards: (numpy 1D array)
         :param episode_starts: (numpy 1D array) boolean array
                                 the ith index is True if one episode starts at this frame
-        :return: (numpy tensor) the learned states for the given observations
+        :return: (np.ndarray) the learned states for the given observations
         """
+
+        print("\nYour are using the following weights for the losses:")
+        pprint(self.losses_weights_dict)
 
         # PREPARE DATA -------------------------------------------------------------------------------------------------
         # here, we organize the data into minibatches
-        # and find pairs for the respective loss terms
+        # and find pairs for the respective loss terms (for robotics priors only)
 
         num_samples = images_path.shape[0] - 1  # number of samples
 
@@ -296,7 +316,8 @@ class SRL4robotics(BaseLearner):
 
         if self.use_vae and self.perceptual_similarity_loss and self.path_to_dae is not None:
 
-            self.denoiser = SRLModules(state_dim=self.state_dim_dae, action_dim=self.dim_action, model_type="custom_cnn",
+            self.denoiser = SRLModules(state_dim=self.state_dim_dae, action_dim=self.dim_action,
+                                       model_type="custom_cnn",
                                        cuda=self.cuda, losses=["dae"])
             self.denoiser.load_state_dict(th.load(self.path_to_dae))
             self.denoiser.eval()
@@ -310,7 +331,7 @@ class SRL4robotics(BaseLearner):
 
         data_loader = DataLoader(minibatchlist, images_path, n_workers=N_WORKERS, multi_view=self.multi_view,
                                  use_triplets=self.use_triplets, is_training=True, apply_occlusion=self.use_dae,
-                                       occlusion_percentage=self.occlusion_percentage)
+                                 occlusion_percentage=self.occlusion_percentage)
         test_data_loader = DataLoader(test_minibatchlist, images_path, n_workers=N_WORKERS, multi_view=self.multi_view,
                                       use_triplets=self.use_triplets, max_queue_len=1, is_training=False,
                                       apply_occlusion=self.use_dae, occlusion_percentage=self.occlusion_percentage)
@@ -322,6 +343,13 @@ class SRL4robotics(BaseLearner):
         best_error = np.inf
         best_model_path = "{}/srl_model.pth".format(self.log_folder)
         start_time = time.time()
+
+        # Random features, we don't need to train a model
+        if len(self.losses) == 1 and self.losses[0] == 'random':
+            global N_EPOCHS
+            N_EPOCHS = 0
+            printYellow("Skipping training because using random features")
+            th.save(self.model.state_dict(), best_model_path)
 
         for epoch in range(N_EPOCHS):
             # In each epoch, we do a full pass over the training data:
@@ -398,12 +426,12 @@ class SRL4robotics(BaseLearner):
 
                 if not self.no_priors:
                     roboticPriorsLoss(states, next_states, minibatch_idx=minibatch_idx,
-                                        dissimilar_pairs=dissimilar_pairs, same_actions_pairs=same_actions_pairs,
-                                        weight=self.losses_weights_dict['priors'], loss_manager=loss_manager)
+                                      dissimilar_pairs=dissimilar_pairs, same_actions_pairs=same_actions_pairs,
+                                      weight=self.losses_weights_dict['priors'], loss_manager=loss_manager)
 
                 if self.use_forward_loss:
                     next_states_pred = self.model.forwardModel(states, actions_st)
-                    forwardModelLoss(next_states_pred, next_states[:, -self.state_dim_second_split:],
+                    forwardModelLoss(next_states_pred, next_states,
                                      weight=self.losses_weights_dict['forward'],
                                      loss_manager=loss_manager)
 
@@ -432,9 +460,9 @@ class SRL4robotics(BaseLearner):
 
                     if self.perceptual_similarity_loss:
                         perceptualSimilarityLoss(states_denoiser, states_denoiser_predicted, next_states_denoiser,
-                                                next_states_denoiser_predicted,
-                                                weight=self.losses_weights_dict['perceptual'],
-                                                loss_manager=loss_manager)
+                                                 next_states_denoiser_predicted,
+                                                 weight=self.losses_weights_dict['perceptual'],
+                                                 loss_manager=loss_manager)
                     else:
                         generationLoss(decoded_obs, next_decoded_obs, obs, next_obs,
                                        weight=self.losses_weights_dict['vae'], loss_manager=loss_manager)
@@ -513,8 +541,10 @@ class SRL4robotics(BaseLearner):
                                 if self.use_dae:
                                     plotImage(deNormalize(detachToNumpy(noisy_obs[0])), "Noisy Input Image (Train)")
                                 if self.perceptual_similarity_loss:
-                                    plotImage(deNormalize(detachToNumpy(decoded_obs_denoiser[0])), "Reconstructed Image DAE")
-                                    plotImage(deNormalize(detachToNumpy(decoded_obs_denoiser_predicted[0])), "Reconstructed Image predicted DAE")
+                                    plotImage(deNormalize(detachToNumpy(decoded_obs_denoiser[0])),
+                                              "Reconstructed Image DAE")
+                                    plotImage(deNormalize(detachToNumpy(decoded_obs_denoiser_predicted[0])),
+                                              "Reconstructed Image predicted DAE")
                                 plotImage(deNormalize(detachToNumpy(decoded_obs[0])), "Reconstructed Image")
 
                             elif obs[0].shape[0] % 3 == 0:  # Multi-RGB
@@ -527,10 +557,10 @@ class SRL4robotics(BaseLearner):
                                     if self.perceptual_similarity_loss:
                                         plotImage(deNormalize(
                                             detachToNumpy(decoded_obs_denoiser[0][k * 3:(k + 1) * 3, :, :])),
-                                                  "Reconstructed Image DAE")
+                                            "Reconstructed Image DAE")
                                         plotImage(deNormalize(
                                             detachToNumpy(decoded_obs_denoiser_predicted[0][k * 3:(k + 1) * 3, :, :])),
-                                                  "Reconstructed Image predicted DAE")
+                                            "Reconstructed Image predicted DAE")
                                     plotImage(deNormalize(detachToNumpy(decoded_obs[0][k * 3:(k + 1) * 3, :, :])),
                                               "Reconstructed Image {}".format(k + 1))
 

@@ -24,8 +24,8 @@ class BaseModelSRL(nn.Module):
 
     def getStates(self, observations):
         """
-        :param observations: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param observations: (th.Tensor)
+        :return: (th.Tensor)
         """
         return self.forward(observations)
 
@@ -84,29 +84,29 @@ class BaseModelAutoEncoder(BaseModelSRL):
 
     def getStates(self, observations):
         """
-        :param observations: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param observations: (th.Tensor)
+        :return: (th.Tensor)
         """
         return self.encode(observations)
 
     def encode(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         raise NotImplementedError
 
     def decode(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         raise NotImplementedError
 
     def forward(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         input_shape = x.size()
         encoded = self.encode(x)
@@ -125,22 +125,22 @@ class BaseModelVAE(BaseModelAutoEncoder):
 
     def getStates(self, observations):
         """
-        :param observations: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param observations: (th.Tensor)
+        :return: (th.Tensor)
         """
         return self.encode(observations)[0]
 
     def encode(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         raise NotImplementedError
 
     def decode(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         raise NotImplementedError
 
@@ -148,8 +148,8 @@ class BaseModelVAE(BaseModelAutoEncoder):
         """
         Reparameterize for the backpropagation of z instead of q.
         (See "The reparameterization trick" section of https://arxiv.org/abs/1312.6114)
-        :param mu: (PyTorch Tensor)
-        :param logvar: (PyTorch Tensor)
+        :param mu: (th.Tensor)
+        :param logvar: (th.Tensor)
         """
         if self.training:
             # logvar = \log(\sigma^2) = 2 * \log(\sigma)
@@ -166,8 +166,8 @@ class BaseModelVAE(BaseModelAutoEncoder):
 
     def forward(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         input_shape = x.size()
         mu, logvar = self.encode(x)

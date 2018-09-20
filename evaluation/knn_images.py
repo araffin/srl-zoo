@@ -12,6 +12,7 @@ from PIL import Image
 from sklearn.neighbors import NearestNeighbors
 from tqdm import tqdm
 
+
 MAX_STATE_LENGTH = 60
 N_NEIGHBORS_PER_LINE = 5
 

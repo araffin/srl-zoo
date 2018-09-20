@@ -24,9 +24,9 @@ def sample_coordinates(coord_1, max_distance, percentage):
     """
     Sampling from a coordinate A, a second one B within a maximum distance [max_distance X percentage]
 
-    :param coord_1: sample first coordinate (int)
-    :param max_distance: max value of coordinate in the axis (int)
-    :param percentage: maximum occlusion as a percentage (float)
+    :param coord_1: (int) sample first coordinate
+    :param max_distance: (int) max value of coordinate in the axis
+    :param percentage: (float) maximum occlusion as a percentage
     :return: (tuple of int)
     """
     min_coord_2 = max(0, coord_1 - max_distance * percentage)
@@ -37,9 +37,12 @@ def sample_coordinates(coord_1, max_distance, percentage):
 
 def preprocessImage(image, convert_to_rgb=True, apply_occlusion=False, occlusion_percentage=0.5):
     """
-    :param image: (numpy matrix) BGR image
+    :param image: (np.ndarray) image (BGR or RGB)
     :param convert_to_rgb: (bool) whether the conversion to rgb is needed or not
-    :return: (numpy matrix)
+    :param apply_occlusion: (bool) whether to occludes part of the images or not
+                            (used for training denoising autoencoder)
+    :param occlusion_percentage: (float) max percentage of occlusion (in width and height)
+    :return: (np.ndarray)
     """
     # Resize
     im = cv2.resize(image, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
@@ -61,6 +64,7 @@ def preprocessImage(image, convert_to_rgb=True, apply_occlusion=False, occlusion
 
     return im
 
+
 class DataLoader(object):
     def __init__(self, minibatchlist, images_path, n_workers=1, multi_view=False, use_triplets=False,
                  infinite_loop=True, max_queue_len=4, is_training=False, apply_occlusion=False,
@@ -68,6 +72,7 @@ class DataLoader(object):
         """
         A Custom dataloader to work with our datasets, and to prepare data for the different models
         (inverse, priors, autoencoder, ...)
+
         :param minibatchlist: ([np.array]) list of observations indices (grouped per minibatch)
         :param images_path: (np.array) Array of path to images
         :param n_workers: (int) number of preprocessing worker (load and preprocess each image)
@@ -76,7 +81,7 @@ class DataLoader(object):
         :param infinite_loop: (bool) whether to have an iterator that can be resetted, set to False, it
         :param max_queue_len: (int) Max number of minibatches that can be preprocessed at the same time
         :param apply_occlusion: is the use of occlusion enabled - when using DAE (bool)
-        :param occlusion percentage: max percentage of occlusion when using DAE (float)
+        :param occlusion_percentage: max percentage of occlusion when using DAE (float)
         :param is_training: (bool)
 
             Set to True, the dataloader will output both `obs` and `next_obs` (a tuple of th.Tensor)
@@ -143,17 +148,17 @@ class DataLoader(object):
 
                     if self.n_workers <= 1:
                         batch = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets)
-                                                        for image_path in images]
+                                 for image_path in images]
                         if self.apply_occlusion:
                             batch_noisy = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets,
-                                                            apply_occlusion=self.apply_occlusion,
-                                                            occlusion_percentage=self.occlusion_percentage)
-                                            for image_path in images]
+                                                                  apply_occlusion=self.apply_occlusion,
+                                                                  occlusion_percentage=self.occlusion_percentage)
+                                           for image_path in images]
 
                     else:
                         batch = parallel(
                             delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets)
-                                                            for image_path in images)
+                            for image_path in images)
                         if self.apply_occlusion:
                             batch_noisy = parallel(
                                 delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets,
@@ -170,9 +175,10 @@ class DataLoader(object):
                         if batch_noisy is not None:
                             batch_obs_noisy, batch_next_obs_noisy = batch_noisy[:len(images) // 2], \
                                                                     batch_noisy[len(images) // 2:]
-                        self.queue.put((minibatch_idx, batch_obs, batch_next_obs, batch_obs_noisy, batch_next_obs_noisy))
+                        self.queue.put((minibatch_idx, batch_obs, batch_next_obs,
+                                        batch_obs_noisy, batch_next_obs_noisy))
                     else:
-                        self.queue.put((batch, batch_noisy))
+                        self.queue.put(batch)
 
                     # Free memory
                     if self.shuffle:
@@ -200,7 +206,6 @@ class DataLoader(object):
 
         if multi_view:
             images = []
-            noisy_images =[]
 
             # Load different view of the same timestep
             for i in range(2):
@@ -208,7 +213,7 @@ class DataLoader(object):
                 if im is None:
                     raise ValueError("tried to load {}_{}.jpg, but it was not found".format(image_path, i + 1))
                 images.append(preprocessImage(im, apply_occlusion=apply_occlusion,
-                                                    occlusion_percentage=occlusion_percentage))
+                                              occlusion_percentage=occlusion_percentage))
             ####################
             # loading a negative observation
             if use_triplets:
@@ -338,7 +343,8 @@ class SupervisedDataLoader(DataLoader):
         """
         Create list of minibatches (contains the observations indices)
         along with the corresponding list of targets
-        Warning: this may create minibatches of different length
+        Warning: this may create minibatches of different lengths
+        
         :param x_indices: (np.array)
         :param y_values: (np.array)
         :param batch_size: (int)

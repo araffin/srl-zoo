@@ -135,9 +135,9 @@ class ReverseLayerF(Function):
     @staticmethod
     def forward(ctx, x, lambda_):
         """
-        :param x: (PyTorch Tensor)
+        :param x: (th.Tensor)
         :param lambda_: (float) scaling factor
-        :return: (PyTorch Tensor)
+        :return: (th.Tensor)
         """
         ctx.lambda_ = lambda_
         # Equivalent to return x ?
@@ -146,8 +146,8 @@ class ReverseLayerF(Function):
     @staticmethod
     def backward(ctx, grad_output):
         """
-        :param grad_output: (PyTorch Tensor)
-        :return: (PyTorch Tensor, None)
+        :param grad_output: (th.Tensor)
+        :return: (th.Tensor, None)
         """
         # Compute the opposite of the gradient
         output = grad_output.neg() * ctx.lambda_

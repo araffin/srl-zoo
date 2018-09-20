@@ -47,7 +47,7 @@ def saveExpConfig(args, log_folder):
 def toNumpyMatrix(obs_var):
     """
     :param obs_var: (th.Tensor)
-    :return: (numpy matrix)
+    :return: (np.ndarray)
     """
     obs_tensor = obs_var.data.numpy()
     n_features = np.prod(obs_tensor.shape[1:])
@@ -104,7 +104,7 @@ print("Fitting PCA with n_components={}".format(n_components))
 ipca = IncrementalPCA(n_components=n_components)
 
 pbar = tqdm(total=len(data_loader))
-for obs_var, _ in data_loader:
+for obs_var in data_loader:
     ipca.partial_fit(toNumpyMatrix(obs_var))
     pbar.update(1)
 pbar.close()
@@ -114,7 +114,7 @@ with open(log_folder + "/pca.pkl", "wb") as f:
 
 print("Transforming observations to states")
 predictions = []
-for obs_var, _ in data_loader:
+for obs_var in data_loader:
     predictions.append(ipca.transform(toNumpyMatrix(obs_var)))
 predictions = np.concatenate(predictions, axis=0)
 

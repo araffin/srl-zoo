@@ -3,6 +3,7 @@ from __future__ import print_function, division
 import os
 import subprocess
 import json
+from collections import OrderedDict
 
 import torch as th
 import numpy as np
@@ -10,23 +11,33 @@ from termcolor import colored
 import argparse
 
 
-def loss_argument(choices, help):
+def parseLossArguments(choices, help):
     """
     Creates a custom type for loss parsing, it overrides the type, choice and help of add_argument, in order to
     properly extract the loss type, and still be able to print the choices available.
+    Example:
+    in: 'autoencoder:1:10' (loss:weight:state_dim)
+    out: autoencoder, 1, 10 (loss_name, weight, state_dim)
 
     :param choices: ([str]) the list of valid losses
+    :param help: (str) help string
     :return: (dict) the arguments for parse arg
     """
+
     def _arg_type(arg):
-        has_weight = ':' in arg
-        if has_weight:
+        arg_separator = arg.count(':')
+        if arg_separator >= 1:
             if arg.split(':')[0] not in choices:
-                raise argparse.ArgumentTypeError("invalid choice: {} (choose from {})".format(arg.split(':')[0], choices))
+                raise argparse.ArgumentTypeError(
+                    "invalid choice: {} (choose from {})".format(arg.split(':')[0], choices))
             try:
-                return arg.split(':')[0], float(arg.split(':')[1])
+                loss, first_arg, second_arg = arg.split(':')[0], float(arg.split(':')[1]), 0
+                if arg_separator == 2:
+                    second_arg = int(arg.split(':')[2])
+                return loss, first_arg, second_arg
             except ValueError:
-                raise argparse.ArgumentTypeError("Error: must be of format '<str>:<float>' or '<str>'")
+                raise argparse. \
+                    ArgumentTypeError("Error: must be of format '<str>:<float>:<int>', '<str>:<float/int>' or '<str>'")
         else:
             if arg not in choices:
                 raise argparse.ArgumentTypeError("invalid choice: {} (choose from {})".format(arg, choices))
@@ -40,43 +51,51 @@ def loss_argument(choices, help):
 
     return {'type': _arg_type, 'help': _choices_print() + " " + help}
 
+
 def buildConfig(args):
     """
     Building the config file for the trainer
+
     :param args: (parsed args object)
-    :return: (dict)
+    :return: (OrderedDict)
     """
-    # Fix to use this function in srl_baselines/
-    split_index = args.split_index if hasattr(args, "split_index") else -1
+    # Fixes to use this function in srl_baselines/
+    split_dimensions = args.split_dimensions if hasattr(args, "split_dimensions") else -1
     beta = args.beta if hasattr(args, "beta") else -1
     l1_reg = args.l1_reg if hasattr(args, "l1_reg") else 0
     l2_reg = args.l2_reg if hasattr(args, "l2_reg") else 0
-    exp_config = {
-        "batch-size": args.batch_size,
-        "beta": beta,
-        "data-folder": args.data_folder,
-        "epochs": args.epochs,
-        "learning-rate": args.learning_rate,
-        "training-set-size": args.training_set_size,
-        "log-folder": "",
-        "model-type": args.model_type,
-        "seed": args.seed,
-        "state-dim": args.state_dim,
-        "knn-samples": 200,
-        "knn-seed": 1,
-        "l1-reg": l1_reg,
-        "l2-reg": l2_reg,
-        "losses": args.losses,
-        "n-neighbors": 5,
-        "n-to-plot": 5,
-        "split-index": split_index
-    }
+
+    if "supervised" in args.losses:
+        args.inverse_model_type = None
+
+    exp_config = OrderedDict(
+        [("batch-size", args.batch_size),
+        ("beta", beta),
+        ("data-folder", args.data_folder),
+        ("epochs", args.epochs),
+        ("learning-rate", args.learning_rate),
+        ("training-set-size", args.training_set_size),
+        ("log-folder", ""),
+        ("model-type", args.model_type),
+        ("seed", args.seed),
+        ("state-dim", args.state_dim),
+        ("knn-samples", 200),
+        ("knn-seed", 1),
+        ("l1-reg", l1_reg),
+        ("l2-reg", l2_reg),
+        ("losses", args.losses),
+        ("n-neighbors", 5),
+        ("n-to-plot", 5),
+        ("split-dimensions", split_dimensions),
+        ("inverse-model-type", args.inverse_model_type)]
+    )
     return exp_config
+
 
 def loadData(data_folder):
     """
     :param data_folder: (str) path to the data_folder to be loaded
-    :return: (Numpy dictionary-like objects and numpy arrays)
+    :return: (Numpy dictionary-like objects and np.ndarrays)
     """
     training_data = np.load('data/{}/preprocessed_data.npz'.format(data_folder))
     episode_starts = training_data['episode_starts']
@@ -130,7 +149,7 @@ def importMaplotlib():
 
 def detachToNumpy(tensor):
     """
-    Gets a pytorch tensor and returns a numpy array
+    Gets a th.Tensor and returns a np.ndarray
     :param tensor: (th.Tensor)
     :return: (numpy float)
     """

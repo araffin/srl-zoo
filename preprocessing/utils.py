@@ -6,7 +6,7 @@ import numpy as np
 def preprocessInput(x, mode="image_net"):
     """
     Normalize input
-    :param x: (numpy tensor) (RGB image with values between [0, 255])
+    :param x: (np.ndarray) (RGB image with values between [0, 255])
     :param mode: (str) One of "image_net", "tf".
         - image_net: will zero-center each color channel with
             respect to the ImageNet dataset,
@@ -14,7 +14,7 @@ def preprocessInput(x, mode="image_net"):
             cf http://pytorch.org/docs/master/torchvision/models.html
         - tf: will scale pixels between -1 and 1,
             sample-wise.
-    :return: (numpy tensor)
+    :return: (np.ndarray)
     """
     assert x.shape[-1] == 3, "Color channel must be at the end of the tensor {}".format(x.shape)
     x /= 255.
@@ -38,9 +38,9 @@ def preprocessInput(x, mode="image_net"):
 def deNormalize(x, mode="image_net"):
     """
     deNormalize data (transform input to [0, 1])
-    :param x: (numpy tensor)
+    :param x: (np.ndarray)
     :param mode: (str) One of "image_net", "tf".
-    :return: (numpy tensor)
+    :return: (np.ndarray)
     """
     # Reorder channels when we have only one image
     if x.shape[0] == 3 and len(x.shape) == 3:

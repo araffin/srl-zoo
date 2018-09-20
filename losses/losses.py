@@ -66,8 +66,8 @@ def roboticPriorsLoss(states, next_states, minibatch_idx,
     :param states: (th.Tensor)
     :param next_states: (th.Tensor)
     :param minibatch_idx: (int)
-    :param dissimilar_pairs: ([numpy array])
-    :param same_actions_pairs: ([numpy array])
+    :param dissimilar_pairs: ([np.ndarray])
+    :param same_actions_pairs: ([np.ndarray])
     :param weight: coefficient to weight the loss
     :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return: (th.Tensor)
@@ -107,7 +107,9 @@ def forwardModelLoss(next_states_pred, next_states, weight, loss_manager):
     :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return:
     """
-    forward_loss = F.mse_loss(next_states_pred, next_states, reduction='elementwise_mean')
+    # TODO: replace with mse_loss once the bug is fixed in PyTorch (see reconstructionLoss)
+    # forward_loss = F.mse_loss(next_states_pred, next_states, reduction='elementwise_mean')
+    forward_loss = reconstructionLoss(next_states_pred, next_states)
     loss_manager.addToLosses('forward_loss', weight, forward_loss)
     return weight * forward_loss
 
@@ -167,15 +169,16 @@ def rewardModelLoss(rewards_pred, rewards_st, weight, loss_manager):
     loss_manager.addToLosses('reward_loss', weight, reward_loss)
     return weight * reward_loss
 
-
 def reconstructionLoss(input_image, target_image):
     """
     Reconstruction Loss for Autoencoders
     :param input_image: Observation (th.Tensor)
-    :param target_image:  Reconstructed observation (th.Tensor)
+    :param target_image: Reconstructed observation (th.Tensor)
     :return:
     """
-    return F.mse_loss(input_image, target_image, reduction='elementwise_mean')
+    # TODO: replace with mse_loss when new release is out.
+    # We use a custom version because of this issue: https://github.com/pytorch/pytorch/issues/10009
+    return th.sum((input_image - target_image) ** 2) / input_image.data.nelement()
 
 
 def autoEncoderLoss(obs, decoded_obs, next_obs, decoded_next_obs, weight, loss_manager):

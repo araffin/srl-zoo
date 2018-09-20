@@ -2,7 +2,6 @@ from __future__ import print_function, division, absolute_import
 
 import argparse
 import time
-import json
 
 import numpy as np
 import torch as th
@@ -89,7 +88,7 @@ start_time = time.time()
 best_acc = 0
 
 for epoch in range(num_epochs):
-    print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+    print('Epoch {}/{}'.format(epoch + 1, num_epochs - 1))
     print('-' * 10)
     # Each epoch has a training and validation phase
     for phase in ['train', 'val']:
@@ -110,6 +109,11 @@ for epoch in range(num_epochs):
             labels = th.from_numpy(rewards[index]).to(device)
             inputs = th.Tensor(states[idx, :]).float().to(device)
             next_inputs = th.Tensor(states[idx + 1, :]).float().to(device)
+
+            # Reshape input in case `inputs` is a vector
+            if len(inputs.shape) == 1:
+                inputs = inputs[None]
+                next_inputs = next_inputs[None]
 
             if len(next_inputs) < args.batch_size:
                 continue

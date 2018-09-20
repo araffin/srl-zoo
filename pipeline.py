@@ -177,6 +177,20 @@ def createGroundTruthFolder(exp_config):
     return exp_config
 
 
+def correlationCall(exp_config, plot=False):
+    """
+    Evaluate the representation using correlation measurement
+    :param exp_config: (dict)
+    :param plot: (bool)
+    """
+    log_folder = exp_config["log-folder"] + "/states_rewards.npz"
+    data_folder = 'data/' + exp_config['data-folder']
+    use_plot = [] if plot else ["--print-corr"]
+    ok = subprocess.call(["python", "-m", "plotting.representation_plot", "-i", log_folder,
+                          "--data-folder", data_folder, "--correlation"] + use_plot)
+    printConfigOnError(ok, exp_config, "correlationCall")
+
+
 def knnCall(exp_config):
     """
     Evaluate the representation using knn
@@ -311,14 +325,14 @@ if __name__ == '__main__':
             # Autoencoder and VAE
             exp_config['model-type'] = "custom_cnn"
             for baseline in ['autoencoder', 'vae']:
-                for state_dim in [2, 3, 6, 12, 32]:
+                for state_dim in [6, 12, 32]:
                     # Update config
                     exp_config['state-dim'] = state_dim
                     baselineCall(exp_config, baseline)
                     evaluateBaseline(base_config)
 
         # PCA
-        for state_dim in [2, 6, 12, 32]:
+        for state_dim in [12, 32]:
             # Update config
             exp_config['state-dim'] = state_dim
             pcaCall(exp_config)
@@ -382,7 +396,7 @@ if __name__ == '__main__':
         # Grid search
         for seed in [0]:
             exp_config['seed'] = seed
-            for state_dim in [2, 3, 4, 6, 10]:
+            for state_dim in [3, 6]:
                 # Update config
                 exp_config['state-dim'] = state_dim
                 log_folder, experiment_name = getLogFolderName(exp_config)
