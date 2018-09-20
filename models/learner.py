@@ -67,6 +67,7 @@ class BaseLearner(object):
     def _predFn(self, observations):
         """
         Predict states in test mode given observations
+        
         :param observations: (th.Tensor)
         :return: (np.ndarray)
         """
@@ -97,7 +98,7 @@ class BaseLearner(object):
     def saveStates(states, images_path, rewards, log_folder, name=""):
         """
         Save learned states to json and npz files
-        
+
         :param states: (np.ndarray)
         :param images_path: ([str])
         :param rewards: (rewards)
@@ -119,20 +120,26 @@ class BaseLearner(object):
 
 class SRL4robotics(BaseLearner):
     """
+    Main Class for training a SRL model
+
     :param state_dim: (int)
     :param model_type: (str) one of "resnet", "mlp" or "custom_cnn"
+    :param inverse_model_type: (str) one of "linear" or "mlp"
     :param log_folder: (str)
     :param seed: (int)
     :param learning_rate: (float)
-    :param l1_reg: (float)
-    :param l2_reg: (float)
+    :param l1_reg: (float) weight for l1 regularization
+    :param l2_reg: (float) weight for l2 regularization
     :param cuda: (bool)
     :param multi_view: (bool)
     :param losses: ([str])
+    :param losses_weights_dict: (OrderedDict)
     :param n_actions: (int)
-    :param beta: (float)
-    :param path_to_dae: path to pre-trained DAE when using perceptual loss (str)
-    :param occlusion_percentage: max percentage of occlusion when using DAE (float)
+    :param beta: (float) for beta-vae
+    :param split_dimensions:
+    :param path_to_dae: (str) path to pre-trained DAE when using perceptual loss
+    :param state_dim_dae: (int)
+    :param occlusion_percentage: (float) max percentage of occlusion when using DAE
     """
 
     def __init__(self, state_dim, model_type="resnet", inverse_model_type="linear", log_folder="logs/default",
@@ -173,7 +180,9 @@ class SRL4robotics(BaseLearner):
                                         cuda=cuda, losses=losses, inverse_model_type=inverse_model_type)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
+
         print("Using {} model".format(model_type))
+
         self.cuda = cuda
         self.device = th.device("cuda" if th.cuda.is_available() and cuda else "cpu")
 
@@ -191,6 +200,7 @@ class SRL4robotics(BaseLearner):
         self.log_folder = log_folder
         self.model_type = model_type
 
+        # Default weights that are updated with the weights passed to the script
         self.losses_weights_dict = {"forward": 1.0, "inverse": 2.0, "reward": 1.0, "priors": 1.0,
                                     "episode-prior": 1.0, "reward-prior": 10, "triplet": 1.0,
                                     "autoencoder": 1.0, "vae": 0.5e-6, "perceptual": 1e-6, "dae": 1.0,
@@ -200,16 +210,19 @@ class SRL4robotics(BaseLearner):
 
         if losses_weights_dict is not None:
             self.losses_weights_dict.update(losses_weights_dict)
+
         if self.use_dae and self.occlusion_percentage is not None:
             print("Using a maximum occlusion surface of {}".format(str(self.occlusion_percentage)))
 
     @staticmethod
     def loadSavedModel(log_folder, valid_models, cuda=True):
         """
+        Load a saved SRL model
+
         :param log_folder: (str)
         :param valid_models: ([str])
         :param cuda: (bool)
-        :return: (SRL4robotics object, dict)
+        :return: (SRL4robotics object, OrderedDict)
         """
         # Sanity checks
         assert os.path.exists(log_folder), "Error: folder '{}' does not exist".format(log_folder)
@@ -247,7 +260,7 @@ class SRL4robotics(BaseLearner):
         """
         Learn a state representation
         :param images_path: (numpy 1D array)
-        :param actions: (numpy matrix)
+        :param actions: (np.ndarray)
         :param rewards: (numpy 1D array)
         :param episode_starts: (numpy 1D array) boolean array
                                 the ith index is True if one episode starts at this frame
@@ -256,9 +269,10 @@ class SRL4robotics(BaseLearner):
 
         print("\nYour are using the following weights for the losses:")
         pprint(self.losses_weights_dict)
+
         # PREPARE DATA -------------------------------------------------------------------------------------------------
         # here, we organize the data into minibatches
-        # and find pairs for the respective loss terms
+        # and find pairs for the respective loss terms (for robotics priors only)
 
         num_samples = images_path.shape[0] - 1  # number of samples
 

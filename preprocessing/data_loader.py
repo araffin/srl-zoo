@@ -24,9 +24,9 @@ def sample_coordinates(coord_1, max_distance, percentage):
     """
     Sampling from a coordinate A, a second one B within a maximum distance [max_distance X percentage]
 
-    :param coord_1: sample first coordinate (int)
-    :param max_distance: max value of coordinate in the axis (int)
-    :param percentage: maximum occlusion as a percentage (float)
+    :param coord_1: (int) sample first coordinate
+    :param max_distance: (int) max value of coordinate in the axis
+    :param percentage: (float) maximum occlusion as a percentage
     :return: (tuple of int)
     """
     min_coord_2 = max(0, coord_1 - max_distance * percentage)
@@ -37,12 +37,12 @@ def sample_coordinates(coord_1, max_distance, percentage):
 
 def preprocessImage(image, convert_to_rgb=True, apply_occlusion=False, occlusion_percentage=0.5):
     """
-    :param image: (numpy matrix) BGR image
+    :param image: (np.ndarray) image (BGR or RGB)
     :param convert_to_rgb: (bool) whether the conversion to rgb is needed or not
     :param apply_occlusion: (bool) whether to occludes part of the images or not
                             (used for training denoising autoencoder)
     :param occlusion_percentage: (float) max percentage of occlusion (in width and height)
-    :return: (numpy matrix)
+    :return: (np.ndarray)
     """
     # Resize
     im = cv2.resize(image, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
@@ -72,6 +72,7 @@ class DataLoader(object):
         """
         A Custom dataloader to work with our datasets, and to prepare data for the different models
         (inverse, priors, autoencoder, ...)
+
         :param minibatchlist: ([np.array]) list of observations indices (grouped per minibatch)
         :param images_path: (np.array) Array of path to images
         :param n_workers: (int) number of preprocessing worker (load and preprocess each image)
@@ -342,7 +343,8 @@ class SupervisedDataLoader(DataLoader):
         """
         Create list of minibatches (contains the observations indices)
         along with the corresponding list of targets
-        Warning: this may create minibatches of different length
+        Warning: this may create minibatches of different lengths
+        
         :param x_indices: (np.array)
         :param y_values: (np.array)
         :param batch_size: (int)

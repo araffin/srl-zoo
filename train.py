@@ -89,8 +89,6 @@ if __name__ == '__main__':
         raise ValueError(
             "Either no losses have a defined weight or dimension, or all losses have a defined weight. {}".format(args.losses))
 
-    # WARNING: split_dimensions must be saved.loaded as an OrderedDict which is not the case for now
-    # Missing: loading exp_config with consistent order
     # If not describing the the losses (weight and or dimension)
     if not has_consistent_description:
         losses = list(set(args.losses))
@@ -135,10 +133,12 @@ if __name__ == '__main__':
     assert not ("dae" in losses and "perceptual" in losses), \
         "Please learn the DAE before learning a VAE with the perceptual loss "
 
+
     print('Loading data ... ')
     training_data, ground_truth, _, _ = loadData(args.data_folder)
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
     actions = training_data['actions']
+    # We assume actions are integers
     n_actions = int(np.max(actions) + 1)
 
     # Try to convert old python 2 format
@@ -149,6 +149,7 @@ if __name__ == '__main__':
 
     # Building the experiment config file
     exp_config = buildConfig(args)
+
     if args.log_folder == "":
         # Automatically create dated log folder for configs
         createFolder("logs/{}".format(exp_config['data-folder']), "Dataset log folder already exist")
@@ -157,10 +158,12 @@ if __name__ == '__main__':
         args.log_folder = log_folder
     else:
         experiment_name = "{}_{}".format(args.model_type, losses)
+
     exp_config['log-folder'] = args.log_folder
     exp_config['experiment-name'] = experiment_name
     exp_config['n_actions'] = n_actions
     exp_config['multi-view'] = args.multi_view
+
     if "dae" in losses:
         exp_config['occlusion-percentage'] = args.occlusion_percentage
     print('Log folder: {}'.format(args.log_folder))

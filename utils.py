@@ -3,6 +3,7 @@ from __future__ import print_function, division
 import os
 import subprocess
 import json
+from collections import OrderedDict
 
 import torch as th
 import numpy as np
@@ -51,37 +52,40 @@ def parseLossArguments(choices, help):
 def buildConfig(args):
     """
     Building the config file for the trainer
+
     :param args: (parsed args object)
-    :return: (dict)
+    :return: (OrderedDict)
     """
-    # Fix to use this function in srl_baselines/
+    # Fixes to use this function in srl_baselines/
     split_dimensions = args.split_dimensions if hasattr(args, "split_dimensions") else -1
     beta = args.beta if hasattr(args, "beta") else -1
     l1_reg = args.l1_reg if hasattr(args, "l1_reg") else 0
     l2_reg = args.l2_reg if hasattr(args, "l2_reg") else 0
+
     if "supervised" in args.losses:
         args.inverse_model_type = None
-    exp_config = {
-        "batch-size": args.batch_size,
-        "beta": beta,
-        "data-folder": args.data_folder,
-        "epochs": args.epochs,
-        "learning-rate": args.learning_rate,
-        "training-set-size": args.training_set_size,
-        "log-folder": "",
-        "model-type": args.model_type,
-        "seed": args.seed,
-        "state-dim": args.state_dim,
-        "knn-samples": 200,
-        "knn-seed": 1,
-        "l1-reg": l1_reg,
-        "l2-reg": l2_reg,
-        "losses": args.losses,
-        "n-neighbors": 5,
-        "n-to-plot": 5,
-        "split-dimensions": split_dimensions,
-        "inverse-model-type": args.inverse_model_type
-    }
+
+    exp_config = OrderedDict(
+        [("batch-size", args.batch_size),
+        ("beta", beta),
+        ("data-folder", args.data_folder),
+        ("epochs", args.epochs),
+        ("learning-rate", args.learning_rate),
+        ("training-set-size", args.training_set_size),
+        ("log-folder", ""),
+        ("model-type", args.model_type),
+        ("seed", args.seed),
+        ("state-dim", args.state_dim),
+        ("knn-samples", 200),
+        ("knn-seed", 1),
+        ("l1-reg", l1_reg),
+        ("l2-reg", l2_reg),
+        ("losses", args.losses),
+        ("n-neighbors", 5),
+        ("n-to-plot", 5),
+        ("split-dimensions", split_dimensions),
+        ("inverse-model-type", args.inverse_model_type)]
+    )
     return exp_config
 
 

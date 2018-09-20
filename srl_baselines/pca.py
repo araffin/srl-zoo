@@ -47,7 +47,7 @@ def saveExpConfig(args, log_folder):
 def toNumpyMatrix(obs_var):
     """
     :param obs_var: (th.Tensor)
-    :return: (numpy matrix)
+    :return: (np.ndarray)
     """
     obs_tensor = obs_var.data.numpy()
     n_features = np.prod(obs_tensor.shape[1:])
