@@ -88,7 +88,7 @@ def buildConfig(args):
 def loadData(data_folder):
     """
     :param data_folder: (str) path to the data_folder to be loaded
-    :return: (Numpy dictionary-like objects and numpy arrays)
+    :return: (Numpy dictionary-like objects and np.ndarrays)
     """
     training_data = np.load('data/{}/preprocessed_data.npz'.format(data_folder))
     episode_starts = training_data['episode_starts']
@@ -142,7 +142,7 @@ def importMaplotlib():
 
 def detachToNumpy(tensor):
     """
-    Gets a pytorch tensor and returns a numpy array
+    Gets a th.Tensor and returns a np.ndarray
     :param tensor: (th.Tensor)
     :return: (numpy float)
     """

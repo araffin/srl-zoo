@@ -14,8 +14,8 @@ def overSampling(batch_size, m_list, pairs, function_on_pairs, actions, rewards)
     :param m_list: (list) mini-batch list
     :param pairs: similar / dissimilar pairs
     :param function_on_pairs: (function) findDissimilar applied to pairs
-    :param actions: (numpy array)
-    :param rewards: (numpy array)
+    :param actions: (np.ndarray)
+    :param rewards: (np.ndarray)
     :return: (list, list) pairs, mini-batch list modified
     """
     # For a each minibatch_id
@@ -50,11 +50,11 @@ def findDissimilar(index, minibatch1, minibatch2, actions, rewards):
     check which samples should be dissimilar
     because they lead to different rewards after the same actions
     :param index: (int)
-    :param minibatch1: (numpy array)
-    :param minibatch2: (numpy array)
-    :param actions: (numpy array)
-    :param rewards: (numpy array)
-    :return: (dict, numpy array)
+    :param minibatch1: (np.ndarray)
+    :param minibatch2: (np.ndarray)
+    :param actions: (np.ndarray)
+    :param rewards: (np.ndarray)
+    :return: (dict, np.ndarray)
     """
     return np.where((actions[minibatch2] == actions[minibatch1[index]]) *
                     (rewards[minibatch2 + 1] != rewards[minibatch1[index] + 1]))[0]
@@ -65,9 +65,9 @@ def findSameActions(index, minibatch, actions):
     Get observations indices where the same action was performed
     as in a reference observation
     :param index: (int)
-    :param minibatch: (numpy array)
-    :param actions: (numpy array)
-    :return: (numpy array)
+    :param minibatch: (np.ndarray)
+    :param actions: (np.ndarray)
+    :return: (np.ndarray)
     """
     return np.where(actions[minibatch] == actions[minibatch[index]])[0]
 
@@ -77,11 +77,11 @@ def findPriorsPairs(batch_size, minibatchlist, actions, rewards, n_actions, n_pa
 
     :param batch_size: (int)
     :param minibatchlist: ([[int]])
-    :param actions: (numpy array)
-    :param rewards: (numpy array)
+    :param actions: (np.ndarray)
+    :param rewards: (np.ndarray)
     :param n_actions: (int)
     :param n_pairs_per_action: ([int])
-    :return: ([numpy array], [numpy array])
+    :return: ([np.ndarray], [np.ndarray])
     """
     dissimilar_pairs = [
         np.array(

@@ -22,8 +22,8 @@ class LinearAutoEncoder(BaseModelAutoEncoder):
 
     def encode(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         # Flatten input
         x = x.view(x.size(0), -1)
@@ -31,8 +31,8 @@ class LinearAutoEncoder(BaseModelAutoEncoder):
 
     def decode(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         return self.decoder(x)
 
@@ -66,8 +66,8 @@ class DenseAutoEncoder(BaseModelAutoEncoder):
 
     def encode(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         # Flatten input
         x = x.view(x.size(0), -1)
@@ -75,8 +75,8 @@ class DenseAutoEncoder(BaseModelAutoEncoder):
 
     def decode(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         return self.decoder(x)
 
@@ -101,8 +101,8 @@ class CNNAutoEncoder(BaseModelAutoEncoder):
 
     def encode(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         encoded = self.encoder_conv(x)
         encoded = encoded.view(encoded.size(0), -1)
@@ -110,8 +110,8 @@ class CNNAutoEncoder(BaseModelAutoEncoder):
 
     def decode(self, x):
         """
-        :param x: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param x: (th.Tensor)
+        :return: (th.Tensor)
         """
         decoded = self.decoder_fc(x)
         decoded = decoded.view(x.size(0), 64, 6, 6)

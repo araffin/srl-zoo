@@ -66,8 +66,8 @@ def roboticPriorsLoss(states, next_states, minibatch_idx,
     :param states: (th.Tensor)
     :param next_states: (th.Tensor)
     :param minibatch_idx: (int)
-    :param dissimilar_pairs: ([numpy array])
-    :param same_actions_pairs: ([numpy array])
+    :param dissimilar_pairs: ([np.ndarray])
+    :param same_actions_pairs: ([np.ndarray])
     :param weight: coefficient to weight the loss
     :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return: (th.Tensor)

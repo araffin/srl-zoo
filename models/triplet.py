@@ -33,8 +33,8 @@ class EmbeddingNet(BaseModelSRL):
 
     def getStates(self, observations):
         """
-        :param observations: (PyTorch Tensor)
-        :return: (PyTorch Tensor)
+        :param observations: (th.Tensor)
+        :return: (th.Tensor)
         """
         # For inference, the forward pass is done one the positive observation (first view)
         return self.forward(observations[:, :3:, :, :])

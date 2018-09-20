@@ -46,7 +46,7 @@ def plotRepresentation(states, rewards, name="Learned State Representation",
                        add_colorbar=True, path=None, fit_pca=False, cmap='coolwarm', true_states=None):
     """
     Plot learned state representation using rewards for coloring
-    :param states: (numpy array)
+    :param states: (np.ndarray)
     :param rewards: (numpy 1D array)
     :param name: (str)
     :param add_colorbar: (bool)
@@ -116,7 +116,7 @@ def plot3dRepresentation(states, rewards, name="Learned State Representation",
 def plotImage(image, name='Observation Sample'):
     """
     Display an image
-    :param image: (numpy tensor) (with values in [0, 1])
+    :param image: (np.ndarray) (with values in [0, 1])
     :param name: (str)
     """
     # Reorder channels
@@ -152,8 +152,8 @@ def prettyPlotAgainst(states, rewards, title="Representation", fit_pca=False, cm
     """
     State dimensions are plotted one against the other (it creates a matrix of 2d representation)
     using rewards for coloring, the diagonal is a distribution plot, and the scatter plots have a density outline.
-    :param states: (numpy tensor)
-    :param rewards: (numpy array)
+    :param states: (np.ndarray)
+    :param rewards: (np.ndarray)
     :param title: (str)
     :param fit_pca: (bool)
     :param cmap: (str)
@@ -213,8 +213,8 @@ def plotAgainst(states, rewards, title="Representation", fit_pca=False, cmap='co
     """
     State dimensions are plotted one against the other (it creates a matrix of 2d representation)
     using rewards for coloring
-    :param states: (numpy tensor)
-    :param rewards: (numpy array)
+    :param states: (np.ndarray)
+    :param rewards: (np.ndarray)
     :param title: (str)
     :param fit_pca: (bool)
     :param cmap: (str)
@@ -262,7 +262,7 @@ def plotCorrelation(states_rewards, ground_truth, target_positions, only_print=F
 
     :param states_rewards: (numpy dict)
     :param ground_truth: (numpy dict)
-    :param target_positions: (numpy array)
+    :param target_positions: (np.ndarray)
     :param only_print: (bool) only print the correlation mesurements (max of correlation for each of
         Ground Truth's dimension)
     :return: returns the max correlation for each of Ground Truth's dimension with the predicted states
@@ -335,6 +335,10 @@ if __name__ == '__main__':
         "You must specify a datafolder when using per-episode color"
     assert not (args.correlation and args.data_folder == ""), \
         "You must specify a datafolder when using the correlation plot"
+
+    # Force correlation plotting when `--print-cor` is passed
+    if args.print_corr:
+        args.correlation = True
 
     args.data_folder = parseDataFolder(args.data_folder)
 

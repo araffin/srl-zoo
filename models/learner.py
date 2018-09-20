@@ -67,8 +67,8 @@ class BaseLearner(object):
     def _predFn(self, observations):
         """
         Predict states in test mode given observations
-        :param observations: (PyTorch Tensor)
-        :return: (numpy tensor)
+        :param observations: (th.Tensor)
+        :return: (np.ndarray)
         """
         # Move the tensor back to the cpu
         return detachToNumpy(self.model.getStates(observations))
@@ -76,8 +76,8 @@ class BaseLearner(object):
     def predStatesWithDataLoader(self, data_loader):
         """
         Predict states using minibatches to avoid memory issues
-        :param data_loader: (Baxter Data Loader object)
-        :return: (numpy tensor)
+        :param data_loader: (DataLoader object)
+        :return: (np.ndarray)
         """
         predictions = []
         for obs_var in data_loader:
@@ -97,7 +97,8 @@ class BaseLearner(object):
     def saveStates(states, images_path, rewards, log_folder, name=""):
         """
         Save learned states to json and npz files
-        :param states: (numpy array)
+        
+        :param states: (np.ndarray)
         :param images_path: ([str])
         :param rewards: (rewards)
         :param log_folder: (str)
@@ -250,7 +251,7 @@ class SRL4robotics(BaseLearner):
         :param rewards: (numpy 1D array)
         :param episode_starts: (numpy 1D array) boolean array
                                 the ith index is True if one episode starts at this frame
-        :return: (numpy tensor) the learned states for the given observations
+        :return: (np.ndarray) the learned states for the given observations
         """
 
         print("\nYour are using the following weights for the losses:")

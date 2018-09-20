@@ -62,9 +62,9 @@ class SupervisedLearning(BaseLearner):
         """
         Learn a state representation
         :param images_path: (numpy 1D array)
-        :param true_states: (numpy tensor)
+        :param true_states: (np.ndarray)
         :param rewards: (numpy 1D array)
-        :return: (numpy tensor) the learned states for the given observations
+        :return: (np.ndarray) the learned states for the given observations
         """
         true_states = true_states.astype(np.float32)
         x_indices = np.arange(len(true_states)).astype(np.int64)
