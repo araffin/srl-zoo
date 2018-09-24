@@ -67,7 +67,7 @@ class BaseLearner(object):
     def _predFn(self, observations):
         """
         Predict states in test mode given observations
-        
+
         :param observations: (th.Tensor)
         :return: (np.ndarray)
         """
@@ -170,7 +170,7 @@ class SRL4robotics(BaseLearner):
             self.use_dae = "dae" in self.losses
             self.path_to_dae = path_to_dae
 
-            if isinstance(split_dimensions, dict) and sum(split_dimensions.values()) > 0:
+            if isinstance(split_dimensions, OrderedDict) and sum(split_dimensions.values()) > 0:
                 printYellow("Using splitted representation")
                 self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action,
                                              model_type=model_type, cuda=cuda, losses=losses,
