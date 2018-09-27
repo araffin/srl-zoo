@@ -1,4 +1,4 @@
-# State Representation Learning Zoo with PyTorch
+# State Representation Learning Zoo with PyTorch (part of S-RL Toolbox)
 
 A collection of State Representation Learning (SRL) methods for Reinforcement Learning, written using PyTorch.
 
@@ -17,6 +17,7 @@ Available methods:
 - **[experimental]** Reward Prior, Episode-prior, Perceptual Similarity loss (DARLA), Mutual Information loss
 
 Related papers:
+- "S-RL Toolbox: Environments, Datasets and Evaluation Metrics for State Representation Learning" (Raffin et al., 2018) [https://arxiv.org/abs/1809.09369](https://arxiv.org/abs/1809.09369)
 - "State Representation Learning for Control: An Overview" (Lesort et al., 2018), link: [https://arxiv.org/pdf/1802.04181.pdf](https://arxiv.org/pdf/1802.04181.pdf)
 - "Learning State Representations with Robotic Priors" (Jonschkowski and Brock, 2015), link: [http://tinyurl.com/gly9sma](http://tinyurl.com/gly9sma)
 
