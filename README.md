@@ -59,7 +59,7 @@ uses the distance between the reconstructed input and real input in the embeddin
 
 All possible arguments can be display using `python train.py --help`. You can limit the training set size (`--training-set-size` argument), change the minibatch size (`-bs`), number of epochs (`--epochs`), ...
 
-## Reak Robot Datasets
+## Datasets: Simulated Environments and Real Robots
 
 Although the data can be generated easily using the RL repo in simulation (cf [Generating Data](https://s-rl-toolbox.readthedocs.io/en/latest/guide/envs.html#generating-data)), we provide datasets with a real baxter:
 
