@@ -111,13 +111,13 @@ def loadData(data_folder):
 
     target_pos_ = []
     # True state is the relative position to the target
-    if relative_pos:
-        target_idx = -1
-        for i in range(len(episode_starts)):
-            if episode_starts[i] == 1:
-                target_idx += 1
+    target_idx = -1
+    for i in range(len(episode_starts)):
+        if episode_starts[i] == 1:
+            target_idx += 1
+        if relative_pos:
             true_states[i] -= target_positions[target_idx]
-            target_pos_.append(target_positions[target_idx])
+        target_pos_.append(target_positions[target_idx])
     target_pos_ = np.array(target_pos_)
 
     return training_data, ground_truth, true_states, target_pos_
