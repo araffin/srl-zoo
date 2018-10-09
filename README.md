@@ -2,6 +2,9 @@
 
 A collection of State Representation Learning (SRL) methods for Reinforcement Learning, written using PyTorch.
 
+S-RL Toolbox Documentation: https://s-rl-toolbox.readthedocs.io/en/latest/
+S-RL Toolbox Repository: https://github.com/araffin/robotics-rl-srl
+
 Available methods:
 
 - SRL with Robotic Priors + extensions (stereovision, additional priors)
