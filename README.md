@@ -2,20 +2,24 @@
 
 A collection of State Representation Learning (SRL) methods for Reinforcement Learning, written using PyTorch.
 
-S-RL Toolbox Documentation: https://s-rl-toolbox.readthedocs.io/en/latest/
+SRL Zoo Documentation: https://srl-zoo.readthedocs.io/
+
+S-RL Toolbox Documentation: https://s-rl-toolbox.readthedocs.io/
 
 S-RL Toolbox Repository: https://github.com/araffin/robotics-rl-srl
 
 Available methods:
 
-- SRL with Robotic Priors + extensions (stereovision, additional priors)
+- Autoencoder (reconstruction loss)
 - Denoising Autoencoder (DAE)
+- Forward Dynamics model
+- Inverse Dynamics model
+- Reward prediction loss
 - Variational Autoencoder (VAE) and beta-VAE
-- PCA
+- SRL with Robotic Priors + extensions (stereovision, additional priors)
 - Supervised Learning
-- Forward, Inverse Models
+- Principal Component Analysis (PCA)
 - Triplet Network (for stereovision only)
-- Reward loss
 - Combination and stacking of methods
 - Random Features
 - **[experimental]** Reward Prior, Episode-prior, Perceptual Similarity loss (DARLA), Mutual Information loss
@@ -23,6 +27,8 @@ Available methods:
 Related papers:
 - "S-RL Toolbox: Environments, Datasets and Evaluation Metrics for State Representation Learning" (Raffin et al., 2018) [https://arxiv.org/abs/1809.09369](https://arxiv.org/abs/1809.09369)
 - "State Representation Learning for Control: An Overview" (Lesort et al., 2018), link: [https://arxiv.org/pdf/1802.04181.pdf](https://arxiv.org/pdf/1802.04181.pdf)
+
+<a href="https://drive.google.com/file/d/153oxiwHyK2W9nU3avEi0b0O4qjo7WD0X/view"><img src="imgs/rl_toolboxplay.jpg"/></a>
 
 ## Documentation
 
