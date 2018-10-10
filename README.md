@@ -2,11 +2,14 @@
 
 A collection of State Representation Learning (SRL) methods for Reinforcement Learning, written using PyTorch.
 
+<img src="imgs/enjoy-latent-real-baxter.gif" align="right" width="50%"/>
+
 SRL Zoo Documentation: https://srl-zoo.readthedocs.io/
 
 S-RL Toolbox Documentation: https://s-rl-toolbox.readthedocs.io/
 
 S-RL Toolbox Repository: https://github.com/araffin/robotics-rl-srl
+
 
 Available methods:
 
