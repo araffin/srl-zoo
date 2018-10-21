@@ -13,38 +13,46 @@ model, you may use:
 
    python -m enjoy.enjoy_latent --log-dir logs/nameOfTheDataset/nameOfTheModel
 
-Create a report
+Create a Report
 ~~~~~~~~~~~~~~~
 
-After a report you can create a csv report file using:
+A report contains knn-mse, ground-truth correlation (GTC and GTC_mean) and information about each model present in a log folder.
+
+Create a csv report file using:
 
 ::
 
-   python evaluation/create_report.py -d logs/nameOfTheDataset/
+   python -m evaluation.gather_results -i logs/nameOfTheDataset/
+
 
 Plot a Learned Representation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ::
 
-   usage: representation_plot.py [-h] [-i INPUT_FILE] [--data-folder DATA_FOLDER]
-                                 [--color-episode] [--plot-against]
-                                 [--correlation] [--projection]
+  usage: representation_plot.py [-h] [-i INPUT_FILE] [--data-folder DATA_FOLDER]
+                                [--color-episode] [--plot-against]
+                                [--pretty-plot-against] [--correlation]
+                                [--projection] [--print-corr]
 
-   Plotting script for representation
+  Plotting script for representation
 
-   optional arguments:
-     -h, --help            show this help message and exit
-     -i INPUT_FILE, --input-file INPUT_FILE
-                           Path to a npz file containing states and rewards
-     --data-folder DATA_FOLDER
-                           Path to a dataset folder, it will plot ground truth
-                           states
-     --color-episode       Color states per episodes instead of reward
-     --plot-against        Plot against each dimension
-     --correlation         Plot the Pearson Matrix of correlation between the Ground truth and learned states.
-     --projection          Plot 1D projection of predicted state on ground truth
-     --print-corr          Only print correlation measurements values (together with --correlation option)
+  optional arguments:
+    -h, --help            show this help message and exit
+    -i INPUT_FILE, --input-file INPUT_FILE
+                          Path to a npz file containing states and rewards
+    --data-folder DATA_FOLDER
+                          Path to a dataset folder, it will plot ground truth
+                          states
+    --color-episode       Color states per episodes instead of reward
+    --plot-against        Plot against each dimension
+    --pretty-plot-against
+                          Plot against each dimension (diagonals are
+                          distributions + cleaner look)
+    --correlation         Plot correlation coeff against each dimension
+    --projection          Plot 1D projection of predicted state on ground truth
+    --print-corr          Only print correlation measurements
+
 
 You can plot a learned representation with:
 
@@ -74,10 +82,8 @@ truth states:
 
    python -m plotting.representation_plot -i path/to/states_rewards.npz --data-folder path/to/datasetFolder/ --correlation
 
-**[Experimental evaluation metric]** Plotting a vector of maximum
-correlation (with the ground truth states) and a normalized scalar to
-assess the disentanglement of the states learned and their global
-quality:
+**[Ground Truth Correlation]** It measures the maximum correlation (in absolute value) in the learned representation
+for each dimension of the ground truth states. GTC_mean is the mean of the GTC vector. :
 
 ::
 
@@ -138,4 +144,4 @@ Example:
 
 ::
 
-   python plotting/knn_images.py --log-folder path/to/an/experiment/log/folder
+   python evaluation/knn_images.py --log-folder path/to/an/experiment/log/folder

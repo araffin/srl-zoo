@@ -302,7 +302,7 @@ def plotCorrelation(states_rewards, ground_truth, target_positions, only_print=F
     # Printing the max correlation for each of Ground Truth's dimension with the predicted states
     # as well as the mean
     correlation_scalar = sum(correlation_max_vector)
-    print("\nCorrelation value of the model's prediction with the Ground Truth:\n Max correlation vector: {}"
+    print("\nCorrelation value of the model's prediction with the Ground Truth:\n Max correlation vector (GTC): {}"
           "\n Mean : {:.2f}".format(correlation_max_vector, correlation_scalar / len(correlation_max_vector)))
     if not only_print:
         pauseOrClose(fig)
