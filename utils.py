@@ -101,6 +101,7 @@ def loadData(data_folder):
     episode_starts = training_data['episode_starts']
 
     ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
+
     # Backward compatibility with previous names
     true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
     target_positions = \

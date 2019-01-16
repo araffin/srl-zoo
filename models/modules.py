@@ -15,7 +15,7 @@ except ImportError:
 
 
 class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
-    def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn", losses=None,
+    def __init__(self, state_dim=2, action_dim=6, n_action=6, cuda=False, model_type="custom_cnn", losses=None,
                  inverse_model_type="linear"):
         """
         A model that can combine AE/VAE + Inverse + Forward + Reward models
@@ -34,7 +34,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         self.cuda = cuda
 
-        self.initForwardNet(state_dim, action_dim)
+        self.initForwardNet(state_dim, action_dim, n_action)
         self.initInverseNet(state_dim, action_dim, model_type=inverse_model_type)
         self.initRewardNet(state_dim)
 
@@ -101,7 +101,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
 
 class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
-    def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn",
+    def __init__(self, state_dim=2, action_dim=6, n_action=6, cuda=False, model_type="custom_cnn",
                  losses=None, split_dimensions=None, n_hidden_reward=16, inverse_model_type="linear"):
         """
         A model that can split representation, combining
@@ -137,7 +137,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         self.cuda = cuda
         self.state_dim = state_dim
 
-        self.initForwardNet(self.state_dim, action_dim)
+        self.initForwardNet(self.state_dim, action_dim, n_action)
         self.initInverseNet(self.state_dim, action_dim, model_type=inverse_model_type)
         self.initRewardNet(self.state_dim, n_hidden=n_hidden_reward)
 

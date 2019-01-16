@@ -135,6 +135,7 @@ class SRL4robotics(BaseLearner):
     :param losses: ([str])
     :param losses_weights_dict: (OrderedDict)
     :param n_actions: (int)
+    :param dim_action: (int)
     :param beta: (float) for beta-vae
     :param split_dimensions:
     :param path_to_dae: (str) path to pre-trained DAE when using perceptual loss
@@ -144,14 +145,15 @@ class SRL4robotics(BaseLearner):
 
     def __init__(self, state_dim, model_type="resnet", inverse_model_type="linear", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, l2_reg=0.0, cuda=False,
-                 multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1,
+                 multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, dim_actions=6, beta=1,
                  split_dimensions=-1, path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
         self.multi_view = multi_view
         self.losses = losses
-        self.dim_action = n_actions
+        self.n_actions = n_actions
+        self.dim_action = dim_actions
         self.beta = beta
         self.denoiser = None
 
@@ -172,11 +174,11 @@ class SRL4robotics(BaseLearner):
 
             if isinstance(split_dimensions, OrderedDict) and sum(split_dimensions.values()) > 0:
                 printYellow("Using splitted representation")
-                self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action,
+                self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action, n_action=self.n_actions,
                                              model_type=model_type, cuda=cuda, losses=losses,
                                              split_dimensions=split_dimensions, inverse_model_type=inverse_model_type)
             else:
-                self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
+                self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, n_action=self.n_actions, model_type=model_type,
                                         cuda=cuda, losses=losses, inverse_model_type=inverse_model_type)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
@@ -239,6 +241,7 @@ class SRL4robotics(BaseLearner):
         state_dim = exp_config['state-dim']
         losses = exp_config['losses']
         n_actions = exp_config['n_actions']
+        dim_actions = exp_config['dim_actions'] # redundant in the discrete case
         model_type = exp_config['model-type']
         multi_view = exp_config.get('multi-view', False)
         split_dimensions = exp_config.get('split-dimensions', -1)
@@ -250,7 +253,7 @@ class SRL4robotics(BaseLearner):
         assert set(losses).intersection(valid_models) != set(), "Error: Not supported losses " + ", ".join(difference)
 
         srl_model = SRL4robotics(state_dim, model_type=model_type, cuda=cuda, multi_view=multi_view,
-                                 losses=losses, n_actions=n_actions, split_dimensions=split_dimensions,
+                                 losses=losses, n_actions=n_actions, dim_actions=dim_actions, split_dimensions=split_dimensions,
                                  inverse_model_type=inverse_model_type, occlusion_percentage=occlusion_percentage)
         srl_model.model.load_state_dict(th.load(model_path))
 
@@ -297,20 +300,28 @@ class SRL4robotics(BaseLearner):
         assert n_val_batches > 0, "Not enough sample to create a validation set"
 
         # Stats about actions
-        action_set = set(actions)
-        n_actions = int(np.max(actions) + 1)
-        print("{} unique actions / {} actions".format(len(action_set), n_actions))
-        n_pairs_per_action = np.zeros(n_actions, dtype=np.int64)
-        n_obs_per_action = np.zeros(n_actions, dtype=np.int64)
+        if self.n_actions != np.inf:
+            print('Discrete action space:')
+            action_set = set(actions)
+            n_actions = int(np.max(actions) + 1)
+            print("{} unique actions / {} actions".format(len(action_set), n_actions))
+            n_pairs_per_action = np.zeros(n_actions, dtype=np.int64)
+            n_obs_per_action = np.zeros(n_actions, dtype=np.int64)
+            for i in range(n_actions):
+                n_obs_per_action[i] = np.sum(actions == i)
 
-        for i in range(n_actions):
-            n_obs_per_action[i] = np.sum(actions == i)
+                print("Number of observations per action")
+                print(n_obs_per_action)
 
-        print("Number of observations per action")
-        print(n_obs_per_action)
+        else:
+            print('Continuous action space:')
+            print('Action dimension: {}'.format(self.dim_action))
 
         dissimilar_pairs, same_actions_pairs = None, None
         if not self.no_priors:
+            if self.n_actions == np.inf:
+                print('This option (priors) doesnt support continuous action space for now !')
+
             dissimilar_pairs, same_actions_pairs = findPriorsPairs(self.batch_size, minibatchlist, actions, rewards,
                                                                    n_actions, n_pairs_per_action)
 
@@ -425,6 +436,9 @@ class SRL4robotics(BaseLearner):
                     l2Loss(loss_manager.reg_params, self.losses_weights_dict['l2_reg'], loss_manager)
 
                 if not self.no_priors:
+                    if self.n_actions == np.inf:
+                        print('This option (priors) doesnt support continuous action space for now !')
+
                     roboticPriorsLoss(states, next_states, minibatch_idx=minibatch_idx,
                                       dissimilar_pairs=dissimilar_pairs, same_actions_pairs=same_actions_pairs,
                                       weight=self.losses_weights_dict['priors'], loss_manager=loss_manager)

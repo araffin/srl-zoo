@@ -11,8 +11,9 @@ class BaseForwardModel(BaseModelSRL):
         self.forward_net = None
         super(BaseForwardModel, self).__init__()
 
-    def initForwardNet(self, state_dim, action_dim):
+    def initForwardNet(self, state_dim, action_dim, n_action):
         self.action_dim = action_dim
+        self.n_action = n_action
         self.forward_net = nn.Linear(state_dim + action_dim, state_dim)
 
     def forward(self, x):
@@ -27,7 +28,13 @@ class BaseForwardModel(BaseModelSRL):
         """
         # Predict the delta between the next state and current state
         # by taking as input concatenation of state & action over the 2nd dimension
-        concat = torch.cat((state, encodeOneHot(action, self.action_dim)), dim=1)
+
+        if self.n_action != np.inf:
+            # Discrete action
+            concat = torch.cat((state, encodeOneHot(action, self.action_dim)), dim=1)
+        else:
+            concat = torch.cat((state, action), dim=1)
+
         return state + self.forward_net(concat)
 
 
