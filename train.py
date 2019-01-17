@@ -65,8 +65,7 @@ if __name__ == '__main__':
                         help='state dimension of the pre-trained dae (default: 200)')
     parser.add_argument('--occlusion-percentage', type=float, default=0.5,
                         help='Max percentage of input occlusion for masks when using DAE')
-    parser.add_argument('--dim-continuous-action', type=int, default=0,
-                        help='Dimension of action space, needed for continuous setup (if 0, discrete)')
+    parser.add_argument('--continuous-action', action='store_true', default=False, help='Allow action space to be continous')
 
 
 
@@ -143,17 +142,19 @@ if __name__ == '__main__':
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
     actions = training_data['actions']
 
-    #TODO: Change this part with following:
-    ## - add bool continuous/discrete
-    ## - infer dim_action from data
-
-    if args.dim_continuous_action == 0:
+    if not args.continuous_action:
         # Action is discrete, get number of actions from dataset
         # We assume actions are integers
         n_actions = int(np.max(actions) + 1)
-        args.dim_continuous_action = n_actions
     else:
-        n_actions = np.inf # TODO: in the future, get authorized range for actions ?
+        try:
+            # get dimension of action space from data, if an action is a list:
+            # WARNING: assume that data is stated as a list of list, each action being a list
+            n_actions = len(actions[0])
+        except TypeError:
+            # Else, there is only one dimension
+            n_actions = 1
+
 
 
 
@@ -177,9 +178,8 @@ if __name__ == '__main__':
 
     exp_config['log-folder'] = args.log_folder
     exp_config['experiment-name'] = experiment_name
-    # TODO: need to store both ? Store bool for continuous/discrete
     exp_config['n_actions'] = n_actions
-    exp_config['dim_actions'] = args.dim_continuous_action # redundant in the discrete case
+    exp_config['continuous_action'] = args.continuous_action
     exp_config['multi-view'] = args.multi_view
 
     if "dae" in losses:
@@ -193,7 +193,8 @@ if __name__ == '__main__':
                        seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, l2_reg=args.l2_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, dim_actions=args.dim_continuous_action,
+                       losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions,
+                       continuous_action=args.continuous_action,
                        beta=args.beta, split_dimensions=split_dimensions, path_to_dae=args.path_to_dae,
                        state_dim_dae=args.state_dim_dae, occlusion_percentage=args.occlusion_percentage)
 

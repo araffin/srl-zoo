@@ -15,8 +15,8 @@ except ImportError:
 
 
 class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
-    def __init__(self, state_dim=2, action_dim=6, n_action=6, cuda=False, model_type="custom_cnn", losses=None,
-                 inverse_model_type="linear"):
+    def __init__(self, state_dim=2, action_dim=6, continuous_action=False, cuda=False,
+                 model_type="custom_cnn", losses=None, inverse_model_type="linear"):
         """
         A model that can combine AE/VAE + Inverse + Forward + Reward models
         :param state_dim: (int)
@@ -34,7 +34,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         self.cuda = cuda
 
-        self.initForwardNet(state_dim, action_dim, n_action)
+        self.initForwardNet(state_dim, action_dim, continuous_action)
         self.initInverseNet(state_dim, action_dim, model_type=inverse_model_type)
         self.initRewardNet(state_dim)
 

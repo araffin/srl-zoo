@@ -114,7 +114,7 @@ def forwardModelLoss(next_states_pred, next_states, weight, loss_manager):
     return weight * forward_loss
 
 
-def inverseModelLoss(actions_pred, actions_st, weight, loss_manager):
+def inverseModelLoss(actions_pred, actions_st, weight, loss_manager, continuous_action=False):
     """
     Inverse model's loss: Cross-entropy between predicted categoriacal actions and true actions
     :param actions_pred: (th.Tensor)
@@ -123,8 +123,13 @@ def inverseModelLoss(actions_pred, actions_st, weight, loss_manager):
     :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return:
     """
-    loss_fn = nn.CrossEntropyLoss()
-    inverse_loss = loss_fn(actions_pred, actions_st.squeeze(1))
+    if continuous_action:
+        loss_fn = nn.MSELoss()
+        inverse_loss = loss_fn(actions_pred, actions_st)
+    else:
+        loss_fn = nn.CrossEntropyLoss()
+        inverse_loss = loss_fn(actions_pred, actions_st.squeeze(1))
+
     loss_manager.addToLosses('inverse_loss', weight, inverse_loss)
     return weight * inverse_loss
 

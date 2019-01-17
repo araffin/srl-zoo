@@ -145,16 +145,15 @@ class SRL4robotics(BaseLearner):
 
     def __init__(self, state_dim, model_type="resnet", inverse_model_type="linear", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, l2_reg=0.0, cuda=False,
-                 multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, dim_actions=6, beta=1,
+                 multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, continuous_action=False, beta=1,
                  split_dimensions=-1, path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
 
         self.multi_view = multi_view
         self.losses = losses
-        # TODO: Check which is needed, get bool
-        self.n_actions = n_actions
-        self.dim_action = dim_actions
+        self.dim_action = n_actions
+        self.continuous_action = continuous_action
         self.beta = beta
         self.denoiser = None
 
@@ -175,11 +174,12 @@ class SRL4robotics(BaseLearner):
 
             if isinstance(split_dimensions, OrderedDict) and sum(split_dimensions.values()) > 0:
                 printYellow("Using splitted representation")
-                self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action, n_action=self.n_actions,
+                self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action,
                                              model_type=model_type, cuda=cuda, losses=losses,
                                              split_dimensions=split_dimensions, inverse_model_type=inverse_model_type)
             else:
-                self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, n_action=self.n_actions, model_type=model_type,
+                self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action,
+                                        continuous_action=self.continuous_action, model_type=model_type,
                                         cuda=cuda, losses=losses, inverse_model_type=inverse_model_type)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
@@ -242,7 +242,7 @@ class SRL4robotics(BaseLearner):
         state_dim = exp_config['state-dim']
         losses = exp_config['losses']
         n_actions = exp_config['n_actions']
-        dim_actions = exp_config['dim_actions'] # redundant in the discrete case
+        continuous_action = exp_config['continuous_action']
         model_type = exp_config['model-type']
         multi_view = exp_config.get('multi-view', False)
         split_dimensions = exp_config.get('split-dimensions', -1)
@@ -254,8 +254,9 @@ class SRL4robotics(BaseLearner):
         assert set(losses).intersection(valid_models) != set(), "Error: Not supported losses " + ", ".join(difference)
 
         srl_model = SRL4robotics(state_dim, model_type=model_type, cuda=cuda, multi_view=multi_view,
-                                 losses=losses, n_actions=n_actions, dim_actions=dim_actions, split_dimensions=split_dimensions,
-                                 inverse_model_type=inverse_model_type, occlusion_percentage=occlusion_percentage)
+                                 losses=losses, n_actions=n_actions, continuous_action=continuous_action,
+                                 split_dimensions=split_dimensions, inverse_model_type=inverse_model_type,
+                                 occlusion_percentage=occlusion_percentage)
         srl_model.model.load_state_dict(th.load(model_path))
 
         return srl_model, exp_config
@@ -300,8 +301,8 @@ class SRL4robotics(BaseLearner):
         print("{} minibatches for validation, {} samples".format(n_val_batches, n_val_batches * BATCH_SIZE))
         assert n_val_batches > 0, "Not enough sample to create a validation set"
 
-        # Stats about actions # TODO: change with bool
-        if self.n_actions != np.inf:
+        # Stats about actions
+        if not self.continuous_action:
             print('Discrete action space:')
             action_set = set(actions)
             n_actions = int(np.max(actions) + 1)
@@ -316,12 +317,11 @@ class SRL4robotics(BaseLearner):
 
         else:
             print('Continuous action space:')
-            print('Action dimension: {}'.format(self.dim_action))
+            print('Action dimension: {}'.format(self.n_actions))
 
         dissimilar_pairs, same_actions_pairs = None, None
         if not self.no_priors:
-            # TODO: change with bool
-            if self.n_actions == np.inf:
+            if self.continuous_action:
                 print('This option (priors) doesnt support continuous action space for now !')
 
             dissimilar_pairs, same_actions_pairs = findPriorsPairs(self.batch_size, minibatchlist, actions, rewards,
@@ -351,7 +351,6 @@ class SRL4robotics(BaseLearner):
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
-        # TODO: declaration of LossManager
         loss_manager = LossManager(self.model, loss_history)
 
         best_error = np.inf
@@ -456,7 +455,7 @@ class SRL4robotics(BaseLearner):
                 if self.use_inverse_loss:
                     actions_pred = self.model.inverseModel(states, next_states)
                     inverseModelLoss(actions_pred, actions_st, weight=self.losses_weights_dict['inverse'],
-                                     loss_manager=loss_manager)
+                                     loss_manager=loss_manager, continuous_action=self.continuous_action)
 
                 if self.use_reward_loss:
                     rewards_st = rewards[minibatchlist[minibatch_idx]].copy()
