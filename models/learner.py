@@ -317,7 +317,7 @@ class SRL4robotics(BaseLearner):
 
         else:
             print('Continuous action space:')
-            print('Action dimension: {}'.format(self.n_actions))
+            print('Action dimension: {}'.format(self.dim_action))
 
         dissimilar_pairs, same_actions_pairs = None, None
         if not self.no_priors:

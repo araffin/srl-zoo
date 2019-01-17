@@ -34,7 +34,8 @@ class BaseForwardModel(BaseModelSRL):
             # Discrete action
             concat = torch.cat((state, encodeOneHot(action, self.action_dim)), dim=1)
         else:
-            concat = torch.cat((state, action), dim=1)
+            # TODO: check why cast to FloatTensor is needed
+            concat = torch.cat((state, action.type(torch.cuda.FloatTensor)), dim=1)
 
         return state + self.forward_net(concat)
 
@@ -75,7 +76,6 @@ class BaseInverseModel(BaseModelSRL):
         :return: probability of each action
         """
         # input: concatenation of state & next state over the 2nd dimension
-        print(state, next_state)
         return self.inverse_net(th.cat((state, next_state), dim=1))
 
 
