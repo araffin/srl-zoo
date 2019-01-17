@@ -152,6 +152,7 @@ class SRL4robotics(BaseLearner):
 
         self.multi_view = multi_view
         self.losses = losses
+        # TODO: Check which is needed, get bool
         self.n_actions = n_actions
         self.dim_action = dim_actions
         self.beta = beta
@@ -299,7 +300,7 @@ class SRL4robotics(BaseLearner):
         print("{} minibatches for validation, {} samples".format(n_val_batches, n_val_batches * BATCH_SIZE))
         assert n_val_batches > 0, "Not enough sample to create a validation set"
 
-        # Stats about actions
+        # Stats about actions # TODO: change with bool
         if self.n_actions != np.inf:
             print('Discrete action space:')
             action_set = set(actions)
@@ -310,8 +311,8 @@ class SRL4robotics(BaseLearner):
             for i in range(n_actions):
                 n_obs_per_action[i] = np.sum(actions == i)
 
-                print("Number of observations per action")
-                print(n_obs_per_action)
+            print("Number of observations per action")
+            print(n_obs_per_action)
 
         else:
             print('Continuous action space:')
@@ -319,6 +320,7 @@ class SRL4robotics(BaseLearner):
 
         dissimilar_pairs, same_actions_pairs = None, None
         if not self.no_priors:
+            # TODO: change with bool
             if self.n_actions == np.inf:
                 print('This option (priors) doesnt support continuous action space for now !')
 
@@ -349,6 +351,7 @@ class SRL4robotics(BaseLearner):
         # TRAINING -----------------------------------------------------------------------------------------------------
         loss_history = defaultdict(list)
 
+        # TODO: declaration of LossManager
         loss_manager = LossManager(self.model, loss_history)
 
         best_error = np.inf
@@ -443,6 +446,7 @@ class SRL4robotics(BaseLearner):
                                       dissimilar_pairs=dissimilar_pairs, same_actions_pairs=same_actions_pairs,
                                       weight=self.losses_weights_dict['priors'], loss_manager=loss_manager)
 
+                # TODO change here to classic call (forward and backward)
                 if self.use_forward_loss:
                     next_states_pred = self.model.forwardModel(states, actions_st)
                     forwardModelLoss(next_states_pred, next_states,

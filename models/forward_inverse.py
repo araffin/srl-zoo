@@ -1,6 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
 import torch
+import numpy as np
 
 from .models import *
 
@@ -74,6 +75,7 @@ class BaseInverseModel(BaseModelSRL):
         :return: probability of each action
         """
         # input: concatenation of state & next state over the 2nd dimension
+        print(state, next_state)
         return self.inverse_net(th.cat((state, next_state), dim=1))
 
 

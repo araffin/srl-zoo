@@ -143,11 +143,13 @@ if __name__ == '__main__':
     rewards, episode_starts = training_data['rewards'], training_data['episode_starts']
     actions = training_data['actions']
 
-    #TODO: change here with continuous actions
-    # We assume actions are integers
+    #TODO: Change this part with following:
+    ## - add bool continuous/discrete
+    ## - infer dim_action from data
 
     if args.dim_continuous_action == 0:
         # Action is discrete, get number of actions from dataset
+        # We assume actions are integers
         n_actions = int(np.max(actions) + 1)
         args.dim_continuous_action = n_actions
     else:
@@ -175,6 +177,7 @@ if __name__ == '__main__':
 
     exp_config['log-folder'] = args.log_folder
     exp_config['experiment-name'] = experiment_name
+    # TODO: need to store both ? Store bool for continuous/discrete
     exp_config['n_actions'] = n_actions
     exp_config['dim_actions'] = args.dim_continuous_action # redundant in the discrete case
     exp_config['multi-view'] = args.multi_view
@@ -185,6 +188,7 @@ if __name__ == '__main__':
 
     print('Learning a state representation ... ')
 
+    # TODO: Need to check what to pass through
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, inverse_model_type=args.inverse_model_type,
                        seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
