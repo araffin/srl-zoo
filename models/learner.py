@@ -428,7 +428,12 @@ class SRL4robotics(BaseLearner):
 
                 # Actions associated to the observations of the current minibatch
                 actions_st = actions[minibatchlist[minibatch_idx]]
-                actions_st = th.from_numpy(actions_st).view(-1, 1).requires_grad_(False).to(self.device)
+                if not self.continuous_action:
+                    # Discrete actions, rearrange action to have n_minibatch ligns and one column, containing the int action
+                    actions_st = th.from_numpy(actions_st).view(-1, 1).requires_grad_(False).to(self.device)
+                else:
+                    # Continuous actions, rearrange action to have n_minibatch ligns and dim_action columns
+                    actions_st = th.from_numpy(actions_st).view(-1, self.dim_action).requires_grad_(False).to(self.device)
 
                 # L1 regularization
                 if self.losses_weights_dict['l1_reg'] > 0:

@@ -35,7 +35,7 @@ class BaseForwardModel(BaseModelSRL):
             concat = torch.cat((state, encodeOneHot(action, self.action_dim)), dim=1)
         else:
             # TODO: check why cast to FloatTensor is needed
-            concat = torch.cat((state, action.type(torch.cuda.FloatTensor)), dim=1)
+            concat = torch.cat((state, action.type(torch.FloatTensor)), dim=1)
 
         return state + self.forward_net(concat)
 
