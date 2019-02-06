@@ -442,8 +442,7 @@ class SRL4robotics(BaseLearner):
 
                 if self.use_reward_loss:
                     rewards_st = rewards[minibatchlist[minibatch_idx]].copy()
-                    # Removing negative reward
-                    rewards_st[rewards_st == -1] = 0
+                    #rewards are recoded here if recode option is on
                     rewards_st = th.from_numpy(rewards_st).to(self.device)
                     rewards_pred = self.model.rewardModel(states, next_states)
                     rewardModelLoss(rewards_pred, rewards_st.long(), weight=self.losses_weights_dict['reward'],

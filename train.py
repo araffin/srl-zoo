@@ -65,7 +65,8 @@ if __name__ == '__main__':
                         help='state dimension of the pre-trained dae (default: 200)')
     parser.add_argument('--occlusion-percentage', type=float, default=0.5,
                         help='Max percentage of input occlusion for masks when using DAE')
-
+    parser.add_argument('--recode-discrete-reward', action='store_true', default=False, 
+                        help="label the discrete reward to 0, 1, 2 ..., make it possible for classification")
     args = parser.parse_args()
     args.cuda = not args.no_cuda and th.cuda.is_available()
     args.data_folder = parseDataFolder(args.data_folder)
@@ -169,6 +170,14 @@ if __name__ == '__main__':
     print('Log folder: {}'.format(args.log_folder))
 
     print('Learning a state representation ... ')
+
+    if args.recode_discrete_reward:
+        rewards_set = np.unique(rewards) # all possible rewards
+        rewards_label_map = {} # the map from real reward to reward label
+        for i, id in enumerate(rewards_set):
+            rewards_label_map[id] = i
+            print("rewards: {} maps to label: {}".format(id, i))
+        rewards = np.array(list(map(lambda x: rewards_label_map[x], rewards)))
 
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, inverse_model_type=args.inverse_model_type,
                        seed=args.seed,
