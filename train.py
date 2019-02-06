@@ -173,18 +173,24 @@ if __name__ == '__main__':
 
     if args.recode_discrete_reward:
         rewards_set = np.unique(rewards) # all possible rewards
+        n_rewards = rewards_set.shape[0]
         rewards_label_map = {} # the map from real reward to reward label
         for i, id in enumerate(rewards_set):
             rewards_label_map[id] = i
             print("rewards: {} maps to label: {}".format(id, i))
         rewards = np.array(list(map(lambda x: rewards_label_map[x], rewards)))
+    else:
+        # by default, put negative reward to zero, positive reward to one
+        rewards = np.array(list(map(lambda x: 0 if x <= 0 else 1, rewards)))
+        n_rewards = 2 
+        
 
     srl = SRL4robotics(args.state_dim, model_type=args.model_type, inverse_model_type=args.inverse_model_type,
                        seed=args.seed,
                        log_folder=args.log_folder, learning_rate=args.learning_rate,
                        l1_reg=args.l1_reg, l2_reg=args.l2_reg, cuda=args.cuda, multi_view=args.multi_view,
-                       losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, beta=args.beta,
-                       split_dimensions=split_dimensions, path_to_dae=args.path_to_dae,
+                       losses=losses, losses_weights_dict=losses_weights_dict, n_actions=n_actions, n_rewards=n_rewards,
+                       beta=args.beta, split_dimensions=split_dimensions, path_to_dae=args.path_to_dae,
                        state_dim_dae=args.state_dim_dae, occlusion_percentage=args.occlusion_percentage)
 
     if args.training_set_size > 0:

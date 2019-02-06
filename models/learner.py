@@ -135,6 +135,7 @@ class SRL4robotics(BaseLearner):
     :param losses: ([str])
     :param losses_weights_dict: (OrderedDict)
     :param n_actions: (int)
+    :param n_rewards: (int)
     :param beta: (float) for beta-vae
     :param split_dimensions:
     :param path_to_dae: (str) path to pre-trained DAE when using perceptual loss
@@ -144,7 +145,7 @@ class SRL4robotics(BaseLearner):
 
     def __init__(self, state_dim, model_type="resnet", inverse_model_type="linear", log_folder="logs/default",
                  seed=1, learning_rate=0.001, l1_reg=0.0, l2_reg=0.0, cuda=False,
-                 multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, beta=1,
+                 multi_view=False, losses=None, losses_weights_dict=None, n_actions=6, n_rewards=2, beta=1,
                  split_dimensions=-1, path_to_dae=None, state_dim_dae=200, occlusion_percentage=None):
 
         super(SRL4robotics, self).__init__(state_dim, BATCH_SIZE, seed, cuda)
@@ -152,6 +153,7 @@ class SRL4robotics(BaseLearner):
         self.multi_view = multi_view
         self.losses = losses
         self.dim_action = n_actions
+        self.reward_dim = n_rewards
         self.beta = beta
         self.denoiser = None
 
@@ -172,11 +174,12 @@ class SRL4robotics(BaseLearner):
 
             if isinstance(split_dimensions, OrderedDict) and sum(split_dimensions.values()) > 0:
                 printYellow("Using splitted representation")
-                self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action,
+                self.model = SRLModulesSplit(state_dim=self.state_dim, action_dim=self.dim_action, reward_dim=self.reward_dim,
                                              model_type=model_type, cuda=cuda, losses=losses,
                                              split_dimensions=split_dimensions, inverse_model_type=inverse_model_type)
             else:
-                self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, model_type=model_type,
+                self.model = SRLModules(state_dim=self.state_dim, action_dim=self.dim_action, reward_dim=self.reward_dim,
+                                         model_type=model_type,
                                         cuda=cuda, losses=losses, inverse_model_type=inverse_model_type)
         else:
             raise ValueError("Unknown model: {}".format(model_type))
@@ -442,7 +445,7 @@ class SRL4robotics(BaseLearner):
 
                 if self.use_reward_loss:
                     rewards_st = rewards[minibatchlist[minibatch_idx]].copy()
-                    #rewards are recoded here if recode option is on
+                    
                     rewards_st = th.from_numpy(rewards_st).to(self.device)
                     rewards_pred = self.model.rewardModel(states, next_states)
                     rewardModelLoss(rewards_pred, rewards_st.long(), weight=self.losses_weights_dict['reward'],

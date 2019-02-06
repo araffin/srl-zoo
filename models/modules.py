@@ -15,12 +15,13 @@ except ImportError:
 
 
 class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
-    def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn", losses=None,
+    def __init__(self, state_dim=2, action_dim=6, reward_dim=2, cuda=False, model_type="custom_cnn", losses=None,
                  inverse_model_type="linear"):
         """
         A model that can combine AE/VAE + Inverse + Forward + Reward models
         :param state_dim: (int)
         :param action_dim: (int)
+        :param reward_dim: (int)
         :param cuda: (bool)
         :param model_type: (str)
         :param losses: ([str])
@@ -36,7 +37,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         self.initForwardNet(state_dim, action_dim)
         self.initInverseNet(state_dim, action_dim, model_type=inverse_model_type)
-        self.initRewardNet(state_dim)
+        self.initRewardNet(state_dim, n_rewards=reward_dim)
 
         # Architecture
         if model_type == "custom_cnn":
@@ -101,7 +102,7 @@ class SRLModules(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
 
 class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
-    def __init__(self, state_dim=2, action_dim=6, cuda=False, model_type="custom_cnn",
+    def __init__(self, state_dim=2, action_dim=6, reward_dim=2, cuda=False, model_type="custom_cnn",
                  losses=None, split_dimensions=None, n_hidden_reward=16, inverse_model_type="linear"):
         """
         A model that can split representation, combining
@@ -109,6 +110,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
         Reward model is learned for all the dimensions
         :param state_dim: (int)
         :param action_dim: (int)
+        :param reward_dim: (int)
         :param cuda: (bool)
         :param model_type: (str)
         :param losses: ([str])
@@ -139,7 +141,7 @@ class SRLModulesSplit(BaseForwardModel, BaseInverseModel, BaseRewardModel):
 
         self.initForwardNet(self.state_dim, action_dim)
         self.initInverseNet(self.state_dim, action_dim, model_type=inverse_model_type)
-        self.initRewardNet(self.state_dim, n_hidden=n_hidden_reward)
+        self.initRewardNet(self.state_dim, n_rewards=reward_dim, n_hidden=n_hidden_reward)
 
         # Architecture
         if model_type == "custom_cnn":
