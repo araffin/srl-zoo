@@ -128,6 +128,10 @@ class DataLoader(object):
 
     def _run(self):
         start = True
+        is_data_in_the_path = False
+        if self.images_path[0][:5] == "data/":
+            is_data_in_the_path = True
+            
         with Parallel(n_jobs=self.n_workers, batch_size="auto", backend="threading") as parallel:
             while start or self.infinite_loop:
                 start = False
@@ -147,23 +151,25 @@ class DataLoader(object):
                         images = self.images_path[self.minibatchlist[minibatch_idx]]
 
                     if self.n_workers <= 1:
-                        batch = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets)
+                        batch = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets, is_data_in_the_path=is_data_in_the_path)
                                  for image_path in images]
                         if self.apply_occlusion:
                             batch_noisy = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets,
                                                                   apply_occlusion=self.apply_occlusion,
-                                                                  occlusion_percentage=self.occlusion_percentage)
+                                                                  occlusion_percentage=self.occlusion_percentage,
+                                                                  is_data_in_the_path=is_data_in_the_path)
                                            for image_path in images]
 
                     else:
                         batch = parallel(
-                            delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets)
+                            delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets, is_data_in_the_path=is_data_in_the_path)
                             for image_path in images)
                         if self.apply_occlusion:
                             batch_noisy = parallel(
                                 delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets,
                                                                 apply_occlusion=self.apply_occlusion,
-                                                                occlusion_percentage=self.occlusion_percentage)
+                                                                occlusion_percentage=self.occlusion_percentage,
+                                                                is_data_in_the_path=is_data_in_the_path)
                                 for image_path in images)
 
                     batch = th.cat(batch, dim=0)
@@ -194,15 +200,20 @@ class DataLoader(object):
 
     @classmethod
     def _makeBatchElement(cls, image_path, multi_view=False, use_triplets=False, apply_occlusion=False,
-                          occlusion_percentage=None):
+                          occlusion_percentage=None, is_data_in_the_path=False):
         """
         :param image_path: (str) path to an image (without the 'data/' prefix)
         :param multi_view: (bool)
         :param use_triplets: (bool)
+        :param is_data_in_the_path: (bool) # deal with the problem where 'data/' is the first word in the image path
         :return: (th.Tensor)
         """
         # Remove trailing .jpg if present
-        image_path = 'data/' + image_path.split('.jpg')[0]
+        if is_data_in_the_path:
+            image_path = image_path.split('.jpg')[0]
+        else:
+            # default choice
+            image_path = 'data/' + image_path.split('.jpg')[0]
 
         if multi_view:
             images = []
@@ -309,6 +320,9 @@ class SupervisedDataLoader(DataLoader):
 
     def _run(self):
         start = True
+        is_data_in_the_path = False
+        if image_path[0][:5] == 'data/':
+            is_data_in_the_path = True
         with Parallel(n_jobs=self.n_workers, batch_size="auto", backend="threading") as parallel:
             while start or self.infinite_loop:
                 start = False
@@ -321,9 +335,9 @@ class SupervisedDataLoader(DataLoader):
                     images = self.images_path[self.minibatchlist[minibatch_idx]]
 
                     if self.n_workers <= 1:
-                        batch = [self._makeBatchElement(image_path) for image_path in images]
+                        batch = [self._makeBatchElement(image_path, is_data_in_the_path=is_data_in_the_path) for image_path in images]
                     else:
-                        batch = parallel(delayed(self._makeBatchElement)(image_path) for image_path in images)
+                        batch = parallel(delayed(self._makeBatchElement)(image_path, is_data_in_the_path=is_data_in_the_path) for image_path in images)
 
                     batch = th.cat(batch, dim=0)
 
@@ -344,7 +358,7 @@ class SupervisedDataLoader(DataLoader):
         Create list of minibatches (contains the observations indices)
         along with the corresponding list of targets
         Warning: this may create minibatches of different lengths
-        
+
         :param x_indices: (np.array)
         :param y_values: (np.array)
         :param batch_size: (int)
