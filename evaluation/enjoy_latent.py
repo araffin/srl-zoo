@@ -90,7 +90,7 @@ def main():
     X = np.array(list(data.values())).astype(float)
     y = list(data.keys())
 
-    bound_max, bound_min, fig_names = {}, {}, {}
+    bound_max, bound_min, fig_names,srl_model_knn = {}, {}, {}, {}
     start_indices, end_indices = {}, {}
     start_idx = 0
 
@@ -102,10 +102,10 @@ def main():
         if loss_name in AUTOENCODERS:
             fig_name = "Decoder for {}".format(loss_name)
         else:
-            srl_model_knn = KNeighborsClassifier()
+            srl_model_knn[loss_name] = KNeighborsClassifier()
             # Find bounds and train KNN model
-            srl_model_knn.fit(X[:, start_indices[loss_name]:end_indices[loss_name]], np.arange(X.shape[0]))
-            fig_name = "KNN on " + ", ".join([item + " " for item in losses])[:-1]
+            srl_model_knn[loss_name].fit(X[:, start_indices[loss_name]:end_indices[loss_name]], np.arange(X.shape[0]))
+            fig_name = "KNN on " + str(loss_name)
 
         bound_min[loss_name] = np.min(X[:, start_indices[loss_name]:end_indices[loss_name]], axis=0)
         bound_max[loss_name] = np.max(X[:, start_indices[loss_name]:end_indices[loss_name]], axis=0)
@@ -135,7 +135,7 @@ def main():
             if loss_name in AUTOENCODERS:
                 img = getImage(srl_model.model, full_state, device)
             else:
-                img_path = y[srl_model_knn.predict([state])[0]]
+                img_path = y[srl_model_knn[loss_name].predict([state])[0]]
                 # Remove trailing .jpg if present
                 img_path = img_path.split('.jpg')[0]
                 img = cv2.imread("data/" + img_path + ".jpg")
