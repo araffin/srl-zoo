@@ -123,10 +123,9 @@ def inverseModelLoss(actions_pred, actions_st, weight, loss_manager, continuous_
     :param loss_manager: loss criterion needed to log the loss value (LossManager)
     :return:
     """
-    # TODO: check why there a cast to Float is needed
     if continuous_action:
         loss_fn = nn.MSELoss()
-        inverse_loss = loss_fn(actions_pred, actions_st.type(th.FloatTensor))
+        inverse_loss = loss_fn(actions_pred, actions_st)
     else:
         loss_fn = nn.CrossEntropyLoss()
         inverse_loss = loss_fn(actions_pred, actions_st.squeeze(1))
