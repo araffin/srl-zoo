@@ -68,7 +68,7 @@ def preprocessImage(image, convert_to_rgb=True, apply_occlusion=False, occlusion
 class DataLoader(object):
     def __init__(self, minibatchlist, images_path, n_workers=1, multi_view=False, use_triplets=False,
                  infinite_loop=True, max_queue_len=4, is_training=False, apply_occlusion=False,
-                 occlusion_percentage=0.5):
+                 occlusion_percentage=0.5, absolute_path=False):
         """
         A Custom dataloader to work with our datasets, and to prepare data for the different models
         (inverse, priors, autoencoder, ...)
@@ -101,6 +101,7 @@ class DataLoader(object):
         # apply occlusion for training a DAE
         self.apply_occlusion = apply_occlusion
         self.occlusion_percentage = occlusion_percentage
+        self.absolute_path = absolute_path
         self.startProcess()
 
     @staticmethod
@@ -147,23 +148,27 @@ class DataLoader(object):
                         images = self.images_path[self.minibatchlist[minibatch_idx]]
 
                     if self.n_workers <= 1:
-                        batch = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets)
+                        batch = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets,
+                                                                  absolute_path=self.absolute_path)
                                  for image_path in images]
                         if self.apply_occlusion:
                             batch_noisy = [self._makeBatchElement(image_path, self.multi_view, self.use_triplets,
                                                                   apply_occlusion=self.apply_occlusion,
-                                                                  occlusion_percentage=self.occlusion_percentage)
+                                                                  occlusion_percentage=self.occlusion_percentage,
+                                                                  absolute_path=self.absolute_path)
                                            for image_path in images]
 
                     else:
                         batch = parallel(
-                            delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets)
+                            delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets,
+                                                                  absolute_path=self.absolute_path)
                             for image_path in images)
                         if self.apply_occlusion:
                             batch_noisy = parallel(
                                 delayed(self._makeBatchElement)(image_path, self.multi_view, self.use_triplets,
                                                                 apply_occlusion=self.apply_occlusion,
-                                                                occlusion_percentage=self.occlusion_percentage)
+                                                                occlusion_percentage=self.occlusion_percentage,
+                                                                absolute_path=self.absolute_path)
                                 for image_path in images)
 
                     batch = th.cat(batch, dim=0)
@@ -194,7 +199,7 @@ class DataLoader(object):
 
     @classmethod
     def _makeBatchElement(cls, image_path, multi_view=False, use_triplets=False, apply_occlusion=False,
-                          occlusion_percentage=None):
+                          occlusion_percentage=None, absolute_path=False):
         """
         :param image_path: (str) path to an image (without the 'data/' prefix)
         :param multi_view: (bool)
@@ -202,7 +207,8 @@ class DataLoader(object):
         :return: (th.Tensor)
         """
         # Remove trailing .jpg if present
-        image_path = 'data/' + image_path.split('.jpg')[0]
+        prepath = '' if absolute_path else 'data/'
+        image_path = prepath + image_path.split('.jpg')[0]
 
         if multi_view:
             images = []
@@ -295,7 +301,7 @@ class SupervisedDataLoader(DataLoader):
     """
 
     def __init__(self, x_indices, y_values, images_path, batch_size, n_workers=1, no_targets=False,
-                 shuffle=False, infinite_loop=True, max_queue_len=4):
+                 shuffle=False, infinite_loop=True, max_queue_len=4, absolute_path=False):
         # Create minibatch list
         minibatchlist, targets = self.createMinibatchList(x_indices, y_values, batch_size)
 
@@ -304,8 +310,10 @@ class SupervisedDataLoader(DataLoader):
         self.no_targets = no_targets
         self.targets = np.array(targets)
         self.shuffle = shuffle
+        self.absolute_path = absolute_path
         super(SupervisedDataLoader, self).__init__(minibatchlist, images_path, n_workers=n_workers,
-                                                   infinite_loop=infinite_loop, max_queue_len=max_queue_len)
+                                                   infinite_loop=infinite_loop, max_queue_len=max_queue_len,
+                                                                  absolute_path=self.absolute_path)
 
     def _run(self):
         start = True
@@ -321,7 +329,8 @@ class SupervisedDataLoader(DataLoader):
                     images = self.images_path[self.minibatchlist[minibatch_idx]]
 
                     if self.n_workers <= 1:
-                        batch = [self._makeBatchElement(image_path) for image_path in images]
+                        batch = [self._makeBatchElement(image_path,
+                                                        absolute_path=self.absolute_path) for image_path in images]
                     else:
                         batch = parallel(delayed(self._makeBatchElement)(image_path) for image_path in images)
 

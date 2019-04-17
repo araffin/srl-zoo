@@ -92,22 +92,25 @@ def buildConfig(args):
     return exp_config
 
 
-def loadData(data_folder):
+def loadData(data_folder, absolute_path=False):
     """
     :param data_folder: (str) path to the data_folder to be loaded
+    :param data_folder: (bool) True if the given datafolder path is complete, otherwise use relative path (data/...)
     :return: (Numpy dictionary-like objects and np.ndarrays)
     """
-    training_data = np.load('data/{}/preprocessed_data.npz'.format(data_folder))
+    prepath = 'data' if not absolute_path else ''
+
+    training_data = np.load(prepath + '{}/preprocessed_data.npz'.format(data_folder))
     episode_starts = training_data['episode_starts']
 
-    ground_truth = np.load('data/{}/ground_truth.npz'.format(data_folder))
+    ground_truth = np.load(prepath +'{}/ground_truth.npz'.format(data_folder))
 
     # Backward compatibility with previous names
     true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
     target_positions = \
         ground_truth['target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
 
-    with open('data/{}/dataset_config.json'.format(data_folder), 'r') as f:
+    with open(prepath + '{}/dataset_config.json'.format(data_folder), 'r') as f:
         relative_pos = json.load(f).get('relative_pos', False)
 
     target_pos_ = []
