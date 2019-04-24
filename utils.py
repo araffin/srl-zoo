@@ -98,7 +98,7 @@ def loadData(data_folder, absolute_path=False):
     :param data_folder: (bool) True if the given datafolder path is complete, otherwise use relative path (data/...)
     :return: (Numpy dictionary-like objects and np.ndarrays)
     """
-    prepath = 'data' if not absolute_path else ''
+    prepath = 'data/' if not absolute_path else ''
 
     training_data = np.load(prepath + '{}/preprocessed_data.npz'.format(data_folder))
     episode_starts = training_data['episode_starts']
@@ -119,7 +119,7 @@ def loadData(data_folder, absolute_path=False):
     for i in range(len(episode_starts)):
         if episode_starts[i] == 1:
             target_idx += 1
-        if relative_pos:
+        if False: #relative_pos:
             true_states[i] -= target_positions[target_idx]
         target_pos_.append(target_positions[target_idx])
     target_pos_ = np.array(target_pos_)
