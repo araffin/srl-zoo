@@ -228,5 +228,5 @@ if __name__ == '__main__':
     correlationCall(exp_config, plot=not args.no_display_plots)
 
     # Do not close plot at the end of training
-    if learner.DISPLAY_PLOTS:
-        getInputBuiltin()('\nPress any key to exit.')
+    # if learner.DISPLAY_PLOTS:
+    #     getInputBuiltin()('\nPress any key to exit.')
