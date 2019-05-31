@@ -214,6 +214,59 @@ class CustomCNN(BaseModelSRL):
         return x
 
 
+class CustomCNNExtraDim(BaseModelSRL):
+    """
+    Convolutional Neural Network
+    input shape : 3-channel RGB images of shape (3 x H x W), where H and W are expected to be at least 224
+    :param state_dim: (int)
+    """
+
+    def __init__(self, state_dim=2):
+        super(CustomCNNExtraDim, self).__init__()
+        # Inspired by ResNet:
+        # conv3x3 followed by BatchNorm2d
+        self.conv_layers = nn.Sequential(
+            # 224x224x3 -> 112x112x64
+            nn.Conv2d(getNChannels(), 64, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),  # 56x56x64
+
+            conv3x3(in_planes=64, out_planes=64, stride=1),  # 56x56x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),  # 27x27x64
+
+            conv3x3(in_planes=64, out_planes=64, stride=2),  # 14x14x64
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
+        )
+
+        '''self.fc = nn.Linear(6 * 6 * 64, 100)
+        self.fc_labels_1 = nn.Linear(1, 100)
+        self.fc_labels_2 = nn.Linear(100, 100)
+        self.fc_final_1 = nn.Linear(200, 100)
+        self.fc_final_2 = nn.Linear(100, state_dim)'''
+
+        self.fc = nn.Linear(6 * 6 * 64 + 1, state_dim)
+
+    def forward(self, x, extra_dim):
+        x = self.conv_layers(x)
+        x = x.view(x.size(0), -1)
+        '''
+        x = F.relu(self.fc(x))
+        h = F.relu(self.fc_labels_1(extra_dim))
+        h = F.relu(self.fc_labels_2(h))
+        z = th.stack([x,h], dim=1).reshape(-1,200)
+        z = F.relu(self.fc_final_1(z))
+        z = self.fc_final_2(z)'''
+
+        z = self.fc(th.cat((x, extra_dim), dim=1))
+
+        return z
+
+
 def conv3x3(in_planes, out_planes, stride=1):
     """"
     From PyTorch Resnet implementation
