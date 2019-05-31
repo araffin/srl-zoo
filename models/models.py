@@ -243,28 +243,14 @@ class CustomCNNExtraDim(BaseModelSRL):
             nn.MaxPool2d(kernel_size=3, stride=2)  # 6x6x64
         )
 
-        '''self.fc = nn.Linear(6 * 6 * 64, 100)
-        self.fc_labels_1 = nn.Linear(1, 100)
-        self.fc_labels_2 = nn.Linear(100, 100)
-        self.fc_final_1 = nn.Linear(200, 100)
-        self.fc_final_2 = nn.Linear(100, state_dim)'''
 
-        self.fc = nn.Linear(6 * 6 * 64 + 1, state_dim)
+        self.fc = nn.Linear(6 * 6 * 64, state_dim + 1)
 
-    def forward(self, x, extra_dim):
+    def forward(self, x):
         x = self.conv_layers(x)
         x = x.view(x.size(0), -1)
-        '''
-        x = F.relu(self.fc(x))
-        h = F.relu(self.fc_labels_1(extra_dim))
-        h = F.relu(self.fc_labels_2(h))
-        z = th.stack([x,h], dim=1).reshape(-1,200)
-        z = F.relu(self.fc_final_1(z))
-        z = self.fc_final_2(z)'''
-
-        z = self.fc(th.cat((x, extra_dim), dim=1))
-
-        return z
+        x = self.fc(x)
+        return x[:, :-1], x[:, -1]
 
 
 def conv3x3(in_planes, out_planes, stride=1):
