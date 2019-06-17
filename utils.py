@@ -109,19 +109,24 @@ def loadData(data_folder, absolute_path=False):
     true_states = ground_truth['ground_truth_states' if 'ground_truth_states' in ground_truth.keys() else 'arm_states']
     target_positions = \
         ground_truth['target_positions' if 'target_positions' in ground_truth.keys() else 'button_positions']
-
+    print('Target pos len:', target_positions.shape)
+    #import pdb
+    #pdb.set_trace()
     with open(prepath + '{}/dataset_config.json'.format(data_folder), 'r') as f:
         relative_pos = json.load(f).get('relative_pos', False)
 
     target_pos_ = []
+    # If not loading distillation dataset
+    if absolute_path is False:
+
     # True state is the relative position to the target
-    target_idx = -1
-    for i in range(len(episode_starts)):
-        if episode_starts[i] == 1:
-            target_idx += 1
-        if False: #relative_pos:
-            true_states[i] -= target_positions[target_idx]
-        target_pos_.append(target_positions[target_idx])
+        target_idx = -1
+        for i in range(len(episode_starts)):
+            if episode_starts[i] == 1:
+                target_idx += 1
+            if False: #relative_pos:
+                true_states[i] -= target_positions[target_idx]
+            target_pos_.append(target_positions[target_idx])
     target_pos_ = np.array(target_pos_)
 
     return training_data, ground_truth, true_states, target_pos_
