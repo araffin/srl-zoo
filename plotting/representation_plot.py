@@ -380,8 +380,8 @@ if __name__ == '__main__':
                 json.dump(result_dict, f)
         else:
             plotRepresentation(states_rewards['states'], rewards, cmap=cmap)
-        if not args.print_corr:
-            getInputBuiltin()('\nPress any key to exit.')
+        # if not args.print_corr:
+        #     getInputBuiltin()('\nPress any key to exit.')
 
     elif args.data_folder != "":
 
@@ -400,7 +400,7 @@ if __name__ == '__main__':
             prettyPlotAgainst(true_states, rewards, cmap=cmap)
         else:
             plotRepresentation(true_states, rewards, name, fit_pca=False, cmap=cmap)
-        getInputBuiltin()('\nPress any key to exit.')
+        # getInputBuiltin()('\nPress any key to exit.')
 
     else:
         print("You must specify one of --input-file or --data-folder")
